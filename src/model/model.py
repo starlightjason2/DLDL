@@ -1,11 +1,11 @@
 """Neural network models and loss functions for disruption prediction."""
 
-import logging
 import os
 from collections.abc import Sized
-from typing import TYPE_CHECKING, Tuple, cast
+from typing import Tuple, cast
 
-import numpy as np
+from loguru import logger
+
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -22,12 +22,12 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, Dataset, DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from constants import CLASSIFICATION_LOSS, TIME_PREDICTION_LOSS
+from constants import (
+    CLASSIFICATION_LOSS,
+    TIME_PREDICTION_LOSS,
+)
 from util.distributed import cleanup, setup
 from util.processing import split
-
-if TYPE_CHECKING:
-    pass
 
 
 def loss(outputs: Tensor, labels: Tensor) -> Tensor:
@@ -127,6 +127,7 @@ class IpCNN(nn.Module):
         self.fc2: nn.Linear = nn.Linear(120, 60)
         self.fc3: nn.Linear = nn.Linear(60, 1 if classification else 2)
         self.classification: bool = classification
+        self.logger = logger.bind(name=__name__)
 
     def forward_conv(self, x: Tensor) -> Tensor:
         """Forward through conv+pool layers. Returns flattened features."""
@@ -145,23 +146,19 @@ class IpCNN(nn.Module):
         x = self.fc3(x)
         return x
 
-    @staticmethod
     def validate_preprocessed_files(
-        data_path: str, labels_path: str, dataset_id: str
+        self, data_path: str, labels_path: str, dataset_id: str
     ) -> None:
-        """
-        Validate that preprocessed files exist before training.
+        """Validate that preprocessed files exist before training.
 
         Args:
             data_path: Path to preprocessed dataset file.
             labels_path: Path to preprocessed labels file.
-            dataset_id: Dataset ID used to construct paths.
+            dataset_id: Dataset ID used for error messages.
 
         Raises:
             FileNotFoundError: If required files are missing.
         """
-        logger = logging.getLogger(__name__)
-
         if not os.path.exists(data_path) or not os.path.exists(labels_path):
             missing_files = []
             if not os.path.exists(data_path):
@@ -169,7 +166,7 @@ class IpCNN(nn.Module):
             if not os.path.exists(labels_path):
                 missing_files.append(f"Labels: {labels_path}")
 
-            logger.error(
+            self.logger.error(
                 f"Preprocessed files not found for DATASET_ID='{dataset_id}'. "
                 f"Please run preprocess_data.py first with the same DATASET_ID.\n"
                 f"Missing files:\n"
@@ -212,24 +209,23 @@ class IpCNN(nn.Module):
 
         Note: Only rank 0 performs validation, logging, and checkpointing.
         """
-        logger = logging.getLogger(__name__)
-
-        # Validate preprocessed files exist before training
         self.validate_preprocessed_files(data_path, labels_path, dataset_id)
 
-        logger.info(f"Loading preprocessed dataset from {data_path}")
-        logger.info(f"Using labels from {labels_path}")
+        self.logger.info(f"Loading preprocessed dataset from {data_path}")
+        self.logger.info(f"Using labels from {labels_path}")
         if dataset_id:
-            logger.info(f"Dataset ID: {dataset_id}")
+            self.logger.info(f"Dataset ID: {dataset_id}")
 
-        logger.info(f"GPUs Available: {torch.cuda.device_count()}")
-        logger.info(f"Distributed training - Rank: {rank}, World Size: {world_size}")
+        self.logger.info(f"GPUs Available: {torch.cuda.device_count()}")
+        self.logger.info(
+            f"Distributed training - Rank: {rank}, World Size: {world_size}"
+        )
 
         setup(rank, world_size)
         torch.manual_seed(42 + rank)
 
         dataset_obj = IpDataset(data_path, labels_path, self.classification)
-        logger.info(
+        self.logger.info(
             f"Dataset loaded: {len(dataset_obj)} examples, max_length={self.max_length}"
         )
         train, dev, _ = split(dataset_obj)
@@ -253,7 +249,7 @@ class IpCNN(nn.Module):
 
         logs = []
         if rank == 0:
-            writer = SummaryWriter(prog_dir + job_id)
+            writer = SummaryWriter(os.path.join(prog_dir, job_id))
 
         for epoch in range(num_epochs):
             model.train()
@@ -284,11 +280,12 @@ class IpCNN(nn.Module):
 
                 if batch_idx % log_interval == 0:
                     dataset_size = len(cast(Sized, train_loader.dataset))
-                    print(
-                        f"Rank {rank}, Epoch {epoch}, Batch {batch_idx}, "
-                        + f"[{batch_idx * len(data)}/{dataset_size}] "
-                        + f"Loss {loss_value.item()}"
-                    )
+                    if rank == 0:
+                        self.logger.info(
+                            f"Epoch {epoch}, Batch {batch_idx}, "
+                            f"[{batch_idx * len(data)}/{dataset_size}] "
+                            f"Loss {loss_value.item():.6f}"
+                        )
                     if rank == 0:
                         writer.add_scalar(
                             "Training Loss",
@@ -414,12 +411,15 @@ class IpCNN(nn.Module):
 
             if epoch % 5 == 0 and rank == 0:
                 torch.save(
-                    model.state_dict(), f"{prog_dir}{job_id}_params_epoch{epoch}.pt"
+                    model.state_dict(),
+                    os.path.join(prog_dir, f"{job_id}_params_epoch{epoch}.pt"),
                 )
 
         if rank == 0:
             writer.close()
             df_logs = pd.DataFrame(logs)
-            df_logs.to_csv(prog_dir + job_id + "_training_log.csv", index=False)
+            df_logs.to_csv(
+                os.path.join(prog_dir, f"{job_id}_training_log.csv"), index=False
+            )
 
         cleanup()

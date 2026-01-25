@@ -1,7 +1,7 @@
-"""Utility module: file I/O, data loading, preprocessing, and distributed training utilities."""
+"""Utility module: data loading, preprocessing, and distributed training utilities."""
 
-from .file_io import check_file
 from .data_loading import (
+    check_file,
     get_length,
     get_scaled_t_disrupt,
     get_means,

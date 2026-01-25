@@ -1,134 +1,83 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-### DLDL: Disruption Labeling with Deep Learning
+# DLDL: Disruption Labeling with Deep Learning
 
-A 1D convolutional neural network that uses the plasma current to produce a time of disruption if a disruption occurs. To be used for labeling D-IIID shots using the 'ipspr15V' plasma current PTDATA signal.
+A 1D CNN that uses plasma current to predict disruption time. For labeling D-IIID shots with the 'ipspr15V' plasma current PTDATA signal.
 
 ## Environment Setup
 
-This project uses environment variables for configuration to easily switch between different environments (local development, Polaris HPC, etc.).
-
-### Quick Start
-
-1. **For local development:**
-Copy the example file into `.env.local` with your local paths.
+1. **Create `.env`** from a template:
    ```bash
-   cp .env.local.example .env.local && ln -s .env.local .env
+   cp .env.local.example .env.local && ln -s .env.local .env   # local
+   # or
+   cp .env.polaris.example .env.polaris && ln -s .env.polaris .env   # Polaris
    ```
 
-2. **For Polaris HPC:**
-Copy the example file into `.env.polaris` with your Polaris paths.
-   ```bash
-   cp .env.polaris.example .env.polaris && ln -s .env.polaris .env
-   ```
-
-3. **Install dependencies:**
+2. **Install:**
    ```bash
    pip install -e .
    ```
 
-The `.env` file will be automatically loaded when the `constants` module is imported.
+`.env` is loaded when `constants` is imported.
 
 ### Environment Variables
 
-**Required Variables:**
-- `DATA_DIR`: Raw signal data directory containing .txt files
-- `DATASET_DIR`: Directory for preprocessed datasets and labels
-- `LABELS_PATH`: Path to labels file (shot list with disruption times)
-- `PROG_DIR`: Training progress/output directory for logs and checkpoints
-- `JOB_ID`: Training run identifier (used for naming logs and checkpoints)
-
-**Optional Variables (for distributed training):**
-- `PMI_LOCAL_RANK`: Local rank for distributed training (set by scheduler)
-- `PMI_RANK`: Process rank (defaults to 0 if not set)
-- `PMI_SIZE`: Total number of processes (defaults to 1 if not set)
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATA_DIR` | ✓ | Raw signal .txt files |
+| `DATASET_DIR` | ✓ | Preprocessed datasets and labels |
+| `LABELS_PATH` | ✓ | Shot list with disruption times |
+| `PROG_DIR` | ✓ | Logs and checkpoints |
+| `JOB_ID` | ✓ | Run identifier |
+| `NORMALIZATION_TYPE` | | `scale`, `meanvar-whole`, or `meanvar-single` (default `meanvar-whole`). |
+| `CPU_USE` | | Fraction of CPU cores for preprocessing, 0-1 (default `0.2`; use `0.2-0.3` for ~32GB RAM) |
+| `PMI_LOCAL_RANK` | | Distributed training (scheduler) |
+| `PMI_RANK` | | Process rank (default 0) |
+| `PMI_SIZE` | | World size (default 1) |
 
 ## Workflow
 
-### 1. Preprocessing (`preprocess_data.py`)
+```
+Raw .txt → preprocess_data.py → .pt files → main.py → Model + logs
+```
 
-Preprocesses raw plasma current signals into PyTorch-ready datasets.
+**Config:** Set `NORMALIZATION_TYPE` and `CPU_USE` in `.env` (or env). `NORMALIZATION_TYPE` is the normalization method and `dataset_id` suffix. Both scripts use `constants`.
 
-**Steps:**
-1. Deletes existing cached files for the specified `dataset_id`
-2. Loads raw signal files from `DATA_DIR`
-3. Computes dataset statistics (max length, mean, std)
-4. Applies normalization (if specified)
-5. Pads sequences to uniform length
-6. Creates binary classification labels + scaled disruption times
-7. Saves processed dataset and labels to `DATASET_DIR`
+### 1. Preprocessing
 
-**Configuration:**
-- Set `DATASET_ID` and `NORMALIZATION` in `preprocess_data.py`
-- Normalization options: `None`, `"scale"`, `"meanvar-whole"`, `"meanvar-single"`
-
-**Normalization Methods:**
-- `None`: No normalization (raw values, zero-padded)
-- `"scale"`: Min-max scaling per shot to [0, 1] range: `(x - min(x)) / (max(x) - min(x))`
-  - Each shot normalized independently using its own min/max
-  - Preserves relative patterns within each shot
-- `"meanvar-whole"`: Z-score normalization using dataset-wide statistics: `(x - μ_dataset) / σ_dataset`
-  - All shots normalized using the same mean and standard deviation computed across entire dataset
-  - Makes all shots directly comparable on the same scale
-- `"meanvar-single"`: Z-score normalization per shot: `(x - μ_shot) / σ_shot`
-  - Each shot normalized independently to have mean=0 and std=1
-  - Removes magnitude differences between shots while preserving relative patterns
-
-**Usage:**
 ```bash
 python src/preprocess_data.py
 ```
 
-### 2. Training (`main.py`)
+* Deletes cached processed files for the current `NORMALIZATION_TYPE`
+* Loads raw files from `DATA_DIR`, computes stats (max length, mean, std)
+* Applies normalization, pads to uniform length, builds labels
+* Writes `processed_dataset_{NORMALIZATION_TYPE}.pt` and `processed_labels_{NORMALIZATION_TYPE}.pt` to `DATASET_DIR`
+* Runs integrity check
 
-Trains the IpCNN model using preprocessed data.
+**Normalization** (env `NORMALIZATION_TYPE`; default `meanvar-whole`):
 
-**Steps:**
-1. Loads preprocessed dataset and labels (using same `DATASET_ID` as preprocessing)
-2. Validates files exist before training
-3. Splits data into train/dev/test sets (80/10/10)
-4. Initializes distributed training (if `PMI_RANK`/`PMI_SIZE` set)
-5. Trains model with validation and checkpointing
-6. Saves logs and model checkpoints to `PROG_DIR`
+| Value | Formula | Use case |
+|-------|---------|----------|
+| `scale` | `(x - min) / (max - min)` per shot | Relative patterns matter, magnitudes vary |
+| `meanvar-whole` | `(x - μ) / σ` dataset-wide | Same scale across all shots |
+| `meanvar-single` | `(x - μ) / σ` per shot | Per-shot standardization |
 
-**Configuration:**
-- Set `DATASET_ID` to match preprocessing (must be identical)
-- Training hyperparameters (lr, epochs, etc.) in `main.py`
+### 2. Training
 
-**Usage:**
 ```bash
 python src/main.py
 ```
 
-### Workflow Summary
+* Loads preprocessed dataset/labels (same `NORMALIZATION_TYPE` as preprocessing)
+* Validates files exist, splits 80/10/10 train/dev/test
+* Uses distributed training if `PMI_*` are set
+* Saves checkpoints and logs to `PROG_DIR`
 
-```
-Raw Data (.txt files)
-    ↓
-[preprocess_data.py]
-    ↓
-Preprocessed Dataset (.pt files)
-    ↓
-[main.py]
-    ↓
-Trained Model + Logs
-```
+Hyperparameters (lr, epochs, etc.) are in `main.py`.
 
-**Important:** The `DATASET_ID` in both scripts must match to ensure preprocessing and training use the same files.
+## Quick Reference
 
-### Dataset ID Approach
-
-The project uses a `dataset_id` suffix system to manage multiple preprocessed dataset configurations. This allows different preprocessing methods (normalization strategies) to coexist without overwriting each other.
-
-**How it works:**
-- The `dataset_id` is a string suffix appended to processed filenames
-- Example: `dataset_id="meanvar-whole"` creates:
-  - `processed_dataset_meanvar-whole.pt`
-  - `processed_labels_meanvar-whole.pt`
-- Both `preprocess_data.py` and `main.py` use the same `DATASET_ID` constant to ensure consistency
-- This enables easy experimentation with different preprocessing configurations (e.g., `"scale"`, `"meanvar-single"`, `""` for no normalization)
-
-**Benefits:**
-- Multiple preprocessed datasets can coexist in the same directory
-- Automatic alignment between preprocessing and training workflows
-- Easy switching between configurations by changing one constant
+* **Config:** `NORMALIZATION_TYPE` and `CPU_USE` in env (or `.env`) drive preprocessing and training.
+* **Output files:** `processed_dataset_{NORMALIZATION_TYPE}.pt`, `processed_labels_{NORMALIZATION_TYPE}.pt` in `DATASET_DIR`.
+* **Multiple configs:** Change `NORMALIZATION_TYPE` in env to switch; each value uses its own .pt files.

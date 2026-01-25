@@ -1,48 +1,31 @@
-"""
-Data preprocessing script for DLDL project.
-
-WARNING: Memory-intensive. For large datasets, use cpu_use=0.2-0.3 and run
-operations one at a time.
-"""
+"""Data preprocessing script for DLDL. Set CPU_USE=0.2-0.3 for ~32GB RAM."""
 
 import os
-import logging
-from constants import NORMALIZATION
+import sys
+
+from loguru import logger
+
+logger.remove()
+logger.add(
+    sys.stderr,
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+    colorize=True,
+    level="INFO",
+)
+
+from constants import NORMALIZATION_TYPE
 from model.preprocessor import Preprocessor
-from util.processing import (
-    get_processed_dataset_path,
-    get_processed_labels_path,
-)
+from util.processing import get_processed_dataset_path, get_processed_labels_path
 
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+if __name__ == "__main__":
+    logger.info("Cleaning up cached preprocessed files...")
+    for path in (
+        get_processed_dataset_path(NORMALIZATION_TYPE),
+        get_processed_labels_path(NORMALIZATION_TYPE),
+    ):
+        if os.path.exists(path):
+            os.remove(path)
+            logger.info(f"Deleted cached file: {path}")
 
-# Configuration - shared with training workflow via constants.NORMALIZATION
-DATASET_ID = NORMALIZATION
-
-# Delete cached/processed files before preprocessing
-logger.info("Cleaning up cached preprocessed files...")
-dataset_path = get_processed_dataset_path(DATASET_ID)
-labels_path = get_processed_labels_path(DATASET_ID)
-
-
-if os.path.exists(dataset_path):
-    os.remove(dataset_path)
-    logger.info(f"Deleted cached dataset: {dataset_path}")
-if os.path.exists(labels_path):
-    os.remove(labels_path)
-    logger.info(f"Deleted cached labels: {labels_path}")
-
-# Create preprocessor (will automatically create dataset since files were deleted)
-preprocessor = Preprocessor(
-    dataset_id=DATASET_ID,
-    cpu_use=0.2,
-    normalization=NORMALIZATION,
-)
-
-# Verify dataset integrity and convert to float32
-preprocessor.check_dataset(scale_labels=True)
-preprocessor.convert_to_float()
+    preprocessor = Preprocessor()
+    preprocessor.check_dataset(scale_labels=True)

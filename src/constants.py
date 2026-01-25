@@ -6,7 +6,6 @@ See .env.local.example or .env.polaris.example for templates.
 """
 
 import os
-from typing import Any
 
 # Get project root directory (one level up from src/)
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -74,9 +73,22 @@ PMI_SIZE = os.environ.get("PMI_SIZE")
 
 
 ################################################################################
-## Dataset Configuration
+## Dataset Configuration (optional env; defaults below)
 ################################################################################
-# Shared normalization configuration for preprocessing and training workflows
-# This value is used as both the normalization method and dataset_id suffix
-# Change this to switch between different preprocessing configs
-NORMALIZATION = "meanvar-whole"
+# NORMALIZATION_TYPE: method + dataset_id suffix. Options: scale, meanvar-whole, meanvar-single.
+# CPU_USE: fraction of CPU cores for preprocessing (0-1). Use 0.2-0.3 for ~32GB RAM.
+_NORMALIZATION_TYPE_RAW = os.environ.get("NORMALIZATION_TYPE", "meanvar-whole")
+_CPU_USE_RAW = os.environ.get("CPU_USE", "0.2")
+
+NORMALIZATION_TYPE: str = _NORMALIZATION_TYPE_RAW
+try:
+    CPU_USE: float = float(_CPU_USE_RAW)
+except (TypeError, ValueError) as e:
+    raise ValueError(f"CPU_USE must be a number, got {_CPU_USE_RAW!r}") from e
+
+if not (0 < CPU_USE <= 1):
+    raise ValueError(f"CPU_USE must be in (0, 1], got {CPU_USE}")
+if NORMALIZATION_TYPE not in ("scale", "meanvar-whole", "meanvar-single"):
+    raise ValueError(
+        f"NORMALIZATION_TYPE must be 'scale', 'meanvar-whole', or 'meanvar-single'; got {NORMALIZATION_TYPE!r}"
+    )
