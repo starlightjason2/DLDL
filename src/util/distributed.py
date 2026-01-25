@@ -1,12 +1,8 @@
 """Distributed training utilities for DLDL project."""
 
 from datetime import timedelta
-
-try:
-    import torch
-    import torch.distributed as dist
-except ImportError:
-    pass
+import torch
+import torch.distributed as dist
 
 
 def setup(rank: int, world_size: int) -> None:

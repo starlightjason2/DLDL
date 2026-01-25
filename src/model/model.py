@@ -1,24 +1,33 @@
 """Neural network models and loss functions for disruption prediction."""
 
+import logging
+import os
+from collections.abc import Sized
+from typing import TYPE_CHECKING, Tuple, cast
+
 import numpy as np
-from typing import Tuple, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from torch import Tensor
-    from torch.utils.data import Dataset
-    import torch.nn as nn
-
-try:
-    import torch
-    from torch import Tensor
-    from torch.utils.data import Dataset
-    import torch.nn as nn
-    import torch.nn.functional as F
-except ImportError:
-    print("WARNING: pytorch not installed!")
-    pass
+import pandas as pd
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+)
+from torch import Tensor
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import DataLoader, Dataset, DistributedSampler
+from torch.utils.tensorboard import SummaryWriter
 
 from constants import CLASSIFICATION_LOSS, TIME_PREDICTION_LOSS
+from util.distributed import cleanup, setup
+from util.processing import split
+
+if TYPE_CHECKING:
+    pass
 
 
 def loss(outputs: Tensor, labels: Tensor) -> Tensor:
@@ -47,7 +56,6 @@ def loss(outputs: Tensor, labels: Tensor) -> Tensor:
 
 class IpDataset(Dataset):
     """PyTorch Dataset for plasma current time series data."""
-
 
     def __init__(
         self, data_file: str, labels_file: str, classification: bool = False
@@ -118,6 +126,7 @@ class IpCNN(nn.Module):
         self.fc1: nn.Linear = nn.Linear(num_features_before_fc, 120)
         self.fc2: nn.Linear = nn.Linear(120, 60)
         self.fc3: nn.Linear = nn.Linear(60, 1 if classification else 2)
+        self.classification: bool = classification
 
     def forward_conv(self, x: Tensor) -> Tensor:
         """Forward through conv+pool layers. Returns flattened features."""
@@ -135,3 +144,282 @@ class IpCNN(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+
+    @staticmethod
+    def validate_preprocessed_files(
+        data_path: str, labels_path: str, dataset_id: str
+    ) -> None:
+        """
+        Validate that preprocessed files exist before training.
+
+        Args:
+            data_path: Path to preprocessed dataset file.
+            labels_path: Path to preprocessed labels file.
+            dataset_id: Dataset ID used to construct paths.
+
+        Raises:
+            FileNotFoundError: If required files are missing.
+        """
+        logger = logging.getLogger(__name__)
+
+        if not os.path.exists(data_path) or not os.path.exists(labels_path):
+            missing_files = []
+            if not os.path.exists(data_path):
+                missing_files.append(f"Dataset: {data_path}")
+            if not os.path.exists(labels_path):
+                missing_files.append(f"Labels: {labels_path}")
+
+            logger.error(
+                f"Preprocessed files not found for DATASET_ID='{dataset_id}'. "
+                f"Please run preprocess_data.py first with the same DATASET_ID.\n"
+                f"Missing files:\n"
+                + "\n".join(f"  - {f}" for f in missing_files)
+                + "\n"
+                f"Note: The DATASET_ID in both preprocess_data.py and main.py must match."
+            )
+            raise FileNotFoundError(
+                f"Preprocessed files not found for DATASET_ID='{dataset_id}'. "
+                f"Run preprocess_data.py first with matching DATASET_ID."
+            )
+
+    def train_model(
+        self,
+        rank: int,
+        world_size: int,
+        data_path: str,
+        labels_path: str,
+        prog_dir: str,
+        job_id: str,
+        dataset_id: str = "",
+        lr: float = 0.01,
+        num_epochs: int = 100,
+        log_interval: int = 20,
+    ) -> None:
+        """
+        Train this model with distributed data parallel.
+
+        Args:
+            rank: Process rank (0 to world_size-1).
+            world_size: Total number of processes/GPUs.
+            data_path: Path to preprocessed dataset (.pt).
+            labels_path: Path to labels (.pt).
+            prog_dir: Directory for logs and checkpoints.
+            job_id: Training run identifier.
+            dataset_id: Dataset ID used for validation messages.
+            lr: Learning rate (default: 0.01).
+            num_epochs: Number of epochs (default: 100).
+            log_interval: Batches between logging (default: 20).
+
+        Note: Only rank 0 performs validation, logging, and checkpointing.
+        """
+        logger = logging.getLogger(__name__)
+
+        # Validate preprocessed files exist before training
+        self.validate_preprocessed_files(data_path, labels_path, dataset_id)
+
+        logger.info(f"Loading preprocessed dataset from {data_path}")
+        logger.info(f"Using labels from {labels_path}")
+        if dataset_id:
+            logger.info(f"Dataset ID: {dataset_id}")
+
+        logger.info(f"GPUs Available: {torch.cuda.device_count()}")
+        logger.info(f"Distributed training - Rank: {rank}, World Size: {world_size}")
+
+        setup(rank, world_size)
+        torch.manual_seed(42 + rank)
+
+        dataset_obj = IpDataset(data_path, labels_path, self.classification)
+        logger.info(
+            f"Dataset loaded: {len(dataset_obj)} examples, max_length={self.max_length}"
+        )
+        train, dev, _ = split(dataset_obj)
+
+        train_sampler = DistributedSampler(
+            train, num_replicas=world_size, rank=rank, shuffle=True
+        )
+        train_loader = DataLoader(
+            train, batch_size=128, sampler=train_sampler, pin_memory=True
+        )
+        dev_loader = DataLoader(dev, batch_size=128, shuffle=False, pin_memory=True)
+
+        model = self.cuda()
+        model = DDP(model, device_ids=[0])
+
+        optimizer = optim.Adam(model.parameters(), lr=lr)
+        bce_loss = torch.nn.BCEWithLogitsLoss()
+        classification = self.classification
+        if not classification:
+            mse_loss = torch.nn.MSELoss()
+
+        logs = []
+        if rank == 0:
+            writer = SummaryWriter(prog_dir + job_id)
+
+        for epoch in range(num_epochs):
+            model.train()
+            total_train_loss = 0.0
+
+            for batch_idx, (data, target) in enumerate(train_loader):
+                data, target = data.cuda(), target.cuda()
+
+                if not classification:
+                    classification_targets, time_targets = target[:, 0], target[:, 1]
+
+                optimizer.zero_grad()
+                output = model(data)
+
+                if not classification:
+                    classification_output, time_output = output[:, 0], output[:, 1]
+                    loss_classification = bce_loss(
+                        classification_output, classification_targets
+                    )
+                    loss_time = mse_loss(time_output, time_targets)
+                    loss_value = loss(output, target)
+                else:
+                    loss_value = bce_loss(output, target)
+
+                loss_value.backward()
+                optimizer.step()
+                total_train_loss += loss_value.item()
+
+                if batch_idx % log_interval == 0:
+                    dataset_size = len(cast(Sized, train_loader.dataset))
+                    print(
+                        f"Rank {rank}, Epoch {epoch}, Batch {batch_idx}, "
+                        + f"[{batch_idx * len(data)}/{dataset_size}] "
+                        + f"Loss {loss_value.item()}"
+                    )
+                    if rank == 0:
+                        writer.add_scalar(
+                            "Training Loss",
+                            loss_value.item(),
+                            epoch * dataset_size + batch_idx,
+                        )
+                        if not classification:
+                            writer.add_scalar(
+                                "Training Classification Loss",
+                                loss_classification.item(),
+                                epoch * dataset_size + batch_idx,
+                            )
+                            writer.add_scalar(
+                                "Training Time Loss",
+                                loss_time.item(),
+                                epoch * dataset_size + batch_idx,
+                            )
+
+            if rank == 0:
+                model.eval()
+                total_val_loss = 0.0
+                if not classification:
+                    all_classification_targets, all_classification_predictions = [], []
+                    all_time_targets, all_time_predictions = [], []
+
+                with torch.no_grad():
+                    for data, targets in dev_loader:
+                        data, targets = data.cuda(), targets.cuda()
+                        output = model(data)
+                        if not classification:
+                            classification_targets, time_targets = (
+                                targets[:, 0],
+                                targets[:, 1],
+                            )
+                            classification_output, time_output = (
+                                output[:, 0],
+                                output[:, 1],
+                            )
+                            val_loss_classification = bce_loss(
+                                classification_output, classification_targets
+                            )
+                            val_loss_time = mse_loss(time_output, time_targets)
+                            all_time_targets.extend(time_targets.cpu().numpy())
+                            all_time_predictions.extend(time_output.cpu().numpy())
+                        else:
+                            classification_output = output
+                            classification_targets = targets
+
+                        classification_predictions = (
+                            torch.sigmoid(classification_output) > 0.5
+                        )
+                        all_classification_targets.extend(
+                            classification_targets.cpu().numpy()
+                        )
+                        all_classification_predictions.extend(
+                            classification_predictions.cpu().numpy()
+                        )
+
+                        val_total_loss = loss(output, targets)
+                        total_val_loss += val_total_loss.item()
+
+                # Compute average losses
+                avg_train_loss = total_train_loss / len(train_loader)
+                avg_val_loss = total_val_loss / len(dev_loader)
+                logs.append(
+                    {
+                        "epoch": epoch,
+                        "training_loss": avg_train_loss,
+                        "validation_loss": avg_val_loss,
+                        "Validation Accuracy": accuracy_score(
+                            all_classification_targets, all_classification_predictions
+                        ),
+                        "Validation Precision": precision_score(
+                            all_classification_targets, all_classification_predictions
+                        ),
+                        "Validation Recall": recall_score(
+                            all_classification_targets, all_classification_predictions
+                        ),
+                        "Validation F1 Score": f1_score(
+                            all_classification_targets, all_classification_predictions
+                        ),
+                    }
+                )
+
+                writer.add_scalar("Validation Loss", avg_val_loss, epoch)
+                writer.add_scalar(
+                    "Validation Accuracy",
+                    accuracy_score(
+                        all_classification_targets, all_classification_predictions
+                    ),
+                    epoch,
+                )
+                writer.add_scalar(
+                    "Validation Precision",
+                    precision_score(
+                        all_classification_targets, all_classification_predictions
+                    ),
+                    epoch,
+                )
+                writer.add_scalar(
+                    "Validation Recall",
+                    recall_score(
+                        all_classification_targets, all_classification_predictions
+                    ),
+                    epoch,
+                )
+                writer.add_scalar(
+                    "Validation F1 Score",
+                    f1_score(
+                        all_classification_targets, all_classification_predictions
+                    ),
+                    epoch,
+                )
+                if not classification:
+                    writer.add_scalar(
+                        "Validation Time MSE",
+                        mse_loss(
+                            torch.tensor(all_time_predictions),
+                            torch.tensor(all_time_targets),
+                        ).item(),
+                        epoch,
+                    )
+
+            if epoch % 5 == 0 and rank == 0:
+                torch.save(
+                    model.state_dict(), f"{prog_dir}{job_id}_params_epoch{epoch}.pt"
+                )
+
+        if rank == 0:
+            writer.close()
+            df_logs = pd.DataFrame(logs)
+            df_logs.to_csv(prog_dir + job_id + "_training_log.csv", index=False)
+
+        cleanup()

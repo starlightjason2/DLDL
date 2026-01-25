@@ -37,11 +37,8 @@ _REQUIRED_ENV_VARS = [
     "DATA_DIR",
     "DATASET_DIR",
     "LABELS_PATH",
-    "DATA_PATH",
-    "TRAIN_LABELS_PATH",
     "PROG_DIR",
     "JOB_ID",
-    "SCALED_LABELS_FILENAME",
 ]
 
 
@@ -57,43 +54,29 @@ if _missing_vars:
 DATA_DIR = _resolve_path(os.environ["DATA_DIR"])
 DATASET_DIR = _resolve_path(os.environ["DATASET_DIR"])
 LABELS_PATH = _resolve_path(os.environ["LABELS_PATH"])
-DATA_PATH = _resolve_path(os.environ["DATA_PATH"])
-TRAIN_LABELS_PATH = _resolve_path(os.environ["TRAIN_LABELS_PATH"])
-SCALED_LABELS_FILENAME = os.environ["SCALED_LABELS_FILENAME"]
 PROG_DIR = _resolve_path(os.environ["PROG_DIR"])
 
 # Ensure all required directories exist
 os.makedirs(DATASET_DIR, exist_ok=True)
 os.makedirs(PROG_DIR, exist_ok=True)
-os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
-os.makedirs(os.path.dirname(TRAIN_LABELS_PATH), exist_ok=True)
 
 JOB_ID = os.environ["JOB_ID"]
 
-try:
-    import torch.nn as nn
+import torch.nn as nn
 
-    CLASSIFICATION_LOSS: "nn.BCEWithLogitsLoss" = nn.BCEWithLogitsLoss()
-    TIME_PREDICTION_LOSS: "nn.MSELoss" = nn.MSELoss()
-except ImportError:
-    CLASSIFICATION_LOSS: Any = None
-    TIME_PREDICTION_LOSS: Any = None
+CLASSIFICATION_LOSS: "nn.BCEWithLogitsLoss" = nn.BCEWithLogitsLoss()
+TIME_PREDICTION_LOSS: "nn.MSELoss" = nn.MSELoss()
 
 # Optional: Distributed training variables (set by job scheduler)
 LOCAL_RANK = os.environ.get("PMI_LOCAL_RANK")
 PMI_RANK = os.environ.get("PMI_RANK")
 PMI_SIZE = os.environ.get("PMI_SIZE")
 
+
 ################################################################################
-## Path Helper Functions
+## Dataset Configuration
 ################################################################################
-
-
-def get_processed_dataset_path(dataset_id: str = "") -> str:
-    """Get path to processed dataset file."""
-    return os.path.join(DATASET_DIR, f"processed_dataset{dataset_id}.pt")
-
-
-def get_processed_labels_path(dataset_id: str = "") -> str:
-    """Get path to processed labels file."""
-    return os.path.join(DATASET_DIR, f"processed_labels{dataset_id}.pt")
+# Shared normalization configuration for preprocessing and training workflows
+# This value is used as both the normalization method and dataset_id suffix
+# Change this to switch between different preprocessing configs
+NORMALIZATION = "meanvar-whole"

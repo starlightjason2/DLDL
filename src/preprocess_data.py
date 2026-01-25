@@ -6,19 +6,43 @@ operations one at a time.
 """
 
 import os
-from util.preprocessor import Preprocessor
-from constants import DATASET_DIR, SCALED_LABELS_FILENAME
-
-preprocessor = Preprocessor(
-    dataset_id="_meanvar-whole",
-    cpu_use=0.2,
-    normalization="meanvar-whole",
-    labels_path=os.path.join(DATASET_DIR, SCALED_LABELS_FILENAME),
+import logging
+from constants import NORMALIZATION
+from model.preprocessor import Preprocessor
+from util.processing import (
+    get_processed_dataset_path,
+    get_processed_labels_path,
 )
-# Dataset is automatically created in __init__ if it doesn't exist
-# Additional operations can be performed if needed
-preprocessor.check_dataset(scale_labels=True)
-# preprocessor_scaled.check_dataset(scale_labels=False, verbose=True)
 
-# Convert labels to float32 (currently active operation)
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+# Configuration - shared with training workflow via constants.NORMALIZATION
+DATASET_ID = NORMALIZATION
+
+# Delete cached/processed files before preprocessing
+logger.info("Cleaning up cached preprocessed files...")
+dataset_path = get_processed_dataset_path(DATASET_ID)
+labels_path = get_processed_labels_path(DATASET_ID)
+
+
+if os.path.exists(dataset_path):
+    os.remove(dataset_path)
+    logger.info(f"Deleted cached dataset: {dataset_path}")
+if os.path.exists(labels_path):
+    os.remove(labels_path)
+    logger.info(f"Deleted cached labels: {labels_path}")
+
+# Create preprocessor (will automatically create dataset since files were deleted)
+preprocessor = Preprocessor(
+    dataset_id=DATASET_ID,
+    cpu_use=0.2,
+    normalization=NORMALIZATION,
+)
+
+# Verify dataset integrity and convert to float32
+preprocessor.check_dataset(scale_labels=True)
 preprocessor.convert_to_float()
