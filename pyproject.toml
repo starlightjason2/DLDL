@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dldl"
+version = "0.1.0"
+description = "Disruption Labeling with Deep Learning - A 1D convolutional neural network that uses plasma current to predict disruption times"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "See LICENSE file"}
+authors = [
+    {name = "Jesse Rodriguez", email = "jesse.rodriguez@oregonstate.edu"},
+    {name = "Jason Jain", email = "jainsp@oregonstate.edu"}
+]
+keywords = ["deep-learning", "plasma-physics", "disruption-prediction", "pytorch", "fusion"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "torch>=1.9.0",
+    "numpy>=1.21.0",
+    "pandas>=1.3.0",
+    "scikit-learn>=0.24.0",
+    "tensorboard>=2.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "flake8>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/jrodriguez/DLDL"
+Repository = "https://github.com/jrodriguez/DLDL"
+Issues = "https://github.com/jrodriguez/DLDL/issues"
+
+[tool.setuptools]
+py-modules = ["DLDL", "Train", "Preprocessor", "preprocess_data"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.package-data]
+"*" = ["*.txt", "*.md", "LICENSE"]
