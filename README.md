@@ -38,10 +38,10 @@ A 1D CNN that uses plasma current to predict disruption time. For labeling D-III
 ## Workflow
 
 ```
-Raw .txt → preprocess_data.py → .pt files → main.py → Model + logs
+Raw .txt → preprocess_data.py → .pt files → train.py → Model + logs
 ```
 
-**Config:** Set `NORMALIZATION_TYPE` and `CPU_USE` in `.env` (or env). `NORMALIZATION_TYPE` is the normalization method and `dataset_id` suffix. Both scripts use `constants`.
+**Config:** Set `NORMALIZATION_TYPE` and `CPU_USE` in `.env` (or env). `NORMALIZATION_TYPE` is the normalization method and filename suffix. Both scripts use `constants`.
 
 ### 1. Preprocessing
 
@@ -66,7 +66,7 @@ python src/preprocess_data.py
 ### 2. Training
 
 ```bash
-python src/main.py
+python src/train.py
 ```
 
 * Loads preprocessed dataset/labels (same `NORMALIZATION_TYPE` as preprocessing)
@@ -74,7 +74,7 @@ python src/main.py
 * Uses distributed training if `PMI_*` are set
 * Saves checkpoints and logs to `PROG_DIR`
 
-Hyperparameters (lr, epochs, etc.) are in `main.py`.
+Hyperparameters (lr, epochs, etc.) are in `train.py`.
 
 ## Quick Reference
 

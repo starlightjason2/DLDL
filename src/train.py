@@ -1,4 +1,4 @@
-"""Main entry point for training DLDL disruption prediction model."""
+"""Training entry point for DLDL disruption prediction model."""
 
 import sys
 
@@ -37,7 +37,7 @@ if __name__ == "__main__":
         labels_path,
         PROG_DIR,
         JOB_ID,
-        dataset_id=NORMALIZATION_TYPE,
+        normalization_type=NORMALIZATION_TYPE,
         lr=0.0005,
         num_epochs=250,
         log_interval=50,

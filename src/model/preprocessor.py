@@ -36,7 +36,7 @@ class Preprocessor:
 
     def __init__(
         self,
-        dataset_id: str = "",
+        normalization_type: str = "",
         dset_path: Optional[str] = None,
         labels_path: Optional[str] = None,
     ) -> None:
@@ -45,15 +45,15 @@ class Preprocessor:
         Uses NORMALIZATION_TYPE and CPU_USE from constants (env). Override paths via args.
 
         Args:
-            dataset_id: Optional identifier for output filenames. Defaults to NORMALIZATION_TYPE.
-            dset_path: Optional custom dataset path. Defaults to processed_dataset_{dataset_id}.pt.
-            labels_path: Optional custom labels path. Defaults to processed_labels_{dataset_id}.pt.
+            normalization_type: Optional identifier for output filenames. Defaults to NORMALIZATION_TYPE.
+            dset_path: Optional custom dataset path. Defaults to processed_dataset_{normalization_type}.pt.
+            labels_path: Optional custom labels path. Defaults to processed_labels_{normalization_type}.pt.
         """
-        self.dataset_id = dataset_id or NORMALIZATION_TYPE
+        self.normalization_type = normalization_type or NORMALIZATION_TYPE
         self.cpu_use = CPU_USE
         self.normalization = NORMALIZATION_TYPE
-        self.dset_path = dset_path or get_processed_dataset_path(self.dataset_id)
-        self.labels_path = labels_path or get_processed_labels_path(self.dataset_id)
+        self.dset_path = dset_path or get_processed_dataset_path(self.normalization_type)
+        self.labels_path = labels_path or get_processed_labels_path(self.normalization_type)
         self.logger = logger.bind(name=__name__)
 
         self.shot_list = np.loadtxt(LABELS_PATH)
@@ -74,7 +74,7 @@ class Preprocessor:
 
         if not os.path.exists(self.dset_path) or not os.path.exists(self.labels_path):
             self.logger.info(
-                f"Creating new dataset (dataset_id='{self.dataset_id}', normalization={self.normalization})"
+                f"Creating new dataset (normalization_type='{self.normalization_type}', normalization={self.normalization})"
             )
             self._make_dataset(make_labels=True, labels_type="scaled")
         else:

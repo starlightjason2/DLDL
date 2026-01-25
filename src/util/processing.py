@@ -31,15 +31,15 @@ def convert_tensors_to_float(dset_path: str, labels_path: str) -> None:
     torch.save(labels.float(), labels_path)
 
 
-def get_processed_dataset_path(dataset_id: str = "") -> str:
+def get_processed_dataset_path(normalization_type: str = "") -> str:
     """Get path to processed dataset file."""
-    suffix = f"_{dataset_id}" if dataset_id else ""
+    suffix = f"_{normalization_type}" if normalization_type else ""
     return os.path.join(DATASET_DIR, f"processed_dataset{suffix}.pt")
 
 
-def get_processed_labels_path(dataset_id: str = "") -> str:
+def get_processed_labels_path(normalization_type: str = "") -> str:
     """Get path to processed labels file."""
-    suffix = f"_{dataset_id}" if dataset_id else ""
+    suffix = f"_{normalization_type}" if normalization_type else ""
     return os.path.join(DATASET_DIR, f"processed_labels{suffix}.pt")
 
 

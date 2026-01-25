@@ -1,4 +1,4 @@
-"""Utility module: data loading, preprocessing, and distributed training utilities."""
+"""Utility module: data loading, preprocessing, distributed training, and plotting utilities."""
 
 from .data_loading import (
     check_file,
@@ -9,6 +9,8 @@ from .data_loading import (
     load_and_pad_norm,
     load_and_pad_scale,
 )
+from .distributed import setup, setup_file, cleanup
+from .plotting import plot_training_log
 from .processing import (
     get_use_cores,
     create_binary_labels,
@@ -17,7 +19,6 @@ from .processing import (
     get_processed_labels_path,
     split,
 )
-from .distributed import setup, setup_file, cleanup
 
 __all__ = [
     "check_file",
@@ -36,4 +37,5 @@ __all__ = [
     "setup",
     "setup_file",
     "cleanup",
+    "plot_training_log",
 ]

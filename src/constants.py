@@ -75,7 +75,7 @@ PMI_SIZE = os.environ.get("PMI_SIZE")
 ################################################################################
 ## Dataset Configuration (optional env; defaults below)
 ################################################################################
-# NORMALIZATION_TYPE: method + dataset_id suffix. Options: scale, meanvar-whole, meanvar-single.
+# NORMALIZATION_TYPE: method + filename suffix. Options: scale, meanvar-whole, meanvar-single.
 # CPU_USE: fraction of CPU cores for preprocessing (0-1). Use 0.2-0.3 for ~32GB RAM.
 _NORMALIZATION_TYPE_RAW = os.environ.get("NORMALIZATION_TYPE", "meanvar-whole")
 _CPU_USE_RAW = os.environ.get("CPU_USE", "0.2")
