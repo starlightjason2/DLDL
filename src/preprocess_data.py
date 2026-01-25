@@ -15,10 +15,8 @@ preprocessor = Preprocessor(
     normalization="meanvar-whole",
     labels_path=os.path.join(DATASET_DIR, SCALED_LABELS_FILENAME),
 )
-labels = preprocessor.make_labels_naive(save=True)
-# labels = preprocessor_scaled.make_labels_scaled(save=True)
-stats = preprocessor.get_mean_std()
-preprocessor.make_dataset(make_labels=False)
+# Dataset is automatically created in __init__ if it doesn't exist
+# Additional operations can be performed if needed
 preprocessor.check_dataset(scale_labels=True)
 # preprocessor_scaled.check_dataset(scale_labels=False, verbose=True)
 

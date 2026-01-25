@@ -8,7 +8,8 @@ from constants import LOCAL_RANK
 if LOCAL_RANK:
     os.environ["CUDA_VISIBLE_DEVICES"] = LOCAL_RANK
 from .model import IpDataset, IpCNN, loss
-from util.utils import split, setup, setup_file, cleanup
+from util.dataset import split
+from util.distributed import setup, setup_file, cleanup
 import pandas as pd
 import numpy as np
 import torch
@@ -156,7 +157,9 @@ def train(
                         classification_output = output
                         classification_targets = targets
 
-                    classification_predictions = (torch.sigmoid(classification_output) > 0.5)
+                    classification_predictions = (
+                        torch.sigmoid(classification_output) > 0.5
+                    )
                     all_classification_targets.extend(
                         classification_targets.cpu().numpy()
                     )

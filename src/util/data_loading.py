@@ -1,39 +1,11 @@
-"""Utility functions for DLDL project."""
+"""Data loading utilities for plasma disruption datasets."""
 
 import os
-from typing import Tuple, List, Optional, Any, TYPE_CHECKING, cast
-from collections.abc import Sized
+from typing import Tuple, List, Optional
 import numpy as np
 from numpy.typing import NDArray
-from datetime import timedelta
-
-try:
-    import torch
-    from torch.utils.data import Dataset, Subset
-    import torch.distributed as dist
-except:
-    pass
 
 
-################################################################################
-## File I/O Utilities
-################################################################################
-def check_file(file_path: str, verbose: bool = False) -> bool:
-    """Check if file exists. If verbose, print file size or non-existence message."""
-    if os.path.exists(file_path):
-        if verbose:
-            file_size: int = os.path.getsize(file_path)
-            print(f"File {file_path} exists. Size: {file_size} bytes.")
-        return True
-    else:
-        if verbose:
-            print(f"File {file_path} does not exist.")
-        return False
-
-
-################################################################################
-## Data Loading Utilities
-################################################################################
 def get_length(filename: str, data_dir: str) -> int:
     """Get time series length for a single file."""
     file_path: str = os.path.join(data_dir, filename)
@@ -165,57 +137,3 @@ def load_and_pad_scale(
     padded_data[:length] = data
 
     return (shot_no, padded_data)
-
-
-################################################################################
-## Dataset Utilities
-################################################################################
-def split(
-    dataset: "Dataset", train_size: float = 0.8
-) -> Tuple["Subset", "Subset", "Subset"]:
-    """Split dataset into train, dev, and test sets. Returns (train, dev, test)."""
-    dev_size: float = (1 - train_size) / 2
-    total_size: int = len(cast(Sized, dataset))
-    train_end: int = int(train_size * total_size)
-    dev_end: int = int((train_size + dev_size) * total_size)
-    train_indices = range(0, train_end)
-    dev_indices = range(train_end, dev_end)
-    test_indices = range(dev_end, total_size)
-
-    train: "Subset" = Subset(dataset, train_indices)
-    dev: "Subset" = Subset(dataset, dev_indices)
-    test: "Subset" = Subset(dataset, test_indices)
-
-    return train, dev, test
-
-
-################################################################################
-## Distributed Training Utilities
-################################################################################
-def setup(rank: int, world_size: int) -> None:
-    """Initialize distributed training process group."""
-    dist.init_process_group(
-        backend="nccl",
-        init_method="env://",
-        world_size=world_size,
-        rank=rank,
-        timeout=timedelta(minutes=10),
-    )
-    torch.cuda.set_device(0)
-
-
-def setup_file(rank: int, world_size: int, rendezvous_file: str) -> None:
-    """Initialize distributed training process group using file-based rendezvous."""
-    dist.init_process_group(
-        backend="nccl",
-        init_method=f"file://{rendezvous_file}",
-        world_size=world_size,
-        rank=rank,
-        timeout=timedelta(minutes=10),
-    )
-    torch.cuda.set_device(rank)
-
-
-def cleanup() -> None:
-    """Destroy the distributed process group."""
-    dist.destroy_process_group()

@@ -5,17 +5,22 @@ import numpy as np
 from numpy.typing import NDArray
 import time
 import random
-import multiprocessing as mp
-from typing import List, Literal, Optional, Tuple
+import os
+from typing import List, Literal, Optional, Tuple, Dict
 from concurrent.futures import ProcessPoolExecutor
 from model.model import IpDataset
-from util.utils import (
+from util.data_loading import (
     get_length,
     get_scaled_t_disrupt,
     get_means,
     load_and_pad,
     load_and_pad_norm,
     load_and_pad_scale,
+)
+from util.preprocessing import (
+    get_use_cores,
+    create_binary_labels,
+    convert_tensors_to_float,
 )
 from constants import (
     DATA_DIR,
@@ -31,9 +36,6 @@ except ImportError:
     pass
 
 
-################################################################################
-## Preprocessor Class
-################################################################################
 class Preprocessor:
     """Preprocessor for plasma current time series data."""
 
@@ -61,82 +63,96 @@ class Preprocessor:
         self.normalization: Optional[
             Literal["scale", "meanvar-whole", "meanvar-single"]
         ] = normalization
+
         self.dset_path: str = dset_path or get_processed_dataset_path(self.dataset_id)
         self.labels_path: str = labels_path or get_processed_labels_path(
             self.dataset_id
         )
-        self.shotlist = np.loadtxt(LABELS_PATH)
-        self.max_length = self.get_max_length()
-        self.get_mean_std()  # Compute and cache mean/std on initialization
+
+        self.shot_list = np.loadtxt(LABELS_PATH)
+        self.file_list = self._get_file_list()
+        self.num_shots = len(self.file_list)
+
+        self.max_length = self._get_max_length()
+        (self.mean, self.std) = self._get_mean_std()
+        self.sorted_shot_numbers: Optional[NDArray] = None
+
+        # Create lookup dicts for efficiency
+        self._shot_to_idx: Dict[int, int] = {
+            int(self.shot_list[i, 0]): i for i in range(len(self.shot_list))
+        }
+        self._shot_to_label: Dict[int, NDArray] = {
+            int(self.shot_list[i, 0]): self.shot_list[i].copy()
+            for i in range(len(self.shot_list))
+        }
+
+        if not os.path.exists(self.dset_path) or not os.path.exists(self.labels_path):
+            self._make_dataset(make_labels=True, labels_type="scaled")
+        else:
+            # Load sorted shot numbers from existing dataset
+            self._load_sorted_shot_numbers()
 
     def _get_file_list(self) -> List[str]:
         """Get list of file names from valid shots in labels file."""
-        return [f"{int(shot[0])}.txt" for shot in self.shotlist]
+        return [f"{int(shot[0])}.txt" for shot in self.shot_list]
 
-    def _get_use_cores(self) -> int:
-        """Calculate number of CPU cores to use for parallel processing."""
-        return max(1, int(self.cpu_use * mp.cpu_count()))
+    def _load_sorted_shot_numbers(self) -> None:
+        """Load sorted shot numbers from shotlist (dataset is always sorted by shot number)."""
+        # Dataset is always sorted by shot number, so just sort shotlist shot numbers
+        self.sorted_shot_numbers = np.sort(self.shot_list[:, 0].astype(int))
+
+    def _load_single_file(self, filename: str) -> Tuple[int, NDArray[float32]]:
+        """Load and preprocess a single file based on normalization setting."""
+        if self.normalization is None:
+            return load_and_pad(filename, DATA_DIR, self.max_length)
+        elif self.normalization == "scale":
+            return load_and_pad_scale(filename, DATA_DIR, self.max_length)
+        elif self.normalization.startswith("meanvar"):
+            return load_and_pad_norm(
+                filename, DATA_DIR, self.max_length, self.mean, self.std
+            )
+        else:
+            raise ValueError(f"Unknown normalization: {self.normalization}")
 
     def convert_to_float(self) -> None:
         """Convert dataset and labels tensors to float32."""
-        torch.save(torch.load(self.dset_path).float(), self.dset_path)
-        torch.save(torch.load(self.labels_path).float(), self.labels_path)
+        convert_tensors_to_float(self.dset_path, self.labels_path)
 
-    def _process_files_parallel(self, func, file_list: List[str], *args) -> NDArray:
+    def _process_files_parallel(self, func, *args) -> NDArray:
         """Process files in parallel using ProcessPoolExecutor."""
-        num_shots = len(file_list)
-        use_cores = self._get_use_cores()
+        use_cores = get_use_cores(self.cpu_use)
         print(f"Running on {use_cores} processes.")
         with ProcessPoolExecutor(max_workers=use_cores) as executor:
-            try:
-                return np.asarray(
-                    list(executor.map(func, file_list, [DATA_DIR] * num_shots, *args))
+            return np.asarray(
+                list(
+                    executor.map(
+                        func, self.file_list, [DATA_DIR] * self.num_shots, *args
+                    )
                 )
-            except Exception as e:
-                print(f"An error occurred: {e}")
-                raise
+            )
 
-    def get_max_length(self) -> int:
+    def _get_max_length(self) -> int:
         """Compute maximum time series length across all shots."""
-        file_list = self._get_file_list()
-        num_shots = len(file_list)
-        print(f"Finding N_max for {num_shots} shots in {DATA_DIR}")
-        time_begin = time.time()
-
-        results = self._process_files_parallel(get_length, file_list)
+        print(f"Finding N_max for {self.num_shots} shots in {DATA_DIR}")
+        results = self._process_files_parallel(get_length)
         maximum = int(np.max(results))
-
-        elapsed_time = time.time() - time_begin
-        print(
-            f"Finished getting end timesteps in {elapsed_time:.2f} seconds. N_max={maximum}"
-        )
+        print(f"N_max={maximum}")
         return maximum
 
-    def get_mean_std(self) -> NDArray[np.float64]:
+    def _get_mean_std(self) -> Tuple[float, float]:
         """
         Compute dataset-wide mean and standard deviation.
 
         Returns:
-            Array [mean, std]. Uses std = sqrt(E[X^2] - E[X]^2).
+            Tuple (mean, std). Uses std = sqrt(E[X^2] - E[X]^2).
         """
-        file_list = self._get_file_list()
-        num_shots = len(file_list)
-        print(f"Finding the mean and std. dev. for {num_shots} shots in {DATA_DIR}")
-        time_begin = time.time()
-
-        results = self._process_files_parallel(get_means, file_list)
-        self.mean = float(np.mean(results[:, 0]))
-        self.std = float((np.mean(results[:, 1]) - self.mean**2) ** 0.5)
-
-        elapsed_time = time.time() - time_begin
-        print(f"Finished getting stats in {elapsed_time:.2f} seconds.")
-        return np.array([self.mean, self.std])
-
-    def _create_binary_labels(self) -> NDArray[np.float64]:
-        """Create binary classification labels from shotlist."""
-        labels = np.copy(self.shotlist)
-        labels[:, 0] = (self.shotlist[:, 1] != -1.0).astype(float)
-        return labels
+        print(
+            f"Finding the mean and std. dev. for {self.num_shots} shots in {DATA_DIR}"
+        )
+        results = self._process_files_parallel(get_means)
+        mean = float(np.mean(results[:, 0]))
+        std = float((np.mean(results[:, 1]) - mean**2) ** 0.5)
+        return (mean, std)
 
     def make_labels_naive(self, save: bool = False) -> NDArray[np.float64]:
         """
@@ -148,7 +164,7 @@ class Preprocessor:
         Returns:
             Labels array (n_shots, 2): [binary_class, original_time].
         """
-        labels = self._create_binary_labels()
+        labels = create_binary_labels(self.shot_list)
         if save:
             self._save_labels(labels)
         return labels
@@ -167,20 +183,20 @@ class Preprocessor:
         Returns:
             Labels array (n_shots, 2): [binary_class, scaled_time]. Time in [0,1] or -1.0.
         """
-        labels = self._create_binary_labels()
-        for i in range(self.shotlist.shape[0]):
-            if self.shotlist[i, 1] != -1.0:
+        labels = create_binary_labels(self.shot_list)
+        for i in range(self.shot_list.shape[0]):
+            if self.shot_list[i, 1] != -1.0:
                 labels[i, 1] = get_scaled_t_disrupt(
-                    int(self.shotlist[i, 0]),
+                    int(self.shot_list[i, 0]),
                     DATA_DIR,
-                    self.shotlist[i, 1],
+                    self.shot_list[i, 1],
                     self.max_length,
                 )
         if save:
             self._save_labels(labels)
         return labels
 
-    def make_dataset(
+    def _make_dataset(
         self,
         make_labels: bool = True,
         labels_type: Literal["scaled", "naive"] = "scaled",
@@ -192,70 +208,89 @@ class Preprocessor:
             make_labels: If True, create and save labels tensor.
             labels_type: 'scaled' or 'naive'.
         """
-        file_list = self._get_file_list()
-        num_shots = len(file_list)
-        print(f"Building dataset for {num_shots} shots in {DATA_DIR}")
+        print(f"Building dataset for {self.num_shots} shots in {DATA_DIR}")
 
-        estimated_memory_gb = (num_shots * self.max_length * 4) / (1024**3)
+        estimated_memory_gb = (self.num_shots * self.max_length * 4) / (1024**3)
         print(f"Estimated memory: ~{estimated_memory_gb:.2f} GB (plus overhead)")
 
-        time_begin = time.time()
-        use_cores = self._get_use_cores()
+        use_cores = get_use_cores(self.cpu_use)
         print(f"Running on {use_cores} processes.")
+
+        # Prepare common arguments
+        data_dir_args = [DATA_DIR] * self.num_shots
+        max_length_args = [self.max_length] * self.num_shots
+
         with ProcessPoolExecutor(max_workers=use_cores) as executor:
-            try:
-                if self.normalization is None:
-                    results = list[Tuple[int, NDArray[float32]]](
-                        executor.map(
-                            load_and_pad,
-                            file_list,
-                            [DATA_DIR] * num_shots,
-                            [self.max_length] * num_shots,
-                        )
+            if self.normalization is None:
+                results = list[Tuple[int, NDArray[float32]]](
+                    executor.map(
+                        load_and_pad,
+                        self.file_list,
+                        data_dir_args,
+                        max_length_args,
                     )
-                elif self.normalization == "scale":
-                    results = list[Tuple[int, NDArray[float32]]](
-                        executor.map(
-                            load_and_pad_scale,
-                            file_list,
-                            [DATA_DIR] * num_shots,
-                            [self.max_length] * num_shots,
-                        )
+                )
+            elif self.normalization == "scale":
+                results = list[Tuple[int, NDArray[float32]]](
+                    executor.map(
+                        load_and_pad_scale,
+                        self.file_list,
+                        data_dir_args,
+                        max_length_args,
                     )
-                elif self.normalization.startswith("meanvar"):
-                    results = list[Tuple[int, NDArray[float32]]](
-                        executor.map(
-                            load_and_pad_norm,
-                            file_list,
-                            [DATA_DIR] * num_shots,
-                            [self.max_length] * num_shots,
-                            [self.mean] * num_shots,
-                            [self.std] * num_shots,
-                        )
+                )
+            elif self.normalization.startswith("meanvar"):
+                results = list[Tuple[int, NDArray[float32]]](
+                    executor.map(
+                        load_and_pad_norm,
+                        self.file_list,
+                        data_dir_args,
+                        max_length_args,
+                        [self.mean] * self.num_shots,
+                        [self.std] * self.num_shots,
                     )
-            except Exception as e:
-                print(f"An error occurred: {e}")
-
-        time_end = time.time()
-        elapsed_time = time_end - time_begin
-
-        if make_labels:
-            labels_tensor = torch.tensor(
-                self.make_labels_scaled()
-                if labels_type == "scaled"
-                else self.make_labels_naive()
-            )
+                )
 
         sorted_data = sorted(results, key=lambda x: x[0])
         dataset = np.array([item[1] for item in sorted_data])
+        # Store sorted shot numbers for alignment with saved dataset
+        sorted_shot_numbers = np.array([item[0] for item in sorted_data])
+        self.sorted_shot_numbers = sorted_shot_numbers
 
         dataset_pt = torch.tensor(dataset)
 
-        print("Finished loading and preparing data in {} seconds.".format(elapsed_time))
-
         torch.save(dataset_pt, self.dset_path)
         if make_labels:
+            labels_tensor = self._create_labels_in_sorted_order(
+                sorted_shot_numbers, labels_type
+            )
             torch.save(labels_tensor, self.labels_path)
+
+    def _create_labels_in_sorted_order(
+        self,
+        sorted_shot_numbers: NDArray,
+        labels_type: Literal["scaled", "naive"],
+    ) -> Tensor:
+        """Create labels in sorted shot number order."""
+        # Use cached shot_to_label dict
+        labels = np.array(
+            [self._shot_to_label[int(shot)] for shot in sorted_shot_numbers]
+        )
+        # Convert to binary labels
+        if labels_type == "scaled":
+            for i in range(len(labels)):
+                shot_no = int(labels[i, 0])
+                t_disrupt = labels[i, 1]
+                if t_disrupt != -1.0:
+                    labels[i, 0] = 1
+                    labels[i, 1] = get_scaled_t_disrupt(
+                        shot_no, DATA_DIR, t_disrupt, self.max_length
+                    )
+                else:
+                    labels[i, 0] = 0
+        else:
+            labels[:, 0] = (labels[:, 1] != -1.0).astype(float)
+        return torch.tensor(labels)
 
     def load_example_from_raw(
         self,
@@ -266,7 +301,7 @@ class Preprocessor:
         Load a single example directly from raw files (bypassing preprocessed dataset).
 
         Args:
-            idx: Index of the example to load (corresponds to row in labels file).
+            idx: Index in the sorted dataset.
             scale_labels: If True, scale disruption time by self.max_length.
 
         Returns:
@@ -274,9 +309,14 @@ class Preprocessor:
                 - data_tensor: Preprocessed time series data
                 - label_tensor: Corresponding label [classification, time]
         """
+        # Always use sorted shot numbers (dataset is always sorted)
+        shot_no = int(self.sorted_shot_numbers[idx])
+        # Use cached lookup dict for O(1) access
+        shotlist_idx = self._shot_to_idx[shot_no]
+
         # Load label for this example
         label = np.array([0, 0.0])
-        if self.shotlist[idx, 1] == -1.0:
+        if self.shot_list[shotlist_idx, 1] == -1.0:
             # No disruption
             label[0] = 0
             label[1] = -1.0
@@ -286,24 +326,17 @@ class Preprocessor:
             if scale_labels:
                 # Scale disruption time to [0, 1] range
                 label[1] = get_scaled_t_disrupt(
-                    int(self.shotlist[idx, 0]),
+                    shot_no,
                     DATA_DIR,
-                    self.shotlist[idx, 1],
+                    self.shot_list[shotlist_idx, 1],
                     self.max_length,
                 )
             else:
                 # Use raw disruption time
-                label[1] = self.shotlist[idx, 1]
+                label[1] = self.shot_list[shotlist_idx, 1]
 
-        filename = f"{int(self.shotlist[idx, 0])}.txt"
-        if self.normalization is None:
-            data = load_and_pad(filename, DATA_DIR, self.max_length)
-        elif self.normalization == "scale":
-            data = load_and_pad_scale(filename, DATA_DIR, self.max_length)
-        elif self.normalization.startswith("meanvar"):
-            data = load_and_pad_norm(
-                filename, DATA_DIR, self.max_length, self.mean, self.std
-            )
+        filename = f"{shot_no}.txt"
+        data = self._load_single_file(filename)
 
         return torch.tensor(data[1]), torch.tensor(label)
 
@@ -331,7 +364,8 @@ class Preprocessor:
         dataset_correct = True
         for idx in check_indices:
             if verbose:
-                print(f"Checking shot {int(self.shotlist[idx,0])}.")
+                shot_no = int(self.sorted_shot_numbers[idx])
+                print(f"Checking shot {shot_no}.")
 
             processed_data, processed_label = dataset[idx]
             expected_data, expected_label = self.load_example_from_raw(

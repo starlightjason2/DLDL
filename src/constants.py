@@ -22,6 +22,7 @@ def _resolve_path(path: str) -> str:
 # Try to load .env file if python-dotenv is available
 try:
     from dotenv import load_dotenv
+
     env_file = os.path.join(_PROJECT_ROOT, ".env")
     if os.path.exists(env_file):
         load_dotenv(env_file)
@@ -71,6 +72,7 @@ JOB_ID = os.environ["JOB_ID"]
 
 try:
     import torch.nn as nn
+
     CLASSIFICATION_LOSS: "nn.BCEWithLogitsLoss" = nn.BCEWithLogitsLoss()
     TIME_PREDICTION_LOSS: "nn.MSELoss" = nn.MSELoss()
 except ImportError:
