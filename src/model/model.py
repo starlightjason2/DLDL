@@ -1,5 +1,10 @@
 import numpy as np
-from typing import Tuple
+from typing import Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from torch import Tensor
+    from torch.utils.data import Dataset
+    import torch.nn as nn
 
 try:
     import torch
@@ -11,19 +16,18 @@ except:
     print("WARNING: pytorch not installed!")
     pass
 
-classification_loss: nn.BCEWithLogitsLoss = nn.BCEWithLogitsLoss()
-time_prediction_loss: nn.MSELoss = nn.MSELoss()
+from constants import CLASSIFICATION_LOSS, TIME_PREDICTION_LOSS
 
 
 def loss(outputs: Tensor, labels: Tensor) -> Tensor:
     # outputs = [classification_logits, time_predictions]
     # labels = [binary_class_labels, normalized_time_steps]
-    class_loss: Tensor = classification_loss(outputs[:, 0], labels[:, 0])
+    class_loss: Tensor = CLASSIFICATION_LOSS(outputs[:, 0], labels[:, 0])
 
     # Apply time prediction loss only to disruptive shots
     disruptive_mask: Tensor = labels[:, 0] == 1
     if disruptive_mask.any():
-        time_loss: Tensor = time_prediction_loss(
+        time_loss: Tensor = TIME_PREDICTION_LOSS(
             outputs[disruptive_mask, 1], labels[disruptive_mask, 1]
         )
     else:
@@ -33,7 +37,9 @@ def loss(outputs: Tensor, labels: Tensor) -> Tensor:
 
 
 class IpDataset(Dataset):
-    def __init__(self, data_file: str, labels_file: str, classification: bool = False) -> None:
+    def __init__(
+        self, data_file: str, labels_file: str, classification: bool = False
+    ) -> None:
         self.data: Tensor = torch.load(data_file)
         self.labels: Tensor = torch.load(labels_file)
         self.classification: bool = classification
@@ -71,7 +77,9 @@ class IpCNN(nn.Module):
         self.conv3: nn.Conv1d = nn.Conv1d(
             conv2[0], conv3[0], kernel_size=conv3[1], stride=1, padding=conv3[2]
         )
-        self.pool: nn.MaxPool1d = nn.MaxPool1d(kernel_size=pool_size, stride=pool_size, padding=0)
+        self.pool: nn.MaxPool1d = nn.MaxPool1d(
+            kernel_size=pool_size, stride=pool_size, padding=0
+        )
         # Dynamically determine the correct input size to the first FC layer
         with torch.no_grad():
             dummy_input: Tensor = torch.zeros(

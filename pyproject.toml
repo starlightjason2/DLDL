@@ -46,7 +46,7 @@ Repository = "https://github.com/jrodriguez/DLDL"
 Issues = "https://github.com/jrodriguez/DLDL/issues"
 
 [tool.setuptools]
-py-modules = ["DLDL", "Train", "Preprocessor", "preprocess_data"]
+packages = ["find:"]
 
 [tool.setuptools.package-dir]
 "" = "src"

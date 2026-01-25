@@ -1,8 +1,10 @@
 """
 Utility functions for DLDL project.
 """
+
 import os
-from typing import Tuple, List, Optional, Any
+from typing import Tuple, List, Optional, Any, TYPE_CHECKING, cast
+from collections.abc import Sized
 import numpy as np
 from numpy.typing import NDArray
 from datetime import timedelta
@@ -60,7 +62,9 @@ def get_length(filename: str, data_dir: str) -> int:
     return len(data)
 
 
-def get_scaled_t_disrupt(shot_no: int, data_dir: str, t_disrupt: float, max_length: int) -> float:
+def get_scaled_t_disrupt(
+    shot_no: int, data_dir: str, t_disrupt: float, max_length: int
+) -> float:
     """
     Get scaled version of t_disrupt; i_disrupt/max_length
 
@@ -75,7 +79,7 @@ def get_scaled_t_disrupt(shot_no: int, data_dir: str, t_disrupt: float, max_leng
     """
     shot_file: str = os.path.join(data_dir, str(shot_no) + ".txt")
     time: NDArray[np.float64] = np.loadtxt(shot_file, usecols=0)
-    disruption_index: int = np.abs(time - t_disrupt).argmin()
+    disruption_index: int = int(np.abs(time - t_disrupt).argmin())
 
     return disruption_index / max_length
 
@@ -100,7 +104,9 @@ def get_means(filename: str, data_dir: str) -> List[float]:
     return [mean, mean_squared]
 
 
-def load_and_pad(filename: str, data_dir: str, max_length: int) -> Tuple[int, NDArray[np.float32]]:
+def load_and_pad(
+    filename: str, data_dir: str, max_length: int
+) -> Tuple[int, NDArray[np.float32]]:
     """
     Loads a single current series and pads it with zeros up to the max length,
     then returns it.
@@ -124,7 +130,11 @@ def load_and_pad(filename: str, data_dir: str, max_length: int) -> Tuple[int, ND
 
 
 def load_and_pad_norm(
-    filename: str, data_dir: str, max_length: int, mean: Optional[float] = None, std: Optional[float] = None
+    filename: str,
+    data_dir: str,
+    max_length: int,
+    mean: Optional[float] = None,
+    std: Optional[float] = None,
 ) -> Tuple[int, NDArray[np.float32]]:
     """
     Loads a single current series and pads it with zeros up to the max length,
@@ -157,7 +167,9 @@ def load_and_pad_norm(
     return (shot_no, padded_data)
 
 
-def load_and_pad_scale(filename: str, data_dir: str, max_length: int) -> Tuple[int, NDArray[np.float32]]:
+def load_and_pad_scale(
+    filename: str, data_dir: str, max_length: int
+) -> Tuple[int, NDArray[np.float32]]:
     """
     Loads a single current series and pads it with zeros up to the max length,
     scales data values to [0,1], then returns it.
@@ -185,12 +197,14 @@ def load_and_pad_scale(filename: str, data_dir: str, max_length: int) -> Tuple[i
 ################################################################################
 ## Dataset Utilities
 ################################################################################
-def split(dataset: Dataset, train_size: float = 0.8) -> Tuple[Subset, Subset, Subset]:
+def split(
+    dataset: "Dataset", train_size: float = 0.8
+) -> Tuple["Subset", "Subset", "Subset"]:
     """
     Split a dataset into train, dev, and test sets.
 
     Args:
-        dataset: Dataset object to split
+        dataset: Dataset object to split (must implement __len__)
         train_size: float, fraction of data for training (default 0.8)
 
     Returns:
@@ -198,16 +212,17 @@ def split(dataset: Dataset, train_size: float = 0.8) -> Tuple[Subset, Subset, Su
     """
     dev_size: float = (1 - train_size) / 2
 
-    total_size: int = len(dataset)
+    # Cast to Sized for len() call (Dataset implements __len__ but type stubs don't reflect this)
+    total_size: int = len(cast(Sized, dataset))
     train_end: int = int(train_size * total_size)
     dev_end: int = int((train_size + dev_size) * total_size)
-    train_indices: range = range(0, train_end)
-    dev_indices: range = range(train_end, dev_end)
-    test_indices: range = range(dev_end, total_size)
+    train_indices = range(0, train_end)
+    dev_indices = range(train_end, dev_end)
+    test_indices = range(dev_end, total_size)
 
-    train: Subset = Subset(dataset, train_indices)
-    dev: Subset = Subset(dataset, dev_indices)
-    test: Subset = Subset(dataset, test_indices)
+    train: "Subset" = Subset(dataset, train_indices)
+    dev: "Subset" = Subset(dataset, dev_indices)
+    test: "Subset" = Subset(dataset, test_indices)
 
     return train, dev, test
 

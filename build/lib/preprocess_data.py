@@ -1,4 +1,4 @@
-from preprocessor import Preprocessor
+from util.preprocessor import Preprocessor
 
 data_dir = "/eagle/fusiondl_aesp/signal_data/d3d/ipspr15V/"
 dataset_dir = "/eagle/fusiondl_aesp/jrodriguez/processed_data/"

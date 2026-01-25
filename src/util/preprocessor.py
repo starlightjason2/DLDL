@@ -1,11 +1,13 @@
 import numpy as np
+from numpy.typing import NDArray
 import time
 import os
 import random
 import multiprocessing as mp
+from typing import Optional, Tuple
 from concurrent.futures import ProcessPoolExecutor
-from dldl import IpDataset
-from utils import (
+from model.model import IpDataset
+from util.utils import (
     check_file,
     get_length,
     get_scaled_t_disrupt,
@@ -17,6 +19,7 @@ from utils import (
 
 try:
     import torch
+    from torch import Tensor
     from torch.utils.data import DataLoader
 except:
     pass
@@ -26,15 +29,23 @@ except:
 ## Preprocessor Class
 ################################################################################
 class Preprocessor:
-    def __init__(self, dataset_dir, data_dir, labels_path, dataset_id=""):
-        self.data_dir = data_dir
-        self.dataset_path = os.path.join(dataset_dir, "processed_dataset" + dataset_id + ".pt")
-        self.labels_pt_path = os.path.join(dataset_dir, "processed_labels" + dataset_id + ".pt")
-        self.max_length_file = os.path.join(dataset_dir, "max_length.txt")
-        self.mean_std_file = os.path.join(dataset_dir, "mean_std.txt")
-        self.labels_path = labels_path
+    def __init__(
+        self, dataset_dir: str, data_dir: str, labels_path: str, dataset_id: str = ""
+    ) -> None:
+        self.data_dir: str = data_dir
+        self.dataset_path: str = os.path.join(
+            dataset_dir, "processed_dataset" + dataset_id + ".pt"
+        )
+        self.labels_pt_path: str = os.path.join(
+            dataset_dir, "processed_labels" + dataset_id + ".pt"
+        )
+        self.max_length_file: str = os.path.join(dataset_dir, "max_length.txt")
+        self.mean_std_file: str = os.path.join(dataset_dir, "mean_std.txt")
+        self.labels_path: str = labels_path
 
-    def convert_to_float(self, dataset_path=None, labels_path=None):
+    def convert_to_float(
+        self, dataset_path: Optional[str] = None, labels_path: Optional[str] = None
+    ) -> None:
         # Load the dataset tensor, convert to float, and re-save
         if dataset_path is None:
             dataset = torch.load(self.dataset_path).float()
@@ -51,7 +62,7 @@ class Preprocessor:
             labels = torch.load(labels_path).float()
             torch.save(labels, labels_path)
 
-    def get_max_length(self, save=True, cpu_use=0.8):
+    def get_max_length(self, save: bool = True, cpu_use: float = 0.8) -> int:
         """
         Acquires the maximum length of the current time series across the
         entire dataset.
@@ -61,7 +72,7 @@ class Preprocessor:
             cpu_use: float in (0,1], fraction of cpu cores to use
         """
         if check_file(self.max_length_file):
-            return np.loadtxt(self.max_length_file).astype(int)
+            return int(np.loadtxt(self.max_length_file).astype(int))
 
         valid_shots = np.loadtxt(self.labels_path, usecols=0).astype(int)
         file_list = [str(num) + ".txt" for num in valid_shots]
@@ -88,7 +99,7 @@ class Preprocessor:
         time_end = time.time()
         elapsed_time = time_end - time_begin
 
-        maximum = np.max(results)
+        maximum: int = int(np.max(results))
 
         print("Finished getting end timesteps in {} seconds.".format(elapsed_time))
 
@@ -97,7 +108,9 @@ class Preprocessor:
 
         return maximum
 
-    def get_mean_std(self, save=True, cpu_use=0.8):
+    def get_mean_std(
+        self, save: bool = True, cpu_use: float = 0.8
+    ) -> NDArray[np.float64]:
         """
         Acquires the mean and std. dev. of the entire dataset.
 
@@ -131,8 +144,8 @@ class Preprocessor:
         time_end = time.time()
         elapsed_time = time_end - time_begin
 
-        mean = np.mean(results[:, 0])
-        std = (np.mean(results[:, 1]) - mean**2) ** 0.5
+        mean: float = float(np.mean(results[:, 0]))
+        std: float = float((np.mean(results[:, 1]) - mean**2) ** 0.5)
 
         print("Finished getting stats in {} seconds.".format(elapsed_time))
 
@@ -160,13 +173,15 @@ class Preprocessor:
 
         return labels
 
-    def make_labels_scaled(self, max_length=None, save=False):
+    def make_labels_scaled(
+        self, max_length: Optional[int] = None, save: bool = False
+    ) -> NDArray[np.float64]:
         """
         Makes labels tensor using a scaled t_disrupt label
         """
-        if max_length == None:
+        if max_length is None:
             if check_file(self.max_length_file):
-                max_length = np.loadtxt(self.max_length_file).astype(int)
+                max_length = int(np.loadtxt(self.max_length_file).astype(int))
             else:
                 raise RuntimeError(
                     "Max length hasn't been computed yet and " + "wasn't supplied."
@@ -192,14 +207,14 @@ class Preprocessor:
 
     def make_dataset(
         self,
-        normalization=None,
-        mean=None,
-        std=None,
-        max_length=None,
-        make_labels=True,
-        labels="scaled",
-        cpu_use=0.8,
-    ):
+        normalization: Optional[str] = None,
+        mean: Optional[float] = None,
+        std: Optional[float] = None,
+        max_length: Optional[int] = None,
+        make_labels: bool = True,
+        labels_type: str = "scaled",
+        cpu_use: float = 0.8,
+    ) -> None:
         """
         Acquires the maximum length of the current time series across the
         entire dataset.
@@ -211,21 +226,21 @@ class Preprocessor:
             mean, std: float, dataset-wide statistics if desired
             cpu_use: float in (0,1], fraction of cpu cores to use
         """
-        if max_length == None:
+        if max_length is None:
             if check_file(self.max_length_file):
-                max_length = np.loadtxt(self.max_length_file).astype(int)
+                max_length = int(np.loadtxt(self.max_length_file).astype(int))
             else:
                 max_length = self.get_max_length(cpu_use=cpu_use)
 
         if normalization == "meanvar-whole":
             if check_file(self.mean_std_file):
                 stats = np.loadtxt(self.mean_std_file)
-                mean = stats[0]
-                std = stats[1]
+                mean = float(stats[0])
+                std = float(stats[1])
             else:
                 stats = self.get_mean_std(cpu_use=cpu_use)
-                mean = stats[0]
-                std = stats[1]
+                mean = float(stats[0])
+                std = float(stats[1])
 
         valid_shots = np.loadtxt(self.labels_path, usecols=0).astype(int)
         file_list = [str(num) + ".txt" for num in valid_shots]
@@ -242,7 +257,7 @@ class Preprocessor:
         with ProcessPoolExecutor(max_workers=use_cores) as executor:
             # Process all files in parallel and collect results
             try:
-                if normalization == None:
+                if normalization is None:
                     results = list(
                         executor.map(
                             load_and_pad,
@@ -278,10 +293,10 @@ class Preprocessor:
         elapsed_time = time_end - time_begin
 
         if make_labels:
-            if labels == "scaled":
-                labels = torch.tensor(self.make_labels_scaled(max_length))
+            if labels_type == "scaled":
+                labels_tensor = torch.tensor(self.make_labels_scaled(max_length))
             else:
-                labels = torch.tensor(self.make_labels_naive())
+                labels_tensor = torch.tensor(self.make_labels_naive())
 
         sorted_data = sorted(results, key=lambda x: x[0])
         dataset = np.zeros((num_shots, max_length))
@@ -294,26 +309,26 @@ class Preprocessor:
 
         torch.save(dataset_pt, self.dataset_path)
         if make_labels:
-            torch.save(labels, self.labels_pt_path)
+            torch.save(labels_tensor, self.labels_pt_path)
 
     def load_example_from_raw(
         self,
-        idx,
-        normalization=None,
-        mean=None,
-        std=None,
-        scale_labels=True,
-        max_length=None,
-    ):
+        idx: int,
+        normalization: Optional[str] = None,
+        mean: Optional[float] = None,
+        std: Optional[float] = None,
+        scale_labels: bool = True,
+        max_length: Optional[int] = None,
+    ) -> Tuple[Tensor, Tensor]:
         """
         Loads a single example from the raw files directly for comparison with
         preprocessed data
 
         Args are described elsewhere.
         """
-        if max_length == None:
+        if max_length is None:
             if check_file(self.max_length_file):
-                max_length = np.loadtxt(self.max_length_file).astype(int)
+                max_length = int(np.loadtxt(self.max_length_file).astype(int))
             else:
                 raise RuntimeError(
                     "Max length hasn't been computed yet and " + "wasn't supplied."
@@ -333,11 +348,11 @@ class Preprocessor:
             else:
                 label[1] = shotlist[idx, 1]
 
-        if normalization == "meanvar-whole" and mean == None:
+        if normalization == "meanvar-whole" and mean is None:
             if check_file(self.mean_std_file):
                 stats = np.loadtxt(self.mean_std_file)
-                mean = stats[0]
-                std = stats[1]
+                mean = float(stats[0])
+                std = float(stats[1])
             else:
                 raise RuntimeError(
                     "Statistics haven't been computed yet and " + "weren't supplied."
@@ -345,7 +360,7 @@ class Preprocessor:
 
         shot_no = int(shotlist[idx, 0])
         filename = str(shot_no) + ".txt"
-        if normalization == None:
+        if normalization is None:
             data = load_and_pad(filename, self.data_dir, max_length)
         elif normalization == "scale":
             data = load_and_pad_scale(filename, self.data_dir, max_length)
@@ -356,16 +371,16 @@ class Preprocessor:
 
     def check_dataset(
         self,
-        dset_path=None,
-        labels_path=None,
-        num_checks=100,
-        normalization=None,
-        mean=None,
-        std=None,
-        scale_labels=True,
-        max_length=None,
-        verbose=False,
-    ):
+        dset_path: Optional[str] = None,
+        labels_path: Optional[str] = None,
+        num_checks: int = 100,
+        normalization: Optional[str] = None,
+        mean: Optional[float] = None,
+        std: Optional[float] = None,
+        scale_labels: bool = True,
+        max_length: Optional[int] = None,
+        verbose: bool = False,
+    ) -> None:
         """
         Checks the integrity of the processed dataset by comparing randomly selected examples
         against the output of 'load_example_from_raw'.

@@ -1,10 +1,12 @@
 import os
+from typing import cast
+from collections.abc import Sized
+from constants import LOCAL_RANK
 
-local_rank = os.environ.get("PMI_LOCAL_RANK")
-if local_rank:
-    os.environ["CUDA_VISIBLE_DEVICES"] = local_rank
-from dldl import IpDataset, IpCNN, loss
-from utils import split, setup, setup_file, cleanup
+if LOCAL_RANK:
+    os.environ["CUDA_VISIBLE_DEVICES"] = LOCAL_RANK
+from .model import IpDataset, IpCNN, loss
+from util.utils import split, setup, setup_file, cleanup
 import pandas as pd
 import numpy as np
 import torch
@@ -18,17 +20,17 @@ from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_sc
 
 def train(
     rank: int,
-    world_size,
+    world_size: int,
     data_path: str,
     labels_path: str,
     prog_dir: str,
-    max_length: np.ndarray,
+    max_length: int,
     job_id: str,
-    lr=0.01,
-    num_epochs=100,
-    log_interval=20,
-    classification=True,
-):
+    lr: float = 0.01,
+    num_epochs: int = 100,
+    log_interval: int = 20,
+    classification: bool = True,
+) -> None:
     setup(rank, world_size)
 
     # Make sure each process has a different seed if you are using any randomness
@@ -85,27 +87,28 @@ def train(
             total_train_loss += loss_value.item()
 
             if batch_idx % log_interval == 0:
+                dataset_size = len(cast(Sized, train_loader.dataset))
                 print(
                     f"Rank {rank}, Epoch {epoch}, Batch {batch_idx}, "
-                    + f"[{batch_idx * len(data)}/{len(train_loader.dataset)}] "
+                    + f"[{batch_idx * len(data)}/{dataset_size}] "
                     + f"Loss {loss_value.item()}"
                 )
                 if rank == 0:
                     writer.add_scalar(
                         "Training Loss",
                         loss_value.item(),
-                        epoch * len(train_loader.dataset) + batch_idx,
+                        epoch * dataset_size + batch_idx,
                     )
                     if not classification:
                         writer.add_scalar(
                             "Training Classification Loss",
                             loss_classification.item(),
-                            epoch * len(train_loader.dataset) + batch_idx,
+                            epoch * dataset_size + batch_idx,
                         )
                         writer.add_scalar(
                             "Training Time Loss",
                             loss_time.item(),
-                            epoch * len(train_loader.dataset) + batch_idx,
+                            epoch * dataset_size + batch_idx,
                         )
 
         # Save model - ensure only one orocess does this or save in each process with unique filenames
@@ -221,29 +224,3 @@ def train(
         df_logs.to_csv(prog_dir + job_id + "_training_log.csv", index=False)
 
     cleanup()
-
-
-if __name__ == "__main__":
-    data_path = "/eagle/fusiondl_aesp/jrodriguez/processed_data/processed_dataset_meanvar-whole.pt"
-    labels_path = "/eagle/fusiondl_aesp/jrodriguez/processed_data/processed_labels_scaled_labels.pt"
-    max_length = np.loadtxt(
-        "/eagle/fusiondl_aesp/jrodriguez/processed_data/max_length.txt"
-    ).astype(int)
-    prog_dir = "/eagle/fusiondl_aesp/jrodriguez/train_progress/"
-
-    rank = int(os.getenv("PMI_RANK", "0"))
-    world_size = int(os.getenv("PMI_SIZE", "1"))  # Default to 1 if not set
-    print("GPUs Available:", torch.cuda.device_count())
-    print("Rank:", rank)
-    train(
-        rank,
-        world_size,
-        data_path,
-        labels_path,
-        prog_dir,
-        max_length,
-        job_id="DLDL_test_lr0005",
-        lr=0.0005,
-        num_epochs=250,
-        log_interval=50,
-    )
