@@ -1,21 +1,15 @@
-"""
-Data preprocessing utilities for plasma disruption datasets.
+"""Data preprocessing utilities for plasma disruption datasets."""
 
-This module provides the Preprocessor class for loading, normalizing, and
-preparing plasma current time series data for training neural networks.
-"""
-
+from numpy import float32
 import numpy as np
 from numpy.typing import NDArray
 import time
-import os
 import random
 import multiprocessing as mp
-from typing import Optional, Tuple
+from typing import List, Literal, Optional, Tuple
 from concurrent.futures import ProcessPoolExecutor
 from model.model import IpDataset
 from util.utils import (
-    check_file,
     get_length,
     get_scaled_t_disrupt,
     get_means,
@@ -23,11 +17,16 @@ from util.utils import (
     load_and_pad_norm,
     load_and_pad_scale,
 )
+from constants import (
+    DATA_DIR,
+    LABELS_PATH,
+    get_processed_dataset_path,
+    get_processed_labels_path,
+)
 
 try:
     import torch
     from torch import Tensor
-    from torch.utils.data import DataLoader
 except ImportError:
     pass
 
@@ -36,381 +35,202 @@ except ImportError:
 ## Preprocessor Class
 ################################################################################
 class Preprocessor:
-    """
-    Preprocessor for plasma current time series data.
-
-    This class handles loading raw plasma current signals, computing dataset
-    statistics, normalizing data, creating labels, and building PyTorch-ready
-    datasets. It supports multiple normalization strategies and parallel
-    processing for efficiency.
-
-    Attributes:
-        data_dir: Directory containing raw signal files.
-        dataset_path: Path to save/load processed dataset tensor.
-        labels_pt_path: Path to save/load processed labels tensor.
-        max_length_file: Path to save/load maximum sequence length.
-        mean_std_file: Path to save/load dataset mean and std statistics.
-        labels_path: Path to raw labels file (shot numbers and disruption times).
-    """
+    """Preprocessor for plasma current time series data."""
 
     def __init__(
-        self, dataset_dir: str, data_dir: str, labels_path: str, dataset_id: str = ""
+        self,
+        dataset_id: str = "",
+        cpu_use: float = 0.8,
+        normalization: Optional[
+            Literal["scale", "meanvar-whole", "meanvar-single"]
+        ] = None,
+        dset_path: Optional[str] = None,
+        labels_path: Optional[str] = None,
     ) -> None:
         """
-        Initialize the Preprocessor.
-
         Args:
-            dataset_dir: Directory where processed datasets and metadata will be saved.
-            data_dir: Directory containing raw signal files (one .txt file per shot).
-            labels_path: Path to labels file containing shot numbers and disruption times.
-            dataset_id: Optional identifier string appended to output filenames
-                (useful for creating multiple preprocessed versions).
+            dataset_id: Optional identifier appended to output filenames.
+            cpu_use: Fraction of CPU cores for parallel processing (0.0 to 1.0).
+            normalization: Normalization strategy (None, 'scale', 'meanvar-whole', or 'meanvar-single').
+            dset_path: Path to dataset file. If None, uses default path.
+            labels_path: Path to labels file. If None, uses default path.
         """
-        self.data_dir: str = data_dir
-        self.dataset_path: str = os.path.join(
-            dataset_dir, "processed_dataset" + dataset_id + ".pt"
+        assert cpu_use <= 1 and cpu_use > 0
+        self.dataset_id: str = dataset_id
+        self.cpu_use: float = cpu_use
+        self.normalization: Optional[
+            Literal["scale", "meanvar-whole", "meanvar-single"]
+        ] = normalization
+        self.dset_path: str = dset_path or get_processed_dataset_path(self.dataset_id)
+        self.labels_path: str = labels_path or get_processed_labels_path(
+            self.dataset_id
         )
-        self.labels_pt_path: str = os.path.join(
-            dataset_dir, "processed_labels" + dataset_id + ".pt"
-        )
-        self.max_length_file: str = os.path.join(dataset_dir, "max_length.txt")
-        self.mean_std_file: str = os.path.join(dataset_dir, "mean_std.txt")
-        self.labels_path: str = labels_path
+        self.shotlist = np.loadtxt(LABELS_PATH)
+        self.max_length = self.get_max_length()
+        self.get_mean_std()  # Compute and cache mean/std on initialization
 
-    def convert_to_float(
-        self, dataset_path: Optional[str] = None, labels_path: Optional[str] = None
-    ) -> None:
-        """
-        Convert dataset and labels tensors to float32 precision.
+    def _get_file_list(self) -> List[str]:
+        """Get list of file names from valid shots in labels file."""
+        return [f"{int(shot[0])}.txt" for shot in self.shotlist]
 
-        This is useful for reducing memory usage or ensuring consistent dtype
-        across different PyTorch versions.
+    def _get_use_cores(self) -> int:
+        """Calculate number of CPU cores to use for parallel processing."""
+        return max(1, int(self.cpu_use * mp.cpu_count()))
 
-        Args:
-            dataset_path: Optional path to dataset file. If None, uses
-                self.dataset_path.
-            labels_path: Optional path to labels file. If None, uses
-                self.labels_pt_path.
-        """
-        if dataset_path is None:
-            dataset = torch.load(self.dataset_path).float()
-            torch.save(dataset, self.dataset_path)
-        else:
-            dataset = torch.load(dataset_path).float()
-            torch.save(dataset, dataset_path)
+    def convert_to_float(self) -> None:
+        """Convert dataset and labels tensors to float32."""
+        torch.save(torch.load(self.dset_path).float(), self.dset_path)
+        torch.save(torch.load(self.labels_path).float(), self.labels_path)
 
-        # Load the labels tensor, convert to float, and re-save
-        if labels_path is None:
-            labels = torch.load(self.labels_pt_path).float()
-            torch.save(labels, self.labels_pt_path)
-        else:
-            labels = torch.load(labels_path).float()
-            torch.save(labels, labels_path)
-
-    def get_max_length(self, save: bool = True, cpu_use: float = 0.8) -> int:
-        """
-        Compute the maximum time series length across all shots in the dataset.
-
-        This is needed to determine the padding length for creating fixed-size
-        tensors. Uses parallel processing for efficiency.
-
-        Args:
-            save: If True, save the result to max_length_file for future use.
-            cpu_use: Fraction of CPU cores to use for parallel processing (0.0 to 1.0).
-
-        Returns:
-            Maximum sequence length found in the dataset.
-
-        Note:
-            If max_length_file already exists, loads and returns the cached value
-            instead of recomputing.
-        """
-        if check_file(self.max_length_file):
-            return int(np.loadtxt(self.max_length_file).astype(int))
-
-        valid_shots = np.loadtxt(self.labels_path, usecols=0).astype(int)
-        file_list = [str(num) + ".txt" for num in valid_shots]
+    def _process_files_parallel(self, func, file_list: List[str], *args) -> NDArray:
+        """Process files in parallel using ProcessPoolExecutor."""
         num_shots = len(file_list)
-        print(
-            "Finding N_max for the {} shots in ".format(int(num_shots)) + self.data_dir
-        )
-        time_begin = time.time()
-
-        assert cpu_use <= 1
-        use_cores = max(1, int((cpu_use) * mp.cpu_count()))
+        use_cores = self._get_use_cores()
         print(f"Running on {use_cores} processes.")
         with ProcessPoolExecutor(max_workers=use_cores) as executor:
-            # Process all files in parallel and collect results
             try:
-                results = np.asarray(
-                    list(
-                        executor.map(get_length, file_list, [self.data_dir] * num_shots)
-                    )
+                return np.asarray(
+                    list(executor.map(func, file_list, [DATA_DIR] * num_shots, *args))
                 )
             except Exception as e:
                 print(f"An error occurred: {e}")
+                raise
 
-        time_end = time.time()
-        elapsed_time = time_end - time_begin
+    def get_max_length(self) -> int:
+        """Compute maximum time series length across all shots."""
+        file_list = self._get_file_list()
+        num_shots = len(file_list)
+        print(f"Finding N_max for {num_shots} shots in {DATA_DIR}")
+        time_begin = time.time()
 
-        maximum: int = int(np.max(results))
+        results = self._process_files_parallel(get_length, file_list)
+        maximum = int(np.max(results))
 
-        print("Finished getting end timesteps in {} seconds.".format(elapsed_time))
-
-        if save:
-            np.savetxt(self.max_length_file, np.array([maximum]))
-
+        elapsed_time = time.time() - time_begin
+        print(
+            f"Finished getting end timesteps in {elapsed_time:.2f} seconds. N_max={maximum}"
+        )
         return maximum
 
-    def get_mean_std(
-        self, save: bool = True, cpu_use: float = 0.8
-    ) -> NDArray[np.float64]:
+    def get_mean_std(self) -> NDArray[np.float64]:
         """
-        Compute dataset-wide mean and standard deviation for normalization.
-
-        These statistics are computed across all shots and can be used for
-        dataset-wide normalization (meanvar-whole). Uses parallel processing
-        for efficiency.
-
-        Args:
-            save: If True, save the result to mean_std_file for future use.
-            cpu_use: Fraction of CPU cores to use for parallel processing (0.0 to 1.0).
+        Compute dataset-wide mean and standard deviation.
 
         Returns:
-            Array containing [mean, std] of the entire dataset.
-
-        Note:
-            The standard deviation is computed using the relationship:
-            std = sqrt(E[X^2] - E[X]^2) for computational efficiency.
+            Array [mean, std]. Uses std = sqrt(E[X^2] - E[X]^2).
         """
-        valid_shots = np.loadtxt(self.labels_path, usecols=0).astype(int)
-        file_list = [str(num) + ".txt" for num in valid_shots]
+        file_list = self._get_file_list()
         num_shots = len(file_list)
-        print(
-            "Finding the mean and std. dev. for the {} shots in ".format(int(num_shots))
-            + self.data_dir
-        )
+        print(f"Finding the mean and std. dev. for {num_shots} shots in {DATA_DIR}")
         time_begin = time.time()
 
-        assert cpu_use <= 1
-        use_cores = max(1, int((cpu_use) * mp.cpu_count()))
-        print(f"Running on {use_cores} processes.")
-        with ProcessPoolExecutor(max_workers=use_cores) as executor:
-            # Process all files in parallel and collect results
-            try:
-                results = np.asarray(
-                    list(
-                        executor.map(get_means, file_list, [self.data_dir] * num_shots)
-                    )
-                )
-            except Exception as e:
-                print(f"An error occurred: {e}")
+        results = self._process_files_parallel(get_means, file_list)
+        self.mean = float(np.mean(results[:, 0]))
+        self.std = float((np.mean(results[:, 1]) - self.mean**2) ** 0.5)
 
-        time_end = time.time()
-        elapsed_time = time_end - time_begin
+        elapsed_time = time.time() - time_begin
+        print(f"Finished getting stats in {elapsed_time:.2f} seconds.")
+        return np.array([self.mean, self.std])
 
-        mean: float = float(np.mean(results[:, 0]))
-        std: float = float((np.mean(results[:, 1]) - mean**2) ** 0.5)
-
-        print("Finished getting stats in {} seconds.".format(elapsed_time))
-
-        if save:
-            np.savetxt(self.mean_std_file, np.array([mean, std]))
-
-        return np.array([mean, std])
+    def _create_binary_labels(self) -> NDArray[np.float64]:
+        """Create binary classification labels from shotlist."""
+        labels = np.copy(self.shotlist)
+        labels[:, 0] = (self.shotlist[:, 1] != -1.0).astype(float)
+        return labels
 
     def make_labels_naive(self, save: bool = False) -> NDArray[np.float64]:
         """
-        Create labels array with binary classification only (no time prediction).
-
-        Converts disruption times to binary labels: 0 for no disruption, 1 for disruption.
-        Time information is discarded in this mode.
+        Create binary classification labels (no time prediction).
 
         Args:
-            save: If True, save labels tensor to labels_pt_path.
+            save: If True, save labels tensor.
 
         Returns:
-            Labels array of shape (n_shots, 2) where:
-                - labels[:, 0]: Binary classification (0 or 1)
-                - labels[:, 1]: Original disruption time (preserved but unused)
+            Labels array (n_shots, 2): [binary_class, original_time].
         """
-        # Load labels file: columns are [shot_number, disruption_time]
-        # disruption_time = -1.0 means no disruption occurred
-        shotlist = np.loadtxt(self.labels_path)
-        labels = np.copy(shotlist)
-
-        # Convert to binary classification labels
-        for i in range(shotlist.shape[0]):
-            if shotlist[i, 1] == -1.0:
-                labels[i, 0] = 0  # No disruption
-            else:
-                labels[i, 0] = 1  # Disruption occurred
-
+        labels = self._create_binary_labels()
         if save:
-            labels_pt = torch.tensor(labels)
-            torch.save(labels_pt, self.labels_pt_path)
-
+            self._save_labels(labels)
         return labels
 
-    def make_labels_scaled(
-        self, max_length: Optional[int] = None, save: bool = False
-    ) -> NDArray[np.float64]:
-        """
-        Create labels array with binary classification and scaled disruption time.
+    def _save_labels(self, labels: NDArray[np.float64]) -> None:
+        """Save labels tensor to file."""
+        torch.save(torch.tensor(labels), self.labels_path)
 
-        The disruption time is normalized by the maximum sequence length to
-        produce values in [0, 1], making it suitable for regression tasks.
+    def make_labels_scaled(self, save: bool = False) -> NDArray[np.float64]:
+        """
+        Create labels with binary classification and scaled disruption time.
 
         Args:
-            max_length: Maximum sequence length for scaling. If None, loads from
-                max_length_file or computes it.
-            save: If True, save labels tensor to labels_pt_path.
+            save: If True, save labels tensor.
 
         Returns:
-            Labels array of shape (n_shots, 2) where:
-                - labels[:, 0]: Binary classification (0 or 1)
-                - labels[:, 1]: Scaled disruption time index (0.0 to 1.0) for
-                  disruptive shots, -1.0 for non-disruptive shots.
-
-        Raises:
-            RuntimeError: If max_length is not provided and max_length_file doesn't exist.
+            Labels array (n_shots, 2): [binary_class, scaled_time]. Time in [0,1] or -1.0.
         """
-        if max_length is None:
-            if check_file(self.max_length_file):
-                max_length = int(np.loadtxt(self.max_length_file).astype(int))
-            else:
-                raise RuntimeError(
-                    "Max length hasn't been computed yet and " + "wasn't supplied."
-                )
-
-        # Load labels file: columns are [shot_number, disruption_time]
-        shotlist = np.loadtxt(self.labels_path)
-        labels = np.copy(shotlist)
-
-        # Create binary classification + scaled time labels
-        for i in range(shotlist.shape[0]):
-            if shotlist[i, 1] == -1.0:
-                # No disruption: classification = 0, time = -1.0 (invalid)
-                labels[i, 0] = 0
-            else:
-                # Disruption: classification = 1, time = scaled index [0, 1]
-                labels[i, 0] = 1
+        labels = self._create_binary_labels()
+        for i in range(self.shotlist.shape[0]):
+            if self.shotlist[i, 1] != -1.0:
                 labels[i, 1] = get_scaled_t_disrupt(
-                    int(shotlist[i, 0]), self.data_dir, shotlist[i, 1], max_length
+                    int(self.shotlist[i, 0]),
+                    DATA_DIR,
+                    self.shotlist[i, 1],
+                    self.max_length,
                 )
-
         if save:
-            labels_pt = torch.tensor(labels)
-            torch.save(labels_pt, self.labels_pt_path)
-
+            self._save_labels(labels)
         return labels
 
     def make_dataset(
         self,
-        normalization: Optional[str] = None,
-        mean: Optional[float] = None,
-        std: Optional[float] = None,
-        max_length: Optional[int] = None,
         make_labels: bool = True,
-        labels_type: str = "scaled",
-        cpu_use: float = 0.8,
+        labels_type: Literal["scaled", "naive"] = "scaled",
     ) -> None:
         """
-        Build the complete preprocessed dataset from raw signal files.
-
-        This is the main preprocessing function that:
-        - Loads raw signal files in parallel
-        - Applies normalization (if specified)
-        - Pads sequences to a fixed length
-        - Creates labels (if requested)
-        - Saves everything as PyTorch tensors
+        Build preprocessed dataset from raw signal files.
 
         Args:
-            normalization: Normalization strategy. Options:
-                - None: No normalization
-                - 'scale': Min-max scaling to [0, 1] per shot
-                - 'meanvar-whole': Z-score normalization using dataset-wide statistics
-                - 'meanvar-single': Z-score normalization using per-shot statistics
-            mean: Dataset-wide mean for normalization (used with 'meanvar-whole').
-                If None and normalization='meanvar-whole', computes automatically.
-            std: Dataset-wide std for normalization (used with 'meanvar-whole').
-                If None and normalization='meanvar-whole', computes automatically.
-            max_length: Maximum sequence length for padding. If None, loads from
-                max_length_file or computes automatically.
             make_labels: If True, create and save labels tensor.
-            labels_type: Type of labels to create. Options:
-                - 'scaled': Binary classification + scaled disruption time
-                - 'naive': Binary classification only
-            cpu_use: Fraction of CPU cores to use for parallel processing (0.0 to 1.0).
-
-        Note:
-            The processed dataset is saved to self.dataset_path and labels to
-            self.labels_pt_path. This operation can be time-consuming for large datasets.
+            labels_type: 'scaled' or 'naive'.
         """
-        if max_length is None:
-            if check_file(self.max_length_file):
-                max_length = int(np.loadtxt(self.max_length_file).astype(int))
-            else:
-                max_length = self.get_max_length(cpu_use=cpu_use)
-
-        if normalization == "meanvar-whole":
-            if check_file(self.mean_std_file):
-                stats = np.loadtxt(self.mean_std_file)
-                mean = float(stats[0])
-                std = float(stats[1])
-            else:
-                stats = self.get_mean_std(cpu_use=cpu_use)
-                mean = float(stats[0])
-                std = float(stats[1])
-
-        # Get list of valid shot files to process
-        valid_shots = np.loadtxt(self.labels_path, usecols=0).astype(int)
-        file_list = [str(num) + ".txt" for num in valid_shots]
+        file_list = self._get_file_list()
         num_shots = len(file_list)
-        print(
-            "Building dataset for the {} shots in ".format(int(num_shots))
-            + self.data_dir
-        )
+        print(f"Building dataset for {num_shots} shots in {DATA_DIR}")
+
+        estimated_memory_gb = (num_shots * self.max_length * 4) / (1024**3)
+        print(f"Estimated memory: ~{estimated_memory_gb:.2f} GB (plus overhead)")
+
         time_begin = time.time()
-
-        # Set up parallel processing
-        assert cpu_use <= 1
-        use_cores = max(1, int((cpu_use) * mp.cpu_count()))
+        use_cores = self._get_use_cores()
         print(f"Running on {use_cores} processes.")
-
-        # Process all files in parallel using the appropriate normalization function
         with ProcessPoolExecutor(max_workers=use_cores) as executor:
             try:
-                if normalization is None:
-                    # No normalization: just pad with zeros
-                    results = list(
+                if self.normalization is None:
+                    results = list[Tuple[int, NDArray[float32]]](
                         executor.map(
                             load_and_pad,
                             file_list,
-                            [self.data_dir] * num_shots,
-                            [max_length] * num_shots,
+                            [DATA_DIR] * num_shots,
+                            [self.max_length] * num_shots,
                         )
                     )
-                elif normalization == "scale":
-                    # Min-max scaling to [0, 1] per shot
-                    results = list(
+                elif self.normalization == "scale":
+                    results = list[Tuple[int, NDArray[float32]]](
                         executor.map(
                             load_and_pad_scale,
                             file_list,
-                            [self.data_dir] * num_shots,
-                            [max_length] * num_shots,
+                            [DATA_DIR] * num_shots,
+                            [self.max_length] * num_shots,
                         )
                     )
-                elif normalization.startswith("meanvar"):
-                    # Z-score normalization (dataset-wide or per-shot)
-                    results = list(
+                elif self.normalization.startswith("meanvar"):
+                    results = list[Tuple[int, NDArray[float32]]](
                         executor.map(
                             load_and_pad_norm,
                             file_list,
-                            [self.data_dir] * num_shots,
-                            [max_length] * num_shots,
-                            [mean] * num_shots,
-                            [std] * num_shots,
+                            [DATA_DIR] * num_shots,
+                            [self.max_length] * num_shots,
+                            [self.mean] * num_shots,
+                            [self.std] * num_shots,
                         )
                     )
             except Exception as e:
@@ -419,72 +239,44 @@ class Preprocessor:
         time_end = time.time()
         elapsed_time = time_end - time_begin
 
-        # Create labels if requested
         if make_labels:
-            if labels_type == "scaled":
-                labels_tensor = torch.tensor(self.make_labels_scaled(max_length))
-            else:
-                labels_tensor = torch.tensor(self.make_labels_naive())
+            labels_tensor = torch.tensor(
+                self.make_labels_scaled()
+                if labels_type == "scaled"
+                else self.make_labels_naive()
+            )
 
-        # Sort results by shot number and convert to numpy array
         sorted_data = sorted(results, key=lambda x: x[0])
-        dataset = np.zeros((num_shots, max_length))
-        for i in range(num_shots):
-            dataset[i, :] = sorted_data[i][1]
+        dataset = np.array([item[1] for item in sorted_data])
 
-        # Convert to PyTorch tensor and save
         dataset_pt = torch.tensor(dataset)
 
         print("Finished loading and preparing data in {} seconds.".format(elapsed_time))
 
-        torch.save(dataset_pt, self.dataset_path)
+        torch.save(dataset_pt, self.dset_path)
         if make_labels:
-            torch.save(labels_tensor, self.labels_pt_path)
+            torch.save(labels_tensor, self.labels_path)
 
     def load_example_from_raw(
         self,
         idx: int,
-        normalization: Optional[str] = None,
-        mean: Optional[float] = None,
-        std: Optional[float] = None,
         scale_labels: bool = True,
-        max_length: Optional[int] = None,
     ) -> Tuple[Tensor, Tensor]:
         """
         Load a single example directly from raw files (bypassing preprocessed dataset).
 
-        This is useful for debugging and verifying that preprocessing produces
-        the expected results. The processing matches what make_dataset() does.
-
         Args:
             idx: Index of the example to load (corresponds to row in labels file).
-            normalization: Normalization strategy (see make_dataset for options).
-            mean: Dataset-wide mean for normalization.
-            std: Dataset-wide std for normalization.
-            scale_labels: If True, scale disruption time by max_length.
-            max_length: Maximum sequence length for padding. If None, loads from file.
+            scale_labels: If True, scale disruption time by self.max_length.
 
         Returns:
             Tuple of (data_tensor, label_tensor):
                 - data_tensor: Preprocessed time series data
                 - label_tensor: Corresponding label [classification, time]
-
-        Raises:
-            RuntimeError: If max_length is not available and normalization requires
-                dataset-wide statistics that haven't been computed.
         """
-        if max_length is None:
-            if check_file(self.max_length_file):
-                max_length = int(np.loadtxt(self.max_length_file).astype(int))
-            else:
-                raise RuntimeError(
-                    "Max length hasn't been computed yet and " + "wasn't supplied."
-                )
-
         # Load label for this example
-        shotlist = np.loadtxt(self.labels_path)
         label = np.array([0, 0.0])
-        if shotlist[idx, 1] == -1.0:
+        if self.shotlist[idx, 1] == -1.0:
             # No disruption
             label[0] = 0
             label[1] = -1.0
@@ -494,106 +286,58 @@ class Preprocessor:
             if scale_labels:
                 # Scale disruption time to [0, 1] range
                 label[1] = get_scaled_t_disrupt(
-                    int(shotlist[idx, 0]), self.data_dir, shotlist[idx, 1], max_length
+                    int(self.shotlist[idx, 0]),
+                    DATA_DIR,
+                    self.shotlist[idx, 1],
+                    self.max_length,
                 )
             else:
                 # Use raw disruption time
-                label[1] = shotlist[idx, 1]
+                label[1] = self.shotlist[idx, 1]
 
-        if normalization == "meanvar-whole" and mean is None:
-            if check_file(self.mean_std_file):
-                stats = np.loadtxt(self.mean_std_file)
-                mean = float(stats[0])
-                std = float(stats[1])
-            else:
-                raise RuntimeError(
-                    "Statistics haven't been computed yet and " + "weren't supplied."
-                )
-
-        shot_no = int(shotlist[idx, 0])
-        filename = str(shot_no) + ".txt"
-        if normalization is None:
-            data = load_and_pad(filename, self.data_dir, max_length)
-        elif normalization == "scale":
-            data = load_and_pad_scale(filename, self.data_dir, max_length)
-        elif normalization.startswith("meanvar"):
-            data = load_and_pad_norm(filename, self.data_dir, max_length, mean, std)
+        filename = f"{int(self.shotlist[idx, 0])}.txt"
+        if self.normalization is None:
+            data = load_and_pad(filename, DATA_DIR, self.max_length)
+        elif self.normalization == "scale":
+            data = load_and_pad_scale(filename, DATA_DIR, self.max_length)
+        elif self.normalization.startswith("meanvar"):
+            data = load_and_pad_norm(
+                filename, DATA_DIR, self.max_length, self.mean, self.std
+            )
 
         return torch.tensor(data[1]), torch.tensor(label)
 
     def check_dataset(
         self,
-        dset_path: Optional[str] = None,
-        labels_path: Optional[str] = None,
-        num_checks: int = 100,
-        normalization: Optional[str] = None,
-        mean: Optional[float] = None,
-        std: Optional[float] = None,
         scale_labels: bool = True,
-        max_length: Optional[int] = None,
+        num_checks: int = 100,
         verbose: bool = False,
     ) -> None:
         """
-        Verify the integrity of a preprocessed dataset.
-
-        This method validates that the preprocessed dataset matches what would be
-        produced by processing raw files. It randomly samples examples and compares
-        them against load_example_from_raw() output.
+        Verify preprocessed dataset integrity by comparing with raw file processing.
 
         Args:
-            dset_path: Path to preprocessed dataset file. If None, uses
-                self.dataset_path.
-            labels_path: Path to preprocessed labels file. If None, uses
-                self.labels_pt_path.
+            scale_labels: Whether labels were scaled.
             num_checks: Number of random examples to verify.
-            normalization: Normalization strategy used during preprocessing.
-            mean: Dataset-wide mean used during preprocessing.
-            std: Dataset-wide std used during preprocessing.
-            scale_labels: Whether labels were scaled during preprocessing.
-            max_length: Maximum sequence length used during preprocessing.
-            verbose: If True, print shot numbers being checked.
-
-        Note:
-            This is a validation/debugging tool. A mismatch indicates the
-            preprocessing pipeline may have inconsistencies.
+            verbose: If True, print shot numbers.
         """
         print("Checking dataset alignment...")
-
-        # Determine file paths
-        if dset_path is None:
-            dataset_file_path = self.dataset_path
-        else:
-            dataset_file_path = dset_path
-        if labels_path is None:
-            labels_file_path = self.labels_pt_path
-        else:
-            labels_file_path = labels_path
-
-        # Load the preprocessed dataset
-        dataset = IpDataset(dataset_file_path, labels_file_path)
+        dataset = IpDataset(self.dset_path, self.labels_path)
         print("loaded IpDataset")
 
-        # Randomly sample indices to check (for efficiency)
-        if verbose:
-            shotlist = np.loadtxt(self.labels_path)
         total_examples = len(dataset)
         check_indices = random.sample(range(total_examples), num_checks)
 
-        # Verify each sampled example matches raw processing
         dataset_correct = True
         for idx in check_indices:
             if verbose:
-                print(f"Checking shot {int(shotlist[idx,0])}.")
+                print(f"Checking shot {int(self.shotlist[idx,0])}.")
 
-            # Get example from preprocessed dataset
             processed_data, processed_label = dataset[idx]
-
-            # Recompute from raw files using the same preprocessing pipeline
             expected_data, expected_label = self.load_example_from_raw(
-                idx, normalization, mean, std, scale_labels, max_length
+                idx, scale_labels
             )
 
-            # Compare: they should be identical
             if not torch.equal(
                 processed_data.squeeze(0), expected_data
             ) or not torch.equal(processed_label.squeeze(0), expected_label):
@@ -602,12 +346,6 @@ class Preprocessor:
                 break
 
         if dataset_correct:
-            print(
-                "Dataset check passed: Processed data matches expected data"
-                + " for checked examples."
-            )
+            print("Dataset check passed.")
         else:
-            print(
-                "Dataset check failed: Some processed examples do not match"
-                + " the expected outputs."
-            )
+            print("Dataset check failed.")

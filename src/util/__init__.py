@@ -1,18 +1,4 @@
-"""
-Utility module for DLDL project.
-
-This package provides utility functions for:
-- File I/O operations
-- Data loading and preprocessing
-- Dataset manipulation (splitting)
-- Distributed training setup/cleanup
-- Data preprocessing pipeline (Preprocessor class)
-
-Exports:
-    - Preprocessor: Main class for preprocessing raw signal data
-    - Various utility functions for data loading and processing
-    - Distributed training utilities
-"""
+"""Utility module: file I/O, data loading, preprocessing, and distributed training utilities."""
 
 from .utils import (
     check_file,
