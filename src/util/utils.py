@@ -66,34 +66,47 @@ def get_scaled_t_disrupt(
     shot_no: int, data_dir: str, t_disrupt: float, max_length: int
 ) -> float:
     """
-    Get scaled version of t_disrupt; i_disrupt/max_length
+    Compute normalized disruption time index for a shot.
+
+    Finds the time index closest to the disruption time and normalizes it
+    by the maximum sequence length to produce a value in [0, 1].
 
     Args:
-        shot_no: int, shot number
-        data_dir: str, path to data directory
-        t_disrupt: float, disruption time
-        max_length: int, maximum length of time series
+        shot_no: Shot number to process.
+        data_dir: Directory containing shot data files.
+        t_disrupt: Actual disruption time (in seconds or time units).
+        max_length: Maximum sequence length for normalization.
 
     Returns:
-        float: scaled disruption time index
+        Normalized disruption index in [0, 1] range.
+            Represents the fraction of the sequence where disruption occurs.
     """
     shot_file: str = os.path.join(data_dir, str(shot_no) + ".txt")
     time: NDArray[np.float64] = np.loadtxt(shot_file, usecols=0)
+
+    # Find the time index closest to the disruption time
     disruption_index: int = int(np.abs(time - t_disrupt).argmin())
 
+    # Return normalized index in [0, 1] range
     return disruption_index / max_length
 
 
 def get_means(filename: str, data_dir: str) -> List[float]:
     """
-    Get mean and mean of squares of time series for a single file.
+    Compute mean and mean of squares for a time series file.
+
+    These statistics are used to compute dataset-wide mean and standard
+    deviation efficiently. The std can be computed as:
+    std = sqrt(E[X^2] - E[X]^2)
 
     Args:
-        filename: str, file name
-        data_dir: str, path to file directory
+        filename: Name of the signal file (e.g., "12345.txt").
+        data_dir: Directory containing the signal files.
 
     Returns:
-        list: [mean, mean_squared] where mean_squared is mean of squares
+        List containing [mean, mean_squared] where:
+            - mean: Average value of the time series
+            - mean_squared: Average of squared values (E[X^2])
     """
     file_path: str = os.path.join(data_dir, filename)
     data: NDArray[np.float64] = np.loadtxt(file_path, usecols=1)
@@ -108,16 +121,21 @@ def load_and_pad(
     filename: str, data_dir: str, max_length: int
 ) -> Tuple[int, NDArray[np.float32]]:
     """
-    Loads a single current series and pads it with zeros up to the max length,
-    then returns it.
+    Load a time series file and pad with zeros to a fixed length.
+
+    This function loads raw signal data and ensures all sequences have
+    the same length by padding shorter sequences with zeros.
 
     Args:
-        filename: str, file name
-        data_dir: str, path to file directory
-        max_length: int, maximum length of the time series across all shots
+        filename: Name of the signal file (e.g., "12345.txt").
+        data_dir: Directory containing the signal files.
+        max_length: Target length for padding. Sequences longer than this
+            are truncated.
 
     Returns:
-        tuple: (shot_no, padded_data) where padded_data is numpy array
+        Tuple of (shot_number, padded_data):
+            - shot_number: Integer shot number extracted from filename
+            - padded_data: NumPy array of shape (max_length,) with zero padding
     """
     shot_no: int = int(filename[:-4])
     file_path: str = os.path.join(data_dir, filename)
@@ -137,18 +155,22 @@ def load_and_pad_norm(
     std: Optional[float] = None,
 ) -> Tuple[int, NDArray[np.float32]]:
     """
-    Loads a single current series and pads it with zeros up to the max length,
-    normalizes the signal values then returns it.
+    Load, normalize (Z-score), and pad a time series file.
+
+    Applies Z-score normalization: (x - mean) / std. If mean/std are not
+    provided, computes per-shot statistics. Then pads to max_length.
 
     Args:
-        filename: str, file name
-        data_dir: str, path to file directory
-        max_length: int, maximum length of the time series across all shots
-        mean: float, supply if you want to use dataset-wide statistics
-        std: float, standard deviation for normalization
+        filename: Name of the signal file (e.g., "12345.txt").
+        data_dir: Directory containing the signal files.
+        max_length: Target length for padding.
+        mean: Dataset-wide mean for normalization. If None, uses per-shot mean.
+        std: Dataset-wide std for normalization. If None, uses per-shot std.
 
     Returns:
-        tuple: (shot_no, padded_data) where padded_data is normalized numpy array
+        Tuple of (shot_number, normalized_padded_data):
+            - shot_number: Integer shot number
+            - normalized_padded_data: Z-score normalized and zero-padded array
     """
     shot_no: int = int(filename[:-4])
     file_path: str = os.path.join(data_dir, filename)
@@ -171,22 +193,30 @@ def load_and_pad_scale(
     filename: str, data_dir: str, max_length: int
 ) -> Tuple[int, NDArray[np.float32]]:
     """
-    Loads a single current series and pads it with zeros up to the max length,
-    scales data values to [0,1], then returns it.
+    Load, min-max scale to [0,1], and pad a time series file.
+
+    Applies min-max normalization per shot: (x - min) / (max - min).
+    This ensures all values are in [0, 1] range. Then pads to max_length.
 
     Args:
-        filename: str, file name
-        data_dir: str, path to file directory
-        max_length: int, maximum length of the time series across all shots
+        filename: Name of the signal file (e.g., "12345.txt").
+        data_dir: Directory containing the signal files.
+        max_length: Target length for padding.
 
     Returns:
-        tuple: (shot_no, padded_data) where padded_data is scaled to [0,1]
+        Tuple of (shot_number, scaled_padded_data):
+            - shot_number: Integer shot number
+            - scaled_padded_data: Min-max scaled and zero-padded array
     """
     shot_no: int = int(filename[:-4])
     file_path: str = os.path.join(data_dir, filename)
     data: NDArray[np.float32] = np.loadtxt(file_path, usecols=1, dtype=np.float32)
+
+    # Min-max scaling to [0, 1] range
     data = data - np.min(data)
     data = data / np.max(data)
+
+    # Pad to fixed length
     length: int = min(len(data), max_length)
     padded_data: NDArray[np.float32] = np.zeros(max_length, dtype=np.float32)
     padded_data[:length] = data

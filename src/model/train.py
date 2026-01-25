@@ -1,3 +1,10 @@
+"""
+Distributed training script for DLDL disruption prediction model.
+
+This module provides the main training function that supports distributed
+multi-GPU training using PyTorch's DistributedDataParallel.
+"""
+
 import os
 from typing import cast
 from collections.abc import Sized
@@ -31,15 +38,47 @@ def train(
     log_interval: int = 20,
     classification: bool = True,
 ) -> None:
+    """
+    Train the IpCNN model using distributed data parallel training.
+
+    This function handles the complete training loop including:
+    - Distributed process group setup
+    - Dataset loading and splitting
+    - Model initialization and DDP wrapping
+    - Training and validation loops
+    - Metrics logging (TensorBoard and CSV)
+    - Model checkpointing
+
+    Args:
+        rank: Process rank in distributed training (0 to world_size-1).
+        world_size: Total number of processes/GPUs.
+        data_path: Path to preprocessed dataset tensor file (.pt).
+        labels_path: Path to labels tensor file (.pt).
+        prog_dir: Directory to save training progress, logs, and checkpoints.
+        max_length: Maximum sequence length of input time series.
+        job_id: Unique identifier for this training run (used in filenames).
+        lr: Learning rate for Adam optimizer. Default: 0.01.
+        num_epochs: Number of training epochs. Default: 100.
+        log_interval: Number of batches between logging training progress. Default: 20.
+        classification: If True, train in classification-only mode.
+            If False, train for both classification and time prediction.
+
+    Note:
+        - Only rank 0 process performs validation, logging, and checkpointing.
+        - Model checkpoints are saved every 5 epochs.
+        - Training logs are saved to both TensorBoard and CSV format.
+    """
     setup(rank, world_size)
 
-    # Make sure each process has a different seed if you are using any randomness
+    # Set different random seed for each process to ensure data diversity
     torch.manual_seed(42 + rank)
 
+    # Load and split dataset
     dataset = IpDataset(data_path, labels_path, classification)
     train, dev, _ = split(dataset)
 
-    # Use DistributedSampler
+    # Create distributed sampler for training data
+    # This ensures each process sees a different subset of the data
     train_sampler = DistributedSampler(
         train, num_replicas=world_size, rank=rank, shuffle=True
     )
@@ -48,14 +87,17 @@ def train(
     )
     dev_loader = DataLoader(dev, batch_size=128, shuffle=False, pin_memory=True)
 
+    # Initialize model and wrap with DistributedDataParallel
     model = IpCNN(max_length=max_length, classification=classification).cuda()
     model = DDP(model, device_ids=[0])
 
+    # Initialize optimizer and loss functions
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    bce_loss = torch.nn.BCEWithLogitsLoss()  # For binary classification
+    bce_loss = torch.nn.BCEWithLogitsLoss()  # Binary cross-entropy for classification
     if not classification:
-        mse_loss = torch.nn.MSELoss()  # For regression
+        mse_loss = torch.nn.MSELoss()  # Mean squared error for time prediction
 
+    # Initialize logging (only on rank 0 to avoid duplicate logs)
     logs = []
     if rank == 0:
         writer = SummaryWriter(prog_dir + job_id)
@@ -63,25 +105,35 @@ def train(
     # Training loop
     for epoch in range(num_epochs):
         model.train()
-        total_train_loss = 0
+        total_train_loss = 0.0
+
         for batch_idx, (data, target) in enumerate(train_loader):
+            # Move data to GPU
             data, target = data.cuda(), target.cuda()
+
+            # Extract targets for multi-task learning (if applicable)
             if not classification:
                 classification_targets, time_targets = target[:, 0], target[:, 1]
 
+            # Forward pass
             optimizer.zero_grad()
             output = model(data)
+
+            # Compute loss based on task mode
             if not classification:
+                # Multi-task: separate classification and time prediction outputs
                 classification_output, time_output = output[:, 0], output[:, 1]
                 loss_classification = bce_loss(
                     classification_output, classification_targets
                 )
                 loss_time = mse_loss(time_output, time_targets)
-
+                # Combined loss (defined in model.loss function)
                 loss_value = loss(output, target)
             else:
+                # Classification-only: single output
                 loss_value = bce_loss(output, target)
 
+            # Backward pass and optimization
             loss_value.backward()
             optimizer.step()
             total_train_loss += loss_value.item()
@@ -111,11 +163,12 @@ def train(
                             epoch * dataset_size + batch_idx,
                         )
 
-        # Save model - ensure only one orocess does this or save in each process with unique filenames
+        # Validation and logging (only on rank 0 to avoid duplicate work)
         if rank == 0:
-            # Validation loop
             model.eval()
-            total_val_loss = 0
+            total_val_loss = 0.0
+
+            # Accumulate predictions for metric computation
             if not classification:
                 all_classification_targets, all_classification_predictions = [], []
                 all_time_targets, all_time_predictions = [], []
@@ -153,10 +206,11 @@ def train(
                     val_total_loss = loss(output, targets)
                     total_val_loss += val_total_loss.item()
 
+            # Compute average losses
             avg_train_loss = total_train_loss / len(train_loader)
             avg_val_loss = total_val_loss / len(dev_loader)
 
-            # Log to DataFrame
+            # Log metrics to DataFrame for CSV export
             logs.append(
                 {
                     "epoch": epoch,
@@ -214,12 +268,14 @@ def train(
                     epoch,
                 )
 
+        # Save model checkpoint every 5 epochs
         if epoch % 5 == 0 and rank == 0:
             torch.save(model.state_dict(), f"{prog_dir}{job_id}_params_epoch{epoch}.pt")
 
+    # Finalize logging and cleanup
     if rank == 0:
         writer.close()
-        # Convert logs to DataFrame and save to CSV
+        # Save training logs to CSV for analysis
         df_logs = pd.DataFrame(logs)
         df_logs.to_csv(prog_dir + job_id + "_training_log.csv", index=False)
 

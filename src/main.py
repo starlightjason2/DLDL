@@ -1,3 +1,11 @@
+"""
+Main entry point for training the DLDL disruption prediction model.
+
+This script initializes distributed training parameters from environment
+variables and launches the training process. It's designed to run on HPC
+systems with SLURM/PMI job schedulers.
+"""
+
 import os
 import numpy as np
 import torch
@@ -6,12 +14,25 @@ from constants import DATA_PATH, TRAIN_LABELS_PATH, MAX_LENGTH_FILE, PROG_DIR, J
 
 
 if __name__ == "__main__":
-    max_length: int = int(np.loadtxt(MAX_LENGTH_FILE).astype(int))
+    # Load maximum sequence length from precomputed file
+    max_length = int(np.loadtxt(MAX_LENGTH_FILE).astype(int))
 
+    # Get distributed training parameters from environment
+    # PMI_RANK and PMI_SIZE are set by job schedulers like SLURM
     rank = int(os.getenv("PMI_RANK", "0"))
     world_size = int(os.getenv("PMI_SIZE", "1"))  # Default to 1 if not set
+
     print("GPUs Available:", torch.cuda.device_count())
     print("Rank:", rank)
+
+    # Launch training
+    max_length = int(np.loadtxt(MAX_LENGTH_FILE).astype(int))
+    rank = int(os.getenv("PMI_RANK", "0"))
+    world_size = int(os.getenv("PMI_SIZE", "1"))  # Default to 1 if not set
+
+    print("GPUs Available:", torch.cuda.device_count())
+    print("Rank:", rank)
+
     train(
         rank,
         world_size,
