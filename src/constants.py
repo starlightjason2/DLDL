@@ -1,32 +1,18 @@
-"""
-Project-wide constants for DLDL disruption prediction system.
-
-All path constants loaded from environment variables. All env vars are REQUIRED.
-See .env.local.example or .env.polaris.example for templates.
-"""
+"""Project-wide constants for DLDL disruption prediction system."""
 
 import os
+
+import torch.nn as nn
+from dotenv import load_dotenv
 
 # Get project root directory (one level up from src/)
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def _resolve_path(path: str) -> str:
-    """Convert relative paths to absolute paths based on project root."""
-    if os.path.isabs(path):
-        return path
-    return os.path.join(_PROJECT_ROOT, path)
-
-
-# Try to load .env file if python-dotenv is available
-try:
-    from dotenv import load_dotenv
-
-    env_file = os.path.join(_PROJECT_ROOT, ".env")
-    if os.path.exists(env_file):
-        load_dotenv(env_file)
-except ImportError:
-    pass
+# Load .env file if available
+env_file = os.path.join(_PROJECT_ROOT, ".env")
+if os.path.exists(env_file):
+    load_dotenv(env_file)
 
 ################################################################################
 ## Path Constants (from environment variables)
@@ -41,14 +27,20 @@ _REQUIRED_ENV_VARS = [
 ]
 
 
-# Check that all required environment variables are set
-_missing_vars = [var for var in _REQUIRED_ENV_VARS if var not in os.environ]
-if _missing_vars:
-    raise RuntimeError(
-        f"Missing required environment variables: {', '.join(_missing_vars)}\n"
-        f"Please set these variables or create a .env file. See .env.local.example "
-        f"or .env.polaris.example for templates."
-    )
+def _resolve_path(path: str) -> str:
+    return path if os.path.isabs(path) else os.path.join(_PROJECT_ROOT, path)
+
+
+def _validate_constants() -> None:
+    if not (0 < CPU_USE <= 1):
+        raise ValueError(f"CPU_USE must be in (0, 1], got {CPU_USE}")
+    if NORMALIZATION_TYPE not in ("scale", "meanvar-whole", "meanvar-single"):
+        raise ValueError(f"NORMALIZATION_TYPE must be 'scale', 'meanvar-whole', or 'meanvar-single'; got {NORMALIZATION_TYPE!r}")
+
+
+missing_vars = [var for var in _REQUIRED_ENV_VARS if var not in os.environ]
+if missing_vars:
+    raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
 DATA_DIR = _resolve_path(os.environ["DATA_DIR"])
 DATASET_DIR = _resolve_path(os.environ["DATASET_DIR"])
@@ -61,7 +53,12 @@ os.makedirs(PROG_DIR, exist_ok=True)
 
 JOB_ID = os.environ["JOB_ID"]
 
-import torch.nn as nn
+# Optional: Graph output directory (defaults to PROG_DIR if not set)
+if "GRAPH_DIR" in os.environ:
+    GRAPH_DIR = _resolve_path(os.environ["GRAPH_DIR"])
+else:
+    GRAPH_DIR = PROG_DIR
+os.makedirs(GRAPH_DIR, exist_ok=True)
 
 CLASSIFICATION_LOSS: "nn.BCEWithLogitsLoss" = nn.BCEWithLogitsLoss()
 TIME_PREDICTION_LOSS: "nn.MSELoss" = nn.MSELoss()
@@ -86,9 +83,5 @@ try:
 except (TypeError, ValueError) as e:
     raise ValueError(f"CPU_USE must be a number, got {_CPU_USE_RAW!r}") from e
 
-if not (0 < CPU_USE <= 1):
-    raise ValueError(f"CPU_USE must be in (0, 1], got {CPU_USE}")
-if NORMALIZATION_TYPE not in ("scale", "meanvar-whole", "meanvar-single"):
-    raise ValueError(
-        f"NORMALIZATION_TYPE must be 'scale', 'meanvar-whole', or 'meanvar-single'; got {NORMALIZATION_TYPE!r}"
-    )
+# Validate all constants
+_validate_constants()

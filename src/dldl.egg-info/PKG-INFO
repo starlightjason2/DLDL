@@ -27,6 +27,7 @@ Requires-Dist: tensorboard>=2.7.0
 Requires-Dist: python-dotenv>=0.19.0
 Requires-Dist: loguru>=0.7.0
 Requires-Dist: matplotlib>=3.5.0
+Requires-Dist: PyQt6>=6.0.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0.0; extra == "dev"
 Requires-Dist: black>=22.0.0; extra == "dev"
@@ -64,6 +65,7 @@ A 1D CNN that uses plasma current to predict disruption time. For labeling D-III
 | `LABELS_PATH` | ✓ | Shot list with disruption times |
 | `PROG_DIR` | ✓ | Logs and checkpoints |
 | `JOB_ID` | ✓ | Run identifier |
+| `GRAPH_DIR` | | Directory for graph outputs (defaults to `PROG_DIR` if not set) |
 | `NORMALIZATION_TYPE` | | `scale`, `meanvar-whole`, or `meanvar-single` (default `meanvar-whole`). |
 | `CPU_USE` | | Fraction of CPU cores for preprocessing, 0-1 (default `0.2`; use `0.2-0.3` for ~32GB RAM) |
 | `PMI_LOCAL_RANK` | | Distributed training (scheduler) |
@@ -73,7 +75,7 @@ A 1D CNN that uses plasma current to predict disruption time. For labeling D-III
 ## Workflow
 
 ```
-Raw .txt → preprocess_data.py → .pt files → train.py → Model + logs
+Raw .txt → preprocess_data.py → .pt files → train.py → Model + logs → graph.py → Visualizations
 ```
 
 **Config:** Set `NORMALIZATION_TYPE` and `CPU_USE` in `.env` (or env). `NORMALIZATION_TYPE` is the normalization method and filename suffix. Both scripts use `constants`.
@@ -110,6 +112,49 @@ python src/train.py
 * Saves checkpoints and logs to `PROG_DIR`
 
 Hyperparameters (lr, epochs, etc.) are in `train.py`.
+
+### 3. Visualization
+
+```bash
+python -m src.graph
+```
+
+* Loads training log CSV from `PROG_DIR/{JOB_ID}_training_log.csv`
+* Creates a 2x2 subplot visualization with:
+  - Training and Validation Loss
+  - Validation Accuracy
+  - Validation Precision and Recall
+  - Validation F1 Score
+* Saves plot to `GRAPH_DIR/{JOB_ID}_training_log_plot.png` (or `PROG_DIR` if `GRAPH_DIR` not set)
+
+**Command-line Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `--csv` | str | `PROG_DIR/{JOB_ID}_training_log.csv` | Path to the training log CSV file. If not specified, uses the default path based on `PROG_DIR` and `JOB_ID` constants. |
+| `--output` | str | `GRAPH_DIR/{JOB_ID}_training_log_plot.png` | Path where the plot image will be saved. If not specified and `--show` is not used, defaults to `GRAPH_DIR/{JOB_ID}_training_log_plot.png`. If `--show` is used without `--output`, the plot is only displayed and not saved. |
+| `--show` | flag | False | Display the plot interactively using matplotlib's GUI. When used without `--output`, the plot is only displayed and not saved to disk. Can be combined with `--output` to both save and display. **Note:** Requires an interactive backend (PyQt5, PyQt6, or Tkinter). In headless environments, the plot will be saved to the default location instead. |
+
+**Examples:**
+```bash
+# Use default paths from constants
+python -m src.graph
+
+# Specify custom CSV file
+python -m src.graph --csv path/to/training_log.csv
+
+# Save plot to specific location
+python -m src.graph --output path/to/output.png
+
+# Display plot interactively (not saved)
+python -m src.graph --show
+
+# Save and display plot
+python -m src.graph --output plot.png --show
+
+# Use custom CSV and save to custom location
+python -m src.graph --csv custom_log.csv --output plot.png
+```
 
 ## Quick Reference
 
