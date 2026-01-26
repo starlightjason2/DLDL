@@ -59,6 +59,26 @@ def plot_training_log(
 
     df = pd.read_csv(csv_path)
 
+    # Print best performance scores
+    best_epoch = df.loc[df["validation_loss"].idxmin()]
+    logger.info("=" * 60)
+    logger.info("Best Performance (Lowest Validation Loss):")
+    logger.info(f"  Epoch: {int(best_epoch['epoch'])}")
+    logger.info(f"  Training Loss: {best_epoch['training_loss']:.6f}")
+    logger.info(f"  Validation Loss: {best_epoch['validation_loss']:.6f}")
+    logger.info(f"  Accuracy: {best_epoch['Validation Accuracy']:.6f}")
+    logger.info(f"  Precision: {best_epoch['Validation Precision']:.6f}")
+    logger.info(f"  Recall: {best_epoch['Validation Recall']:.6f}")
+    logger.info(f"  F1 Score: {best_epoch['Validation F1 Score']:.6f}")
+    
+    best_accuracy_epoch = df.loc[df["Validation Accuracy"].idxmax()]
+    logger.info("-" * 60)
+    logger.info("Best Accuracy:")
+    logger.info(f"  Epoch: {int(best_accuracy_epoch['epoch'])}")
+    logger.info(f"  Accuracy: {best_accuracy_epoch['Validation Accuracy']:.6f}")
+    logger.info(f"  Validation Loss: {best_accuracy_epoch['validation_loss']:.6f}")
+    logger.info("=" * 60)
+
     # Define plot configurations: (position, series_configs, ylabel, title, ylim)
     plot_configs = [
         (

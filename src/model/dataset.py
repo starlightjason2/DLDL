@@ -33,62 +33,58 @@ class IpDataset(Dataset):
 
     def __init__(
         self,
+        normalization_type: str,
         data_file: Optional[str] = None,
         labels_file: Optional[str] = None,
         classification: bool = False,
-        normalization_type: str = "",
         labels_type: Literal["scaled", "naive"] = "scaled",
     ) -> None:
         """Initialize dataset, creating preprocessed files if missing.
 
         Args:
+            normalization_type: Normalization type identifier (required).
             data_file: Path to preprocessed data tensor (.pt). If None, uses default path.
             labels_file: Path to labels tensor (.pt). If None, uses default path.
             classification: If True, return only binary label. If False, return [class, time].
-            normalization_type: Normalization type identifier. Defaults to NORMALIZATION_TYPE.
+            labels_type: Type of labels to use ("scaled" or "naive").
         """
-        self.normalization_type = normalization_type or NORMALIZATION_TYPE
+        self.normalization_type = normalization_type
         self.labels_type = labels_type or "scaled"
-        self.cpu_use = CPU_USE
         self.classification = classification
         self.logger = logger.bind(name=__name__)
 
         # Set paths
         suffix = f"_{self.normalization_type}" if self.normalization_type else ""
-        self.data_file = data_file or os.path.join(DATASET_DIR, f"processed_dataset{suffix}.pt")
-        self.labels_file = labels_file or os.path.join(DATASET_DIR, f"processed_labels{suffix}.pt")
+        self.data_file = data_file or os.path.join(
+            DATASET_DIR, f"processed_dataset{suffix}.pt"
+        )
+        self.labels_file = labels_file or os.path.join(
+            DATASET_DIR, f"processed_labels{suffix}.pt"
+        )
 
         # Create dataset if missing
         if not os.path.exists(self.data_file) or not os.path.exists(self.labels_file):
-            if data_file is None and labels_file is None:
-                # Using default paths and files don't exist - create them
-                self.logger.info(
-                    f"Preprocessed files not found. Creating dataset "
-                    f"(normalization_type='{self.normalization_type}')"
-                )
-                # Initialize preprocessing state
-                self.shot_list = np.loadtxt(LABELS_PATH)
-                self.file_list = [f"{int(shot[0])}.txt" for shot in self.shot_list]
-                self.num_shots = len(self.file_list)
-                self.max_length = self._get_max_length()
-                self.mean, self.std = (
-                    self._get_mean_std()
-                    if NORMALIZATION_TYPE == "meanvar-whole"
-                    else (None, None)
-                )
-                self.sorted_shot_numbers = None
-                self._shot_to_idx = {
-                    int(shot[0]): idx for idx, shot in enumerate(self.shot_list)
-                }
-                self._shot_to_label = {int(shot[0]): shot.copy() for shot in self.shot_list}
-                self.sorted_shot_numbers = np.sort(self.shot_list[:, 0].astype(int))
-                self._make_dataset(make_labels=True)
-            else:
-                # Files explicitly provided but don't exist - raise error
-                raise FileNotFoundError(
-                    f"Dataset files not found: {self.data_file} or {self.labels_file}. "
-                    "Run preprocess_data.py first or use default paths to auto-create."
-                )
+            self.logger.info(
+                f"Preprocessed files not found. Creating dataset "
+                f"(normalization_type='{self.normalization_type}')"
+            )
+            # Initialize preprocessing state
+            self.shot_list = np.loadtxt(LABELS_PATH)
+            self.file_list = [f"{int(shot[0])}.txt" for shot in self.shot_list]
+            self.num_shots = len(self.file_list)
+            self.max_length = self._get_max_length()
+            self.mean, self.std = (
+                self._get_mean_std()
+                if NORMALIZATION_TYPE == "meanvar-whole"
+                else (None, None)
+            )
+            self.sorted_shot_numbers = None
+            self._shot_to_idx = {
+                int(shot[0]): idx for idx, shot in enumerate(self.shot_list)
+            }
+            self._shot_to_label = {int(shot[0]): shot.copy() for shot in self.shot_list}
+            self.sorted_shot_numbers = np.sort(self.shot_list[:, 0].astype(int))
+            self._make_dataset(make_labels=True)
         else:
             self.logger.info(f"Loading existing dataset from {self.data_file}")
 
@@ -124,9 +120,13 @@ class IpDataset(Dataset):
 
     def _process_files_parallel(self, func: Callable[..., Any], *args: Any) -> NDArray:
         """Process files in parallel."""
-        with ProcessPoolExecutor(max_workers=get_use_cores(self.cpu_use)) as executor:
+        with ProcessPoolExecutor(max_workers=get_use_cores(CPU_USE)) as executor:
             return np.asarray(
-                list(executor.map(func, self.file_list, [DATA_DIR] * self.num_shots, *args))
+                list(
+                    executor.map(
+                        func, self.file_list, [DATA_DIR] * self.num_shots, *args
+                    )
+                )
             )
 
     def _get_max_length(self) -> int:
@@ -143,7 +143,9 @@ class IpDataset(Dataset):
         self.logger.info(f"Dataset statistics: mean={mean:.6f}, std={std:.6f}")
         return mean, std
 
-    def make_labels(self, scaled: bool = True, save: bool = False) -> NDArray[np.float64]:
+    def make_labels(
+        self, scaled: bool = True, save: bool = False
+    ) -> NDArray[np.float64]:
         """Create labels with optional scaling."""
         labels = create_binary_labels(self.shot_list)
         if scaled:
@@ -156,12 +158,35 @@ class IpDataset(Dataset):
             torch.save(torch.tensor(labels), self.labels_file)
         return labels
 
-    def _get_normalization_loader(self, data_dir_args: List[str], max_length_args: List[int]) -> Tuple[Callable[..., Tuple[int, NDArray[float32]]], Tuple[Any, ...]]:
+    def _get_normalization_loader(
+        self, data_dir_args: List[str], max_length_args: List[int]
+    ) -> Tuple[Callable[..., Tuple[int, NDArray[float32]]], Tuple[Any, ...]]:
         """Get loader function and arguments for current normalization method."""
         loaders = {
-            "scale": (load_and_pad_scale, (self.file_list, data_dir_args, max_length_args)),
-            "meanvar-whole": (load_and_pad_norm, (self.file_list, data_dir_args, max_length_args, [self.mean] * self.num_shots, [self.std] * self.num_shots)),
-            "meanvar-single": (load_and_pad_norm, (self.file_list, data_dir_args, max_length_args, [None] * self.num_shots, [None] * self.num_shots)),
+            "scale": (
+                load_and_pad_scale,
+                (self.file_list, data_dir_args, max_length_args),
+            ),
+            "meanvar-whole": (
+                load_and_pad_norm,
+                (
+                    self.file_list,
+                    data_dir_args,
+                    max_length_args,
+                    [self.mean] * self.num_shots,
+                    [self.std] * self.num_shots,
+                ),
+            ),
+            "meanvar-single": (
+                load_and_pad_norm,
+                (
+                    self.file_list,
+                    data_dir_args,
+                    max_length_args,
+                    [None] * self.num_shots,
+                    [None] * self.num_shots,
+                ),
+            ),
         }
         if self.normalization_type not in loaders:
             raise ValueError(f"Unknown normalization: {self.normalization_type}")
@@ -169,14 +194,18 @@ class IpDataset(Dataset):
 
     def _make_dataset(self, make_labels: bool = True) -> None:
         """Build preprocessed dataset from raw signal files."""
-        self.logger.info(f"Building dataset for {self.num_shots} shots (normalization={self.normalization_type})")
-        self.logger.info(f"Estimated memory: ~{(self.num_shots * self.max_length * 4) / (1024**3):.2f} GB")
+        self.logger.info(
+            f"Building dataset for {self.num_shots} shots (normalization={self.normalization_type})"
+        )
+        self.logger.info(
+            f"Estimated memory: ~{(self.num_shots * self.max_length * 4) / (1024**3):.2f} GB"
+        )
 
         loader_func, loader_args = self._get_normalization_loader(
             [DATA_DIR] * self.num_shots, [self.max_length] * self.num_shots
         )
 
-        with ProcessPoolExecutor(max_workers=get_use_cores(self.cpu_use)) as executor:
+        with ProcessPoolExecutor(max_workers=get_use_cores(CPU_USE)) as executor:
             results = list(executor.map(loader_func, *loader_args))
 
         sorted_data = sorted(results, key=lambda x: x[0])
@@ -214,7 +243,9 @@ class IpDataset(Dataset):
             labels[:, 0] = (labels[:, 1] != -1.0).astype(float)
         return torch.tensor(labels)
 
-    def _load_example_from_raw(self, idx: int, scale_labels: bool = True) -> Tuple[Tensor, Tensor]:
+    def _load_example_from_raw(
+        self, idx: int, scale_labels: bool = True
+    ) -> Tuple[Tensor, Tensor]:
         """Load single example from raw files."""
         shot_no = int(self.sorted_shot_numbers[idx])
         t_disrupt = self.shot_list[self._shot_to_idx[shot_no], 1]
@@ -226,10 +257,13 @@ class IpDataset(Dataset):
                 shot_no, DATA_DIR, t_disrupt, self.max_length
             )
 
-        return torch.tensor(self._load_single_file(f"{shot_no}.txt")[1]), torch.tensor(label)
+        return torch.tensor(self._load_single_file(f"{shot_no}.txt")[1]), torch.tensor(
+            label
+        )
 
-
-    def check_dataset(self, scale_labels: bool = True, num_checks: int = 100, verbose: bool = False) -> None:
+    def check_dataset(
+        self, scale_labels: bool = True, num_checks: int = 100, verbose: bool = False
+    ) -> None:
         """Verify preprocessed dataset integrity."""
         # Initialize preprocessing state if not already done
         if not hasattr(self, "shot_list"):

@@ -17,4 +17,4 @@ if __name__ == "__main__":
         if os.path.exists(path):
             os.remove(path)
             logger.info(f"Deleted cached file: {path}")
-    IpDataset().check_dataset(scale_labels=True)
+    IpDataset(normalization_type=NORMALIZATION_TYPE).check_dataset(scale_labels=True)
