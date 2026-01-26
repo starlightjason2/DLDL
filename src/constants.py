@@ -60,8 +60,8 @@ else:
     GRAPH_DIR = PROG_DIR
 os.makedirs(GRAPH_DIR, exist_ok=True)
 
-CLASSIFICATION_LOSS: "nn.BCEWithLogitsLoss" = nn.BCEWithLogitsLoss()
-TIME_PREDICTION_LOSS: "nn.MSELoss" = nn.MSELoss()
+CLASSIFICATION_LOSS = nn.BCEWithLogitsLoss()
+TIME_PREDICTION_LOSS = nn.MSELoss()
 
 # Optional: Distributed training variables (set by job scheduler)
 LOCAL_RANK = os.environ.get("PMI_LOCAL_RANK")
@@ -77,9 +77,9 @@ PMI_SIZE = os.environ.get("PMI_SIZE")
 _NORMALIZATION_TYPE_RAW = os.environ.get("NORMALIZATION_TYPE", "meanvar-whole")
 _CPU_USE_RAW = os.environ.get("CPU_USE", "0.2")
 
-NORMALIZATION_TYPE: str = _NORMALIZATION_TYPE_RAW
+NORMALIZATION_TYPE = _NORMALIZATION_TYPE_RAW
 try:
-    CPU_USE: float = float(_CPU_USE_RAW)
+    CPU_USE = float(_CPU_USE_RAW)
 except (TypeError, ValueError) as e:
     raise ValueError(f"CPU_USE must be a number, got {_CPU_USE_RAW!r}") from e
 

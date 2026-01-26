@@ -19,7 +19,7 @@ from sklearn.metrics import (
 )
 from torch import Tensor
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader, Dataset, DistributedSampler
+from torch.utils.data import DataLoader, DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from constants import (
@@ -56,46 +56,46 @@ class IpCNN(nn.Module):
         self.labels_path = labels_path
         self.data_path = data_path
         self.prog_dir = prog_dir
-        self.classification: bool = classification
+        self.classification = classification
         self.logger = logger.bind(name=__name__)
 
-        self.conv1: nn.Conv1d = nn.Conv1d(
-            1, conv1[0], kernel_size=conv1[1], stride=1, padding=conv1[2]
-        )
-        self.conv2: nn.Conv1d = nn.Conv1d(
-            conv1[0], conv2[0], kernel_size=conv2[1], stride=1, padding=conv2[2]
-        )
-        self.conv3: nn.Conv1d = nn.Conv1d(
-            conv2[0], conv3[0], kernel_size=conv3[1], stride=1, padding=conv3[2]
-        )
-        self.pool: nn.MaxPool1d = nn.MaxPool1d(
-            kernel_size=pool_size, stride=pool_size, padding=0
-        )
+        self.conv1 = nn.Conv1d(1, conv1[0], kernel_size=conv1[1], stride=1, padding=conv1[2])
+        self.bn1 = nn.BatchNorm1d(conv1[0])
+        self.conv2 = nn.Conv1d(conv1[0], conv2[0], kernel_size=conv2[1], stride=1, padding=conv2[2])
+        self.bn2 = nn.BatchNorm1d(conv2[0])
+        self.conv3 = nn.Conv1d(conv2[0], conv3[0], kernel_size=conv3[1], stride=1, padding=conv3[2])
+        self.bn3 = nn.BatchNorm1d(conv3[0])
+        self.pool = nn.MaxPool1d(kernel_size=pool_size, stride=pool_size, padding=0)
 
         # Compute FC input size dynamically
         with torch.no_grad():
-            dummy_input: Tensor = torch.zeros(1, 1, self.max_length)
-            dummy_output: Tensor = self.forward_conv(dummy_input)
-            num_features_before_fc: int = dummy_output.numel()
+            dummy_input = torch.zeros(1, 1, self.max_length)
+            dummy_output = self.forward_conv(dummy_input)
+            num_features_before_fc = dummy_output.numel()
 
-        self.fc1: nn.Linear = nn.Linear(num_features_before_fc, 120)
-        self.fc2: nn.Linear = nn.Linear(120, 60)
-        self.fc3: nn.Linear = nn.Linear(60, 1 if classification else 2)
+        self.fc1 = nn.Linear(num_features_before_fc, 120)
+        self.bn4 = nn.BatchNorm1d(120)
+        self.dropout1 = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(120, 60)
+        self.bn5 = nn.BatchNorm1d(60)
+        self.dropout2 = nn.Dropout(0.5)
+        self.fc3 = nn.Linear(60, 1 if classification else 2)
 
     def __len__(self) -> int:
         return sum(p.numel() for p in self.parameters())
 
     def forward_conv(self, x: Tensor) -> Tensor:
         """Forward through conv+pool layers."""
-        for conv in [self.conv1, self.conv2, self.conv3]:
-            x = self.pool(F.relu(conv(x)))
+        x = self.pool(F.relu(self.bn1(self.conv1(x))))
+        x = self.pool(F.relu(self.bn2(self.conv2(x))))
+        x = self.pool(F.relu(self.bn3(self.conv3(x))))
         return x.view(x.size(0), -1)
 
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass."""
         x = self.forward_conv(x.unsqueeze(1))
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+        x = self.dropout1(F.relu(self.bn4(self.fc1(x))))
+        x = self.dropout2(F.relu(self.bn5(self.fc2(x))))
         return self.fc3(x)
 
     def validate_preprocessed_files(self, normalization_type: str) -> None:
@@ -136,14 +136,11 @@ class IpCNN(nn.Module):
 
                 classification_predictions = torch.sigmoid(classification_output) > 0.5
                 all_classification_targets.extend(classification_targets.cpu().numpy())
-                all_classification_predictions.extend(
-                    classification_predictions.cpu().numpy()
-                )
+                all_classification_predictions.extend(classification_predictions.cpu().numpy())
 
                 val_total_loss = self._loss(output, targets)
                 total_val_loss += val_total_loss.item()
 
-        # Compute average losses
         avg_train_loss = total_train_loss / len(train_loader)
         avg_val_loss = total_val_loss / len(dev_loader)
         metrics = {
@@ -166,7 +163,7 @@ class IpCNN(nn.Module):
                 epoch,
             )
 
-    def train_model(self, rank: int, world_size: int, job_id: str, normalization_type: str = "", lr: float = 0.01, num_epochs: int = 100, log_interval: int = 20) -> None:
+    def train_model(self, rank: int, world_size: int, job_id: str, normalization_type: str = "", lr: float = 0.01, num_epochs: int = 100, log_interval: int = 20, weight_decay: float = 1e-4, lr_scheduler: bool = True, early_stopping_patience: int = 10, gradient_clip: float = 1.0) -> None:
         """Train this model with distributed data parallel."""
         self.validate_preprocessed_files(normalization_type)
 
@@ -213,7 +210,11 @@ class IpCNN(nn.Module):
         if use_distributed:
             model = DDP(model, device_ids=[0])
 
-        optimizer = optim.Adam(model.parameters(), lr=lr)
+        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+        if lr_scheduler:
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, mode="min", factor=0.5, patience=5
+            )
         bce_loss = torch.nn.BCEWithLogitsLoss()
         classification = self.classification
         if not classification:
@@ -222,6 +223,9 @@ class IpCNN(nn.Module):
         logs = []
         if rank == 0:
             writer = SummaryWriter(os.path.join(self.prog_dir, job_id))
+
+        best_val_loss = float("inf")
+        epochs_without_improvement = 0
 
         for epoch in range(num_epochs):
             if rank == 0 and epoch > 0:
@@ -250,6 +254,8 @@ class IpCNN(nn.Module):
                     loss_value = bce_loss(output, target)
 
                 loss_value.backward()
+                if gradient_clip > 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clip)
                 optimizer.step()
                 total_train_loss += loss_value.item()
 
@@ -275,6 +281,27 @@ class IpCNN(nn.Module):
                     train_loader=train_loader,
                     logs=logs,
                 )
+                avg_val_loss = logs[-1]["validation_loss"] if logs else float("inf")
+                
+                if lr_scheduler:
+                    scheduler.step(avg_val_loss)
+                    current_lr = optimizer.param_groups[0]["lr"]
+                    writer.add_scalar("Learning Rate", current_lr, epoch)
+                
+                if avg_val_loss < best_val_loss:
+                    best_val_loss = avg_val_loss
+                    epochs_without_improvement = 0
+                    torch.save(
+                        model.state_dict(),
+                        os.path.join(self.prog_dir, f"{job_id}_best_params.pt"),
+                    )
+                    self.logger.info(f"New best validation loss: {best_val_loss:.6f}")
+                else:
+                    epochs_without_improvement += 1
+                
+                if early_stopping_patience > 0 and epochs_without_improvement >= early_stopping_patience:
+                    self.logger.info(f"Early stopping triggered after {epoch + 1} epochs (no improvement for {early_stopping_patience} epochs)")
+                    break
 
             if epoch % 5 == 0 and rank == 0:
                 torch.save(
@@ -285,9 +312,7 @@ class IpCNN(nn.Module):
         if rank == 0:
             writer.close()
             df_logs = pd.DataFrame(logs)
-            df_logs.to_csv(
-                os.path.join(self.prog_dir, f"{job_id}_training_log.csv"), index=False
-            )
+            df_logs.to_csv(os.path.join(self.prog_dir, f"{job_id}_training_log.csv"), index=False)
 
         if use_distributed:
             cleanup()

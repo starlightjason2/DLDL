@@ -3,7 +3,7 @@
 import os
 import random
 from concurrent.futures import ProcessPoolExecutor
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
+from typing import Any, Callable, List, Literal, Optional, Tuple
 
 import numpy as np
 import torch
@@ -76,7 +76,7 @@ class IpDataset(Dataset):
                     if NORMALIZATION_TYPE == "meanvar-whole"
                     else (None, None)
                 )
-                self.sorted_shot_numbers: Optional[NDArray] = None
+                self.sorted_shot_numbers = None
                 self._shot_to_idx = {
                     int(shot[0]): idx for idx, shot in enumerate(self.shot_list)
                 }
@@ -93,8 +93,8 @@ class IpDataset(Dataset):
             self.logger.info(f"Loading existing dataset from {self.data_file}")
 
         # Load preprocessed data
-        self.data: Tensor = torch.load(self.data_file)
-        self.labels: Tensor = torch.load(self.labels_file)
+        self.data = torch.load(self.data_file)
+        self.labels = torch.load(self.labels_file)
 
     def __len__(self) -> int:
         """Return dataset size."""
@@ -177,9 +177,7 @@ class IpDataset(Dataset):
         )
 
         with ProcessPoolExecutor(max_workers=get_use_cores(self.cpu_use)) as executor:
-            results = list[Tuple[int, NDArray[float32]]](
-                executor.map(loader_func, *loader_args)
-            )
+            results = list(executor.map(loader_func, *loader_args))
 
         sorted_data = sorted(results, key=lambda x: x[0])
         sorted_shot_numbers, dataset_data = zip(*sorted_data)
@@ -244,7 +242,7 @@ class IpDataset(Dataset):
                 if NORMALIZATION_TYPE == "meanvar-whole"
                 else (None, None)
             )
-            self.sorted_shot_numbers: Optional[NDArray] = None
+            self.sorted_shot_numbers = None
             self._shot_to_idx = {
                 int(shot[0]): idx for idx, shot in enumerate(self.shot_list)
             }

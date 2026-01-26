@@ -1,14 +1,26 @@
 """Training entry point for DLDL disruption prediction model."""
 
+import os
 import sys
 from loguru import logger
 
 logger.remove()
-logger.add(sys.stderr, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>", colorize=True, level="INFO")
+logger.add(
+    sys.stderr,
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+    colorize=True,
+    level="INFO",
+)
 
-from constants import DATASET_DIR, JOB_ID, NORMALIZATION_TYPE, PMI_RANK, PMI_SIZE, PROG_DIR
+from constants import (
+    DATASET_DIR,
+    JOB_ID,
+    NORMALIZATION_TYPE,
+    PMI_RANK,
+    PMI_SIZE,
+    PROG_DIR,
+)
 from model.cnn import IpCNN
-import os
 
 if __name__ == "__main__":
     suffix = f"_{NORMALIZATION_TYPE}" if NORMALIZATION_TYPE else ""
@@ -24,6 +36,6 @@ if __name__ == "__main__":
         job_id=JOB_ID,
         normalization_type=NORMALIZATION_TYPE,
         lr=0.0005,
-        num_epochs=250,
+        num_epochs=200,
         log_interval=50,
     )

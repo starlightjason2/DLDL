@@ -28,6 +28,7 @@ Requires-Dist: python-dotenv>=0.19.0
 Requires-Dist: loguru>=0.7.0
 Requires-Dist: matplotlib>=3.5.0
 Requires-Dist: PyQt6>=6.0.0
+Requires-Dist: mplcursors>=0.5.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0.0; extra == "dev"
 Requires-Dist: black>=22.0.0; extra == "dev"
