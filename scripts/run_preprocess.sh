@@ -6,8 +6,8 @@
 #PBS -l filesystems=home:eagle
 #PBS -q debug
 #PBS -A fusiondl_aesp
-#PBS -o preprocess_%j.out
-#PBS -e preprocess_%j.err
+#PBS -o /eagle/fusiondl_aesp/starlightjason2/DLDL/preprocess_%j.out
+#PBS -e /eagle/fusiondl_aesp/starlightjason2/DLDL/preprocess_%j.err
 
 # DLDL preprocessing - runs on compute node (CPU-only)
 

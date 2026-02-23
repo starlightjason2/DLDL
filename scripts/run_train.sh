@@ -6,8 +6,8 @@
 #PBS -l filesystems=home:eagle
 #PBS -q debug
 #PBS -A fusiondl_aesp
-#PBS -o train_%j.out
-#PBS -e train_%j.err
+#PBS -o /eagle/fusiondl_aesp/starlightjason2/DLDL/train_%j.out
+#PBS -e /eagle/fusiondl_aesp/starlightjason2/DLDL/train_%j.err
 
 # DLDL training - runs on compute node (GPU)
 
