@@ -11,7 +11,8 @@ cd "$PROJECT_ROOT"
 mkdir -p "$SCRIPT_DIR/hptune/trials"
 
 echo "Starting HPTune chain..."
-CONTROLLER_ID=$(qsub "$SCRIPT_DIR/hptune/controller.sh" 2>&1 | tail -1)
+HPTUNE_DIR="$SCRIPT_DIR/hptune"
+CONTROLLER_ID=$(qsub -o "$HPTUNE_DIR/controller_%j.out" -e "$HPTUNE_DIR/controller_%j.err" "$HPTUNE_DIR/controller.sh" 2>&1 | tail -1)
 echo "Controller submitted: $CONTROLLER_ID"
 echo ""
 echo "Monitor: qstat -u \$USER"

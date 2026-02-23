@@ -33,7 +33,7 @@ submit_worker_and_chain() {
     cd "$PROJECT_ROOT"
     worker_job_id=$(cd "$HPTUNE_DIR/trials/$trial_dir" && qsub run.sh 2>&1 | tail -1)
     echo "[controller] Worker job: $worker_job_id"
-    qsub -W depend=afterany:$worker_job_id "$CONTROLLER_SCRIPT" "$CHAIN_ID"
+    qsub -o "$HPTUNE_DIR/controller_%j.out" -e "$HPTUNE_DIR/controller_%j.err" -W depend=afterany:$worker_job_id "$CONTROLLER_SCRIPT" "$CHAIN_ID"
 }
 
 echo "[controller] Running bayesian_hp_tuning..."
