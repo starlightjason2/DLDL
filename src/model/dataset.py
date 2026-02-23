@@ -8,6 +8,7 @@ from typing import Any, Callable, List, Literal, Optional, Tuple
 import numpy as np
 import torch
 from loguru import logger
+from tqdm import tqdm
 from numpy import float32
 from numpy.typing import NDArray
 from torch import Tensor
@@ -118,26 +119,31 @@ class IpDataset(Dataset):
             raise ValueError(f"Unknown normalization: {self.normalization_type}")
         return loaders[self.normalization_type]()
 
-    def _process_files_parallel(self, func: Callable[..., Any], *args: Any) -> NDArray:
+    def _process_files_parallel(
+        self, func: Callable[..., Any], *args: Any, desc: str = "Processing"
+    ) -> NDArray:
         """Process files in parallel."""
         with ProcessPoolExecutor(max_workers=get_use_cores(CPU_USE)) as executor:
+            it = executor.map(
+                func, self.file_list, [DATA_DIR] * self.num_shots, *args
+            )
             return np.asarray(
-                list(
-                    executor.map(
-                        func, self.file_list, [DATA_DIR] * self.num_shots, *args
-                    )
-                )
+                list(tqdm(it, total=self.num_shots, desc=desc, unit="file"))
             )
 
     def _get_max_length(self) -> int:
         """Compute maximum time series length across all shots."""
-        max_len = int(np.max(self._process_files_parallel(get_length)))
+        max_len = int(
+            np.max(
+                self._process_files_parallel(get_length, desc="Getting max length")
+            )
+        )
         self.logger.info(f"Maximum time series length: {max_len} timesteps")
         return max_len
 
     def _get_mean_std(self) -> Tuple[float, float]:
         """Compute dataset-wide mean and std."""
-        results = self._process_files_parallel(get_means)
+        results = self._process_files_parallel(get_means, desc="Computing mean/std")
         mean = float(np.mean(results[:, 0]))
         std = float(max(0.0, float(np.mean(results[:, 1]) - mean**2)) ** 0.5)
         self.logger.info(f"Dataset statistics: mean={mean:.6f}, std={std:.6f}")
@@ -206,7 +212,15 @@ class IpDataset(Dataset):
         )
 
         with ProcessPoolExecutor(max_workers=get_use_cores(CPU_USE)) as executor:
-            results = list(executor.map(loader_func, *loader_args))
+            it = executor.map(loader_func, *loader_args)
+            results = list(
+                tqdm(
+                    it,
+                    total=self.num_shots,
+                    desc="Loading and normalizing",
+                    unit="file",
+                )
+            )
 
         sorted_data = sorted(results, key=lambda x: x[0])
         sorted_shot_numbers, dataset_data = zip(*sorted_data)
