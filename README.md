@@ -146,6 +146,15 @@ qstat -u $USER
 
 Output logs: `preprocess_<jobid>.out`, `train_<jobid>.out` (and `.err`).
 
+### Bayesian Hyperparameter Tuning
+
+```bash
+# From project root (with .env.polaris configured)
+./scripts/start_hptune.sh
+```
+
+Runs a chain of jobs: each controller picks or creates a trial (lr, epochs, dropout), submits a training job, then chains the next controller. Uses random sampling for the first 5 trials, then Bayesian optimization. Results in `scripts/hptune/trials_log.csv` and `scripts/hptune/trials/`.
+
 ## Quick Reference
 
 * **Config:** `NORMALIZATION_TYPE` and `CPU_USE` in env (or `.env`) drive preprocessing and training.

@@ -8,6 +8,14 @@ from dotenv import load_dotenv
 # Get project root directory (one level up from src/)
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# HPTune (Bayesian hyperparameter optimization)
+HPTUNE_DIR = os.environ.get("DLDL_HPTUNE_DIR", os.path.join(_PROJECT_ROOT, "scripts", "hptune"))
+TRIALS_DIR = os.path.join(HPTUNE_DIR, "trials")
+HPTUNE_CSV_PATH = os.path.join(HPTUNE_DIR, "trials_log.csv")
+LR_MIN, LR_MAX = 1e-5, 1e-2
+DROPOUT_MIN, DROPOUT_MAX = 0.1, 0.5
+ALLOWED_EPOCHS = [50, 100, 150, 200]
+NUM_INITIAL_TRIALS = 5
 
 # Load .env file if available
 env_file = os.path.join(_PROJECT_ROOT, ".env")

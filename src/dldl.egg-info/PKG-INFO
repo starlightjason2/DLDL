@@ -26,9 +26,9 @@ Requires-Dist: scikit-learn>=0.24.0
 Requires-Dist: tensorboard>=2.7.0
 Requires-Dist: python-dotenv>=0.19.0
 Requires-Dist: loguru>=0.7.0
-Requires-Dist: tqdm>=4.62.0
 Requires-Dist: matplotlib>=3.5.0
 Requires-Dist: PyQt6>=6.0.0
+Requires-Dist: bayesian-optimization>=1.4.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0.0; extra == "dev"
 Requires-Dist: black>=22.0.0; extra == "dev"
@@ -68,7 +68,9 @@ A 1D CNN that uses plasma current to predict disruption time. For labeling D-III
 | `JOB_ID` | ✓ | Run identifier |
 | `GRAPH_DIR` | | Directory for graph outputs (defaults to `PROG_DIR` if not set) |
 | `NORMALIZATION_TYPE` | | `scale`, `meanvar-whole`, or `meanvar-single` (default `meanvar-whole`). |
-| `CPU_USE` | | Fraction of CPU cores for preprocessing, 0-1 (default `0.2`; use `0.2-0.3` for ~32GB RAM) |
+| `CPU_USE` | | Fraction of CPU cores for preprocessing, 0-1 (default `0.2`; use `0.5-1.0` on HPC with more RAM) |
+| `PREPROCESSOR_MAX_WORKERS` | | Hard cap on preprocessing workers (default `4`; avoids fork/resource issues on HPC) |
+| `DATALOADER_NUM_WORKERS` | | DataLoader workers for training (default `4`; 0 when no GPU) |
 | `PMI_LOCAL_RANK` | | Distributed training (scheduler) |
 | `PMI_RANK` | | Process rank (default 0) |
 | `PMI_SIZE` | | World size (default 1) |
@@ -156,6 +158,39 @@ python -m src.graph --output plot.png --show
 # Use custom CSV and save to custom location
 python -m src.graph --csv custom_log.csv --output plot.png
 ```
+
+## Polaris Batch Jobs
+
+Run preprocessing and training on compute nodes (not login nodes):
+
+```bash
+# From DLDL project root, with .env symlinked to .env.polaris
+cd /path/to/DLDL
+
+# Edit scripts/run_preprocess.sh and scripts/run_train.sh:
+# - Uncomment and set your conda activation
+# - Adjust #PBS -A if your account differs from fusiondl_aesp
+
+# Submit preprocessing (CPU, ~2 hr walltime)
+qsub scripts/run_preprocess.sh
+
+# Submit training (GPU, ~4 hr walltime)
+qsub scripts/run_train.sh
+
+# Check status
+qstat -u $USER
+```
+
+Output logs: `preprocess_<jobid>.out`, `train_<jobid>.out` (and `.err`).
+
+### Bayesian Hyperparameter Tuning
+
+```bash
+# From project root (with .env.polaris configured)
+./scripts/start_hptune.sh
+```
+
+Runs a chain of jobs: each controller picks or creates a trial (lr, epochs, dropout), submits a training job, then chains the next controller. Uses random sampling for the first 5 trials, then Bayesian optimization. Results in `scripts/hptune/trials_log.csv` and `scripts/hptune/trials/`.
 
 ## Quick Reference
 
