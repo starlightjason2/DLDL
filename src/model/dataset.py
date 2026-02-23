@@ -14,7 +14,14 @@ from numpy.typing import NDArray
 from torch import Tensor
 from torch.utils.data import Dataset
 
-from constants import CPU_USE, DATA_DIR, DATASET_DIR, LABELS_PATH, NORMALIZATION_TYPE
+from constants import (
+    CPU_USE,
+    DATA_DIR,
+    DATASET_DIR,
+    LABELS_PATH,
+    NORMALIZATION_TYPE,
+    PREPROCESSOR_MAX_WORKERS,
+)
 from util.data_loading import (
     get_length,
     get_means,
@@ -123,7 +130,7 @@ class IpDataset(Dataset):
         self, func: Callable[..., Any], *args: Any, desc: str = "Processing"
     ) -> NDArray:
         """Process files in parallel."""
-        workers = get_use_cores(CPU_USE)
+        workers = min(get_use_cores(CPU_USE), PREPROCESSOR_MAX_WORKERS)
         chunksize = max(1, self.num_shots // (workers * 4))  # Reduce IPC overhead
         with ProcessPoolExecutor(max_workers=workers) as executor:
             it = executor.map(
@@ -214,7 +221,7 @@ class IpDataset(Dataset):
             [DATA_DIR] * self.num_shots, [self.max_length] * self.num_shots
         )
 
-        workers = get_use_cores(CPU_USE)
+        workers = min(get_use_cores(CPU_USE), PREPROCESSOR_MAX_WORKERS)
         chunksize = max(1, self.num_shots // (workers * 4))  # Reduce IPC overhead
         with ProcessPoolExecutor(max_workers=workers) as executor:
             it = executor.map(loader_func, *loader_args, chunksize=chunksize)

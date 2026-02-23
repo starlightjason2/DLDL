@@ -239,5 +239,14 @@ try:
 except (TypeError, ValueError) as e:
     raise ValueError(f"CPU_USE must be a number, got {_CPU_USE_RAW!r}") from e
 
+# PREPROCESSOR_MAX_WORKERS: hard cap on ProcessPoolExecutor workers (avoids fork/resource issues on HPC)
+_PREPROCESSOR_MAX_WORKERS_RAW = os.environ.get("PREPROCESSOR_MAX_WORKERS", "4")
+try:
+    PREPROCESSOR_MAX_WORKERS = int(_PREPROCESSOR_MAX_WORKERS_RAW)
+    if PREPROCESSOR_MAX_WORKERS < 1:
+        raise ValueError(f"PREPROCESSOR_MAX_WORKERS must be >= 1, got {PREPROCESSOR_MAX_WORKERS}")
+except (TypeError, ValueError) as e:
+    raise ValueError(f"PREPROCESSOR_MAX_WORKERS must be a positive integer, got {_PREPROCESSOR_MAX_WORKERS_RAW!r}") from e
+
 # Validate all constants
 _validate_constants()
