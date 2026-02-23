@@ -278,8 +278,14 @@ class IpDataset(Dataset):
     def check_dataset(
         self, scale_labels: bool = True, num_checks: int = 100, verbose: bool = False
     ) -> None:
-        """Verify preprocessed dataset integrity."""
-        # Initialize preprocessing state if not already done
+        """Verify preprocessed dataset integrity.
+
+        Spot-checks a random subset of examples by comparing the saved preprocessed
+        data against freshly recomputed values from raw .txt files. Catches corruption,
+        preprocessing bugs, or mismatched normalization settings.
+        """
+        # Initialize preprocessing state if not already done (e.g., dataset loaded
+        # from existing .pt files without running _make_dataset)
         if not hasattr(self, "shot_list"):
             self.shot_list = np.loadtxt(LABELS_PATH)
             self.file_list = [f"{int(shot[0])}.txt" for shot in self.shot_list]
@@ -297,7 +303,8 @@ class IpDataset(Dataset):
             self._shot_to_label = {int(shot[0]): shot.copy() for shot in self.shot_list}
             self.sorted_shot_numbers = np.sort(self.shot_list[:, 0].astype(int))
 
-        # Reload data to ensure we're checking the saved files
+        # Load the saved .pt files from disk (not self.data/self.labels) so we
+        # verify what is actually stored, not any in-memory copies
         data = torch.load(self.data_file)
         labels = torch.load(self.labels_file)
 
@@ -306,18 +313,23 @@ class IpDataset(Dataset):
             f"Verifying dataset integrity: {num_checks} examples (scale_labels={scale_labels})"
         )
 
+        # For each randomly sampled index: compare preprocessed cache vs recomputed
         for idx in random.sample(range(len(data)), num_checks):
             shot_no = int(self.sorted_shot_numbers[idx])
             if verbose:
                 self.logger.debug(f"Verifying shot {shot_no} at index {idx}")
 
+            # What we have in the preprocessed files
             proc_data = data[idx]
             proc_label = labels[idx]
+            # What we get by loading raw .txt and applying the same preprocessing
             exp_data, exp_label = self._load_example_from_raw(idx, scale_labels)
 
+            # Normalize shapes/dtypes for comparison
             proc_data, proc_label = proc_data.squeeze(0), proc_label.squeeze(0)
             exp_data = exp_data.to(proc_data.dtype)
             exp_label = exp_label.to(proc_label.dtype)
+            # Numerical comparison with tolerance (floating point)
             data_match = torch.allclose(proc_data, exp_data, rtol=1e-5, atol=1e-8)
             label_match = torch.allclose(proc_label, exp_label, rtol=1e-5, atol=1e-8)
 
