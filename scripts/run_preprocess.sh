@@ -2,9 +2,9 @@
 #PBS -N dldl_preprocess
 #PBS -l select=1:system=polaris
 #PBS -l place=scatter
-#PBS -l walltime=2:00:00
+#PBS -l walltime=1:00:00
 #PBS -l filesystems=home:eagle
-#PBS -q prod
+#PBS -q debug
 #PBS -A fusiondl_aesp
 #PBS -o preprocess_%j.out
 #PBS -e preprocess_%j.err

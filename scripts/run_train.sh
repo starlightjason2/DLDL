@@ -2,9 +2,9 @@
 #PBS -N dldl_train
 #PBS -l select=1:system=polaris
 #PBS -l place=scatter
-#PBS -l walltime=4:00:00
+#PBS -l walltime=1:00:00
 #PBS -l filesystems=home:eagle
-#PBS -q prod
+#PBS -q debug
 #PBS -A fusiondl_aesp
 #PBS -o train_%j.out
 #PBS -e train_%j.err
