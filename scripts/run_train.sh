@@ -8,6 +8,7 @@
 #PBS -A fusiondl_aesp
 #PBS -o /eagle/fusiondl_aesp/starlightjason2/DLDL/train_%j.out
 #PBS -e /eagle/fusiondl_aesp/starlightjason2/DLDL/train_%j.err
+#PBS -k oe
 
 # DLDL training - runs on compute node (GPU)
 

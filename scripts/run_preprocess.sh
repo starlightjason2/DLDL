@@ -8,6 +8,7 @@
 #PBS -A fusiondl_aesp
 #PBS -o /eagle/fusiondl_aesp/starlightjason2/DLDL/preprocess_%j.out
 #PBS -e /eagle/fusiondl_aesp/starlightjason2/DLDL/preprocess_%j.err
+#PBS -k oe
 
 # DLDL preprocessing - runs on compute node (CPU-only)
 
@@ -27,3 +28,5 @@ export OMP_NUM_THREADS=1
 
 # Run preprocessing
 python src/preprocess_data.py
+
+
