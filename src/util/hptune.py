@@ -66,7 +66,8 @@ def create_run_script(
         .replace('cd "${PBS_O_WORKDIR:-$(pwd)}"', f"cd {project_root}")
         .replace(
             "# .env is loaded by Python (constants.py) when the script runs",
-            f"set -a\nsource {env_path}\nset +a",
+            f"set -a\nsource {env_path}\nset +a\n"
+            f"# Write our own log (don't rely on PBS -o/-e)\nexec > >(tee \"$PROG_DIR/train_${{PBS_JOBID}}.log\") 2>&1",
         )
     )
     script = re.sub(r"#PBS -o .*", f"#PBS -o {trial_dir}/train_%j.out", script)

@@ -66,7 +66,17 @@ python src/preprocess_data.py
 | `meanvar-whole` | `(x - μ) / σ` dataset-wide | Same scale across all shots |
 | `meanvar-single` | `(x - μ) / σ` per shot | Per-shot standardization |
 
-### 2. Training
+### 2. Validation (optional)
+
+```bash
+python src/validate.py
+```
+
+* Verifies preprocessed files exist
+* Runs dataset integrity check (samples examples and compares to raw data)
+* Options: `--num-checks N`, `--skip-integrity`, `--verbose`
+
+### 3. Training
 
 ```bash
 python src/train.py
@@ -79,7 +89,7 @@ python src/train.py
 
 Hyperparameters (lr, epochs, etc.) are in `train.py`.
 
-### 3. Visualization
+### 4. Visualization
 
 ```bash
 python -m src.graph
