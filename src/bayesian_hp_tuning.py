@@ -14,7 +14,8 @@ import os
 
 import numpy as np
 import pandas as pd
-from bayes_opt import BayesianOptimization, UtilityFunction
+from bayes_opt import BayesianOptimization
+from bayes_opt import acquisition
 
 from constants import (
     ALLOWED_EPOCHS,
@@ -67,14 +68,20 @@ def sample_bayesian(df: pd.DataFrame) -> tuple[float, int, float]:
         "epochs": (float(min(ALLOWED_EPOCHS)), float(max(ALLOWED_EPOCHS))),
         "dropout": (DROPOUT_MIN, DROPOUT_MAX),
     }
-    optimizer = BayesianOptimization(f=None, pbounds=pbounds, verbose=0, random_state=42)
+    optimizer = BayesianOptimization(
+        f=None,
+        pbounds=pbounds,
+        acquisition_function=acquisition.ExpectedImprovement(xi=0.0),
+        verbose=0,
+        random_state=42,
+    )
     for _, row in completed.iterrows():
         optimizer.register(
             params={"lr": row["lr"], "epochs": float(row["epochs"]), "dropout": row["dropout"]},
             target=-row["val_loss"],
         )
 
-    suggestion = optimizer.suggest(UtilityFunction(kind="ei", kappa=2.5, xi=0.0))
+    suggestion = optimizer.suggest()
     epochs = min(ALLOWED_EPOCHS, key=lambda x: abs(x - suggestion["epochs"]))
     return suggestion["lr"], epochs, suggestion["dropout"]
 
@@ -130,7 +137,8 @@ def main() -> None:
 
     df = update_trials(load_trials(TRIALS_DIR, HPTUNE_CSV_PATH))
 
-    if pending := find_pending_trial(df):
+    pending = find_pending_trial(df)
+    if pending:
         print(f"Next trial -> {pending}")
         return
 
