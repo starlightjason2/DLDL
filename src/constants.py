@@ -116,6 +116,14 @@ try:
 except (TypeError, ValueError) as e:
     raise ValueError(f"BATCH_SIZE must be a positive integer, got {_BATCH_SIZE_RAW!r}") from e
 
+_DATALOADER_NUM_WORKERS_RAW = os.environ.get("DATALOADER_NUM_WORKERS", "4")
+try:
+    DATALOADER_NUM_WORKERS = int(_DATALOADER_NUM_WORKERS_RAW)
+    if DATALOADER_NUM_WORKERS < 0:
+        raise ValueError(f"DATALOADER_NUM_WORKERS must be >= 0, got {DATALOADER_NUM_WORKERS}")
+except (TypeError, ValueError) as e:
+    raise ValueError(f"DATALOADER_NUM_WORKERS must be a non-negative integer, got {_DATALOADER_NUM_WORKERS_RAW!r}") from e
+
 _LR_SCHEDULER_RAW = os.environ.get("LR_SCHEDULER", "true")
 LR_SCHEDULER = _LR_SCHEDULER_RAW.lower() in ("true", "1", "yes", "on")
 

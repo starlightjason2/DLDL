@@ -31,7 +31,8 @@ A 1D CNN that uses plasma current to predict disruption time. For labeling D-III
 | `JOB_ID` | ✓ | Run identifier |
 | `GRAPH_DIR` | | Directory for graph outputs (defaults to `PROG_DIR` if not set) |
 | `NORMALIZATION_TYPE` | | `scale`, `meanvar-whole`, or `meanvar-single` (default `meanvar-whole`). |
-| `CPU_USE` | | Fraction of CPU cores for preprocessing, 0-1 (default `0.2`; use `0.2-0.3` for ~32GB RAM) |
+| `CPU_USE` | | Fraction of CPU cores for preprocessing, 0-1 (default `0.2`; use `0.5-1.0` on HPC with more RAM) |
+| `DATALOADER_NUM_WORKERS` | | DataLoader workers for training (default `4`; 0 when no GPU) |
 | `PMI_LOCAL_RANK` | | Distributed training (scheduler) |
 | `PMI_RANK` | | Process rank (default 0) |
 | `PMI_SIZE` | | World size (default 1) |

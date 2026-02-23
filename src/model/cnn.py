@@ -30,6 +30,7 @@ from constants import (
     LOG_INTERVAL,
     WEIGHT_DECAY,
     BATCH_SIZE,
+    DATALOADER_NUM_WORKERS,
     LR_SCHEDULER,
     LR_SCHEDULER_FACTOR,
     LR_SCHEDULER_PATIENCE,
@@ -308,22 +309,26 @@ class IpCNN(nn.Module):
             self.logger.info(f"    Factor: {lr_scheduler_factor}, Patience: {lr_scheduler_patience}")
         self.logger.info(f"  Early stopping patience: {early_stopping_patience}")
         self.logger.info(f"  Gradient clip: {gradient_clip}")
+        self.logger.info(f"  DataLoader num_workers: {DATALOADER_NUM_WORKERS} (0 when no GPU)")
         self.logger.info("=" * 60)
 
         train, dev, _ = split(self.dataset)
 
+        num_workers = DATALOADER_NUM_WORKERS if torch.cuda.is_available() else 0
+        loader_kw = dict(
+            batch_size=batch_size,
+            pin_memory=torch.cuda.is_available(),
+            num_workers=num_workers,
+            persistent_workers=num_workers > 0,
+        )
         if use_distributed:
             train_sampler = DistributedSampler(
                 train, num_replicas=world_size, rank=rank, shuffle=True
             )
-            train_loader = DataLoader(
-                train, batch_size=batch_size, sampler=train_sampler, pin_memory=True
-            )
+            train_loader = DataLoader(train, sampler=train_sampler, **loader_kw)
         else:
-            train_loader = DataLoader(
-                train, batch_size=batch_size, shuffle=True, pin_memory=True
-            )
-        dev_loader = DataLoader(dev, batch_size=batch_size, shuffle=False, pin_memory=True)
+            train_loader = DataLoader(train, shuffle=True, **loader_kw)
+        dev_loader = DataLoader(dev, shuffle=False, **loader_kw)
 
         model = self.cuda()
         if use_distributed:
