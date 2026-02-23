@@ -6,6 +6,18 @@ import sys
 
 from loguru import logger
 
+from constants import GRAPH_DIR, JOB_ID, PROG_DIR
+
+# Configure logging: stderr + file
+logger.remove()
+log_format = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+logger.add(sys.stderr, format=log_format, colorize=True, level="INFO")
+logger.add(
+    os.path.join(PROG_DIR, "graph.log"),
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+    level="INFO",
+)
+
 # Set matplotlib backend to PyQt6 for interactive display
 import matplotlib
 
@@ -16,8 +28,6 @@ matplotlib.rcParams["path.simplify_threshold"] = 1.0
 import matplotlib.pyplot as plt  # type: ignore[import-untyped]
 import matplotlib.ticker as ticker
 import pandas as pd
-
-from constants import GRAPH_DIR, JOB_ID, PROG_DIR
 
 
 def _plot_and_configure(

@@ -4,10 +4,17 @@ import os
 import sys
 from loguru import logger
 
-logger.remove()
-logger.add(sys.stderr, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>", colorize=True, level="INFO")
+from constants import DATASET_DIR, NORMALIZATION_TYPE, PROG_DIR
 
-from constants import DATASET_DIR, NORMALIZATION_TYPE
+# Configure logging: stderr + file
+logger.remove()
+log_format = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+logger.add(sys.stderr, format=log_format, colorize=True, level="INFO")
+logger.add(
+    os.path.join(PROG_DIR, "preprocess.log"),
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+    level="INFO",
+)
 from model.dataset import IpDataset
 
 if __name__ == "__main__":
