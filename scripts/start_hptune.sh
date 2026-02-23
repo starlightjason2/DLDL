@@ -11,11 +11,12 @@ cd "$PROJECT_ROOT"
 mkdir -p "$SCRIPT_DIR/hptune/trials"
 
 echo "Starting HPTune chain..."
-HPTUNE_DIR="$SCRIPT_DIR/hptune"
-CONTROLLER_ID=$(qsub -o "$HPTUNE_DIR/controller_%j.out" -e "$HPTUNE_DIR/controller_%j.err" "$HPTUNE_DIR/controller.sh" 2>&1 | tail -1)
+HPTUNE_DIR="$PROJECT_ROOT/scripts/hptune"
+LOG_DIR="$HPTUNE_DIR"
+CONTROLLER_ID=$(qsub -o "$LOG_DIR/controller_%j.out" -e "$LOG_DIR/controller_%j.err" "$HPTUNE_DIR/controller.sh" 2>&1 | tail -1)
 echo "Controller submitted: $CONTROLLER_ID"
 echo ""
 echo "Monitor: qstat -u \$USER"
-echo "Logs: scripts/hptune/controller_*.out"
-echo "Trials: scripts/hptune/trials/"
-echo "Results: scripts/hptune/trials_log.csv"
+echo "Logs: $LOG_DIR/controller_*.out (also check \$HOME if empty)"
+echo "Trials: $HPTUNE_DIR/trials/"
+echo "Results: $HPTUNE_DIR/trials_log.csv"

@@ -6,16 +6,15 @@
 #PBS -l filesystems=home:eagle
 #PBS -q debug
 #PBS -A fusiondl_aesp
-#PBS -o controller_%j.out
-#PBS -e controller_%j.err
-
 # Controller for DLDL Bayesian hyperparameter optimization
+# Note: -o/-e passed by qsub caller; without them PBS may write to $HOME
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null || cd "$(dirname "$0")")"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 HPTUNE_DIR="$SCRIPT_DIR"
+LOG_DIR="$HPTUNE_DIR"
 CONTROLLER_SCRIPT="$HPTUNE_DIR/controller.sh"
 
 # Chain ID propagation
