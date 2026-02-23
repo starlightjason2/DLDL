@@ -16,8 +16,10 @@ def _read_signal_file(filepath: str, col: int = 1) -> np.ndarray:
 
 
 def get_length(filename: str, data_dir: str) -> int:
-    data = _read_signal_file(os.path.join(data_dir, filename), col=1)
-    return len(data)
+    """Count lines (no parsing). Much faster than loading full file on network storage."""
+    filepath = os.path.join(data_dir, filename)
+    with open(filepath, "rb") as f:
+        return sum(1 for _ in f)
 
 
 def get_scaled_t_disrupt(shot_no: int, data_dir: str, t_disrupt: float, max_length: int) -> float:

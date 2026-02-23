@@ -122,6 +122,30 @@ python -m src.graph --output plot.png --show
 python -m src.graph --csv custom_log.csv --output plot.png
 ```
 
+## Polaris Batch Jobs
+
+Run preprocessing and training on compute nodes (not login nodes):
+
+```bash
+# From DLDL project root, with .env symlinked to .env.polaris
+cd /path/to/DLDL
+
+# Edit scripts/run_preprocess.sh and scripts/run_train.sh:
+# - Uncomment and set your conda activation
+# - Adjust #PBS -A if your account differs from fusiondl_aesp
+
+# Submit preprocessing (CPU, ~2 hr walltime)
+qsub scripts/run_preprocess.sh
+
+# Submit training (GPU, ~4 hr walltime)
+qsub scripts/run_train.sh
+
+# Check status
+qstat -u $USER
+```
+
+Output logs: `preprocess_<jobid>.out`, `train_<jobid>.out` (and `.err`).
+
 ## Quick Reference
 
 * **Config:** `NORMALIZATION_TYPE` and `CPU_USE` in env (or `.env`) drive preprocessing and training.
