@@ -15,8 +15,12 @@ from model.bayesian_hptuner import BayesianHPTuner
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="DLDL Bayesian hyperparameter optimization")
-    parser.add_argument("--chain-id", default=None, help="Optional unique chain identifier")
+    parser = argparse.ArgumentParser(
+        description="DLDL Bayesian hyperparameter optimization"
+    )
+    parser.add_argument(
+        "--chain-id", default=None, help="Optional unique chain identifier"
+    )
     args = parser.parse_args()
 
     BayesianHPTuner(chain_id=args.chain_id).run()

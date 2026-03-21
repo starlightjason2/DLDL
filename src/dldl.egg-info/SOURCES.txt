@@ -2,12 +2,17 @@ LICENSE
 README.md
 pyproject.toml
 src/preprocess_data.py
+src/config/__init__.py
+src/config/dldl.json
+src/config/schema.py
+src/config/settings.py
 src/dldl.egg-info/PKG-INFO
 src/dldl.egg-info/SOURCES.txt
 src/dldl.egg-info/dependency_links.txt
 src/dldl.egg-info/requires.txt
 src/dldl.egg-info/top_level.txt
 src/model/__init__.py
+src/model/bayesian_hptuner.py
 src/model/cnn.py
 src/model/dataset.py
 src/util/__init__.py

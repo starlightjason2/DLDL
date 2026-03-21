@@ -6,6 +6,7 @@ from typing import ClassVar, List, Literal, Optional, Tuple
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 _M = ConfigDict(extra="forbid")
+_DLDL_FILE = ConfigDict(extra="forbid", populate_by_name=True)
 
 
 class HptuneConfig(BaseModel):
@@ -62,7 +63,6 @@ class TrainingConfig(BaseModel):
     weight_decay: float = Field(ge=0)
     dropout_rate: float = Field(ge=0, le=1)
     batch_size: int = Field(ge=1)
-    dataloader_num_workers: int = Field(ge=0)
     lr_scheduler: bool
     lr_scheduler_factor: float = Field(gt=0, lt=1)
     lr_scheduler_patience: int = Field(ge=1)
@@ -76,7 +76,6 @@ class TrainingConfig(BaseModel):
         ("weight_decay", "WEIGHT_DECAY"),
         ("dropout_rate", "DROPOUT_RATE"),
         ("batch_size", "BATCH_SIZE"),
-        ("dataloader_num_workers", "DATALOADER_NUM_WORKERS"),
         ("lr_scheduler_factor", "LR_SCHEDULER_FACTOR"),
         ("lr_scheduler_patience", "LR_SCHEDULER_PATIENCE"),
         ("gradient_clip", "GRADIENT_CLIP"),
@@ -133,9 +132,9 @@ class ArchitectureConfig(BaseModel):
 
 
 class DldlConfigFile(BaseModel):
-    model_config = _M
+    model_config = _DLDL_FILE
     hptune: HptuneConfig
-    training: TrainingConfig
+    default_training: TrainingConfig = Field(alias="defaultTraining")
     architecture: ArchitectureConfig
 
 

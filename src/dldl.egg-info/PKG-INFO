@@ -29,6 +29,7 @@ Requires-Dist: loguru>=0.7.0
 Requires-Dist: matplotlib>=3.5.0
 Requires-Dist: PyQt6>=6.0.0
 Requires-Dist: bayesian-optimization>=1.4.0
+Requires-Dist: pydantic>=2.5.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0.0; extra == "dev"
 Requires-Dist: black>=22.0.0; extra == "dev"
@@ -55,22 +56,22 @@ A 1D CNN that uses plasma current to predict disruption time. For labeling D-III
    pip install -e .
    ```
 
-`.env` is loaded when `constants` is imported.
+`.env` is loaded when you call ``load_settings()`` from ``config.settings`` (typically at script startup).
 
 ### Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATA_DIR` | ✓ | Raw signal .txt files |
-| `DATASET_DIR` | ✓ | Preprocessed datasets and labels |
 | `LABELS_PATH` | ✓ | Shot list with disruption times |
-| `PROG_DIR` | ✓ | Logs and checkpoints |
+| `DATA_PATH` | ✓ | Full path to preprocessed dataset tensor (`.pt`) |
+| `TRAIN_LABELS_PATH` | ✓ | Full path to preprocessed labels tensor (`.pt`) |
+| `PROG_DIR` | ✓ | Logs, checkpoints, and `graph.py` plot output |
 | `JOB_ID` | ✓ | Run identifier |
-| `GRAPH_DIR` | | Directory for graph outputs (defaults to `PROG_DIR` if not set) |
 | `NORMALIZATION_TYPE` | | `scale`, `meanvar-whole`, or `meanvar-single` (default `meanvar-whole`). |
 | `CPU_USE` | | Fraction of CPU cores for preprocessing, 0-1 (default `0.2`; use `0.5-1.0` on HPC with more RAM) |
 | `PREPROCESSOR_MAX_WORKERS` | | Hard cap on preprocessing workers (default `4`; avoids fork/resource issues on HPC) |
-| `DATALOADER_NUM_WORKERS` | | DataLoader workers for training (default `4`; 0 when no GPU) |
+| `DATALOADER_NUM_WORKERS` | | DataLoader workers for training (default `4`; forced to `0` when no GPU) |
 | `PMI_LOCAL_RANK` | | Distributed training (scheduler) |
 | `PMI_RANK` | | Process rank (default 0) |
 | `PMI_SIZE` | | World size (default 1) |
@@ -81,7 +82,7 @@ A 1D CNN that uses plasma current to predict disruption time. For labeling D-III
 Raw .txt → preprocess_data.py → .pt files → train.py → Model + logs → graph.py → Visualizations
 ```
 
-**Config:** Set `NORMALIZATION_TYPE` and `CPU_USE` in `.env` (or env). `NORMALIZATION_TYPE` is the normalization method and filename suffix. Both scripts use `constants`.
+**Config:** Set `NORMALIZATION_TYPE` and `CPU_USE` in `.env` (or env). Point `DATA_PATH` / `TRAIN_LABELS_PATH` at the `.pt` files that match that normalization (e.g. filenames containing `meanvar-whole`). Scripts call `load_settings()` for hyperparameters from `dldl.json` (defaults under `defaultTraining`, architecture under `architecture`, plus env overrides).
 
 ### 1. Preprocessing
 
@@ -89,10 +90,10 @@ Raw .txt → preprocess_data.py → .pt files → train.py → Model + logs → 
 python src/preprocess_data.py
 ```
 
-* Deletes cached processed files for the current `NORMALIZATION_TYPE`
+* Deletes the preprocessed files at `DATA_PATH` and `TRAIN_LABELS_PATH` (so the next build is fresh)
 * Loads raw files from `DATA_DIR`, computes stats (max length, mean, std)
 * Applies normalization, pads to uniform length, builds labels
-* Writes `processed_dataset_{NORMALIZATION_TYPE}.pt` and `processed_labels_{NORMALIZATION_TYPE}.pt` to `DATASET_DIR`
+* Writes tensors to `DATA_PATH` and `TRAIN_LABELS_PATH`
 * Runs integrity check
 
 **Normalization** (env `NORMALIZATION_TYPE`; default `meanvar-whole`):
@@ -119,7 +120,7 @@ python src/validate.py
 python src/train.py
 ```
 
-* Loads preprocessed dataset/labels (same `NORMALIZATION_TYPE` as preprocessing)
+* Loads preprocessed tensors at `DATA_PATH` and `TRAIN_LABELS_PATH` (must match preprocessing / `NORMALIZATION_TYPE`)
 * Validates files exist, splits 80/10/10 train/dev/test
 * Uses distributed training if `PMI_*` are set
 * Saves checkpoints and logs to `PROG_DIR`
@@ -138,19 +139,19 @@ python -m src.graph
   - Validation Accuracy
   - Validation Precision and Recall
   - Validation F1 Score
-* Saves plot to `GRAPH_DIR/{JOB_ID}_training_log_plot.png` (or `PROG_DIR` if `GRAPH_DIR` not set)
+* Saves plot to `PROG_DIR/{JOB_ID}_training_log_plot.png`
 
 **Command-line Parameters:**
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--csv` | str | `PROG_DIR/{JOB_ID}_training_log.csv` | Path to the training log CSV file. If not specified, uses the default path based on `PROG_DIR` and `JOB_ID` constants. |
-| `--output` | str | `GRAPH_DIR/{JOB_ID}_training_log_plot.png` | Path where the plot image will be saved. If not specified and `--show` is not used, defaults to `GRAPH_DIR/{JOB_ID}_training_log_plot.png`. If `--show` is used without `--output`, the plot is only displayed and not saved. |
+| `--csv` | str | `PROG_DIR/{JOB_ID}_training_log.csv` | Path to the training log CSV file. If not specified, uses the default path based on `PROG_DIR` and `JOB_ID` from config. |
+| `--output` | str | `PROG_DIR/{JOB_ID}_training_log_plot.png` | Path where the plot image will be saved. If not specified and `--show` is not used, defaults to that path. If `--show` is used without `--output`, the plot is only displayed and not saved. |
 | `--show` | flag | False | Display the plot interactively using matplotlib's GUI. When used without `--output`, the plot is only displayed and not saved to disk. Can be combined with `--output` to both save and display. **Note:** Requires an interactive backend (PyQt5, PyQt6, or Tkinter). In headless environments, the plot will be saved to the default location instead. |
 
 **Examples:**
 ```bash
-# Use default paths from constants
+# Use default paths from config
 python -m src.graph
 
 # Specify custom CSV file
@@ -200,10 +201,16 @@ Output logs: `preprocess_<jobid>.out`, `train_<jobid>.out` (and `.err`).
 ./scripts/start_hptune.sh
 ```
 
+`start_hptune.sh` starts a **fresh** chain: it removes `scripts/hptune/trials/` (all `trial_*` directories), rewrites `scripts/hptune/trials_log.csv` with headers only, and deletes old `scripts/hptune/controller_*.{log,out,err}` before submitting.
+
 Runs a chain of jobs: each controller picks or creates a trial (lr, epochs, dropout), submits a training job, then chains the next controller. Uses random sampling for the first 5 trials, then Bayesian optimization. Results in `scripts/hptune/trials_log.csv` and `scripts/hptune/trials/`.
+
+**Validate chaining locally (no PBS):** from the repo root, `bash scripts/validate_hptune_chain.sh` checks that the same `grep`/`sed` used in `controller.sh` correctly extracts the `trial_N` id from log output, that PBS job ids strip to a numeric id for `depend=afterany`, and (if `loguru` is installed) that the Python logger emits a parseable `Next trial ->` line.
+
+**If the chain stops after the worker is submitted:** open `scripts/hptune/controller_<jobid>.log`. If the log ends right after “Chaining next controller…”, the second `qsub` failed; the script now prints the full PBS message (older versions hid it behind `| tail -1`). Also check `scripts/hptune/controller_<jobid>.err` and `.out`. An empty `qstat` usually means jobs finished or failed quickly—confirm the next controller job id appears on the “Next controller job (chained):” line.
 
 ## Quick Reference
 
 * **Config:** `NORMALIZATION_TYPE` and `CPU_USE` in env (or `.env`) drive preprocessing and training.
-* **Output files:** `processed_dataset_{NORMALIZATION_TYPE}.pt`, `processed_labels_{NORMALIZATION_TYPE}.pt` in `DATASET_DIR`.
-* **Multiple configs:** Change `NORMALIZATION_TYPE` in env to switch; each value uses its own .pt files.
+* **Output files:** Whatever paths you set in `DATA_PATH` and `TRAIN_LABELS_PATH` (often filenames include the normalization mode, e.g. `processed_dataset_meanvar-whole.pt`).
+* **Multiple configs:** Change `NORMALIZATION_TYPE` and update `DATA_PATH` / `TRAIN_LABELS_PATH` to the matching `.pt` files.

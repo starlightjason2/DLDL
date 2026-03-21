@@ -61,14 +61,20 @@ def validate_preprocessed_files() -> None:
     logger.info("Preprocessed files exist: OK")
 
 
-def check_dataset(num_checks: int = 100, scale_labels: bool = True, verbose: bool = False) -> None:
+def check_dataset(
+    num_checks: int = 100, scale_labels: bool = True, verbose: bool = False
+) -> None:
     """Run dataset integrity check (IpDataset.check_dataset)."""
     dataset = IpDataset(normalization_type=DatasetEnv.from_os().normalization_type)
-    dataset.check_dataset(scale_labels=scale_labels, num_checks=num_checks, verbose=verbose)
+    dataset.check_dataset(
+        scale_labels=scale_labels, num_checks=num_checks, verbose=verbose
+    )
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Validate preprocessed data and dataset integrity")
+    parser = argparse.ArgumentParser(
+        description="Validate preprocessed data and dataset integrity"
+    )
     parser.add_argument(
         "--num-checks",
         type=int,

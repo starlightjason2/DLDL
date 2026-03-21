@@ -94,7 +94,7 @@ def plot_training_log(
     logger.info(f"  Precision: {best_epoch['Validation Precision']:.6f}")
     logger.info(f"  Recall: {best_epoch['Validation Recall']:.6f}")
     logger.info(f"  F1 Score: {best_epoch['Validation F1 Score']:.6f}")
-    
+
     best_accuracy_epoch = df.loc[df["Validation Accuracy"].idxmax()]
     logger.info("-" * 60)
     logger.info("Best Accuracy:")
@@ -154,7 +154,9 @@ def plot_training_log(
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     fig.suptitle("Training Progress", fontsize=16, fontweight="bold")
     for position, series_configs, ylabel, title, ylim in plot_configs:
-        _plot_and_configure(axes[position], df["epoch"], series_configs, ylabel, title, ylim)
+        _plot_and_configure(
+            axes[position], df["epoch"], series_configs, ylabel, title, ylim
+        )
 
     plt.tight_layout()
 

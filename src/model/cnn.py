@@ -63,9 +63,15 @@ class IpCNN(nn.Module):
         # Log hyperparameters
         self.logger.info("=" * 60)
         self.logger.info("CNN Architecture Hyperparameters:")
-        self.logger.info(f"  Conv1: filters={conv1[0]}, kernel={conv1[1]}, padding={conv1[2]}")
-        self.logger.info(f"  Conv2: filters={conv2[0]}, kernel={conv2[1]}, padding={conv2[2]}")
-        self.logger.info(f"  Conv3: filters={conv3[0]}, kernel={conv3[1]}, padding={conv3[2]}")
+        self.logger.info(
+            f"  Conv1: filters={conv1[0]}, kernel={conv1[1]}, padding={conv1[2]}"
+        )
+        self.logger.info(
+            f"  Conv2: filters={conv2[0]}, kernel={conv2[1]}, padding={conv2[2]}"
+        )
+        self.logger.info(
+            f"  Conv3: filters={conv3[0]}, kernel={conv3[1]}, padding={conv3[2]}"
+        )
         self.logger.info(f"  Pool size: {pool_size}")
         self.logger.info(f"  FC1 size: {fc1_size}")
         self.logger.info(f"  FC2 size: {fc2_size}")
@@ -161,9 +167,7 @@ class IpCNN(nn.Module):
         class_loss = self._cls_loss(outputs[:, 0], labels[:, 0])
         disruptive_mask = labels[:, 0] == 1
         time_loss = (
-            self._time_loss(
-                outputs[disruptive_mask, 1], labels[disruptive_mask, 1]
-            )
+            self._time_loss(outputs[disruptive_mask, 1], labels[disruptive_mask, 1])
             if disruptive_mask.any()
             else torch.tensor(0.0, device=outputs.device)
         )
@@ -280,12 +284,27 @@ class IpCNN(nn.Module):
         num_epochs = num_epochs if num_epochs is not None else t.num_epochs
         log_interval = log_interval if log_interval is not None else t.log_interval
         weight_decay = weight_decay if weight_decay is not None else t.weight_decay
-        lr_scheduler_enabled = lr_scheduler if lr_scheduler is not None else t.lr_scheduler
-        lr_scheduler_factor = lr_scheduler_factor if lr_scheduler_factor is not None else t.lr_scheduler_factor
-        lr_scheduler_patience = lr_scheduler_patience if lr_scheduler_patience is not None else t.lr_scheduler_patience
-        early_stopping_patience = early_stopping_patience if early_stopping_patience is not None else t.early_stopping_patience
+        lr_scheduler_enabled = (
+            lr_scheduler if lr_scheduler is not None else t.lr_scheduler
+        )
+        lr_scheduler_factor = (
+            lr_scheduler_factor
+            if lr_scheduler_factor is not None
+            else t.lr_scheduler_factor
+        )
+        lr_scheduler_patience = (
+            lr_scheduler_patience
+            if lr_scheduler_patience is not None
+            else t.lr_scheduler_patience
+        )
+        early_stopping_patience = (
+            early_stopping_patience
+            if early_stopping_patience is not None
+            else t.early_stopping_patience
+        )
         gradient_clip = gradient_clip if gradient_clip is not None else t.gradient_clip
         batch_size = batch_size if batch_size is not None else t.batch_size
+        dl_workers = int(os.environ.get("DATALOADER_NUM_WORKERS", "4"))
 
         # Log training hyperparameters
         self.logger.info("=" * 60)
@@ -297,15 +316,17 @@ class IpCNN(nn.Module):
         self.logger.info(f"  Log interval: {log_interval}")
         self.logger.info(f"  LR scheduler: {lr_scheduler_enabled}")
         if lr_scheduler_enabled:
-            self.logger.info(f"    Factor: {lr_scheduler_factor}, Patience: {lr_scheduler_patience}")
+            self.logger.info(
+                f"    Factor: {lr_scheduler_factor}, Patience: {lr_scheduler_patience}"
+            )
         self.logger.info(f"  Early stopping patience: {early_stopping_patience}")
         self.logger.info(f"  Gradient clip: {gradient_clip}")
-        self.logger.info(f"  DataLoader num_workers: {t.dataloader_num_workers} (0 when no GPU)")
+        self.logger.info(f"  DataLoader num_workers: {dl_workers} (0 when no GPU)")
         self.logger.info("=" * 60)
 
         train, dev, _ = split(self.dataset)
 
-        num_workers = t.dataloader_num_workers if torch.cuda.is_available() else 0
+        num_workers = dl_workers if torch.cuda.is_available() else 0
         loader_kw = dict(
             batch_size=batch_size,
             pin_memory=torch.cuda.is_available(),
@@ -328,7 +349,10 @@ class IpCNN(nn.Module):
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         if lr_scheduler_enabled:
             scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode="min", factor=lr_scheduler_factor, patience=lr_scheduler_patience
+                optimizer,
+                mode="min",
+                factor=lr_scheduler_factor,
+                patience=lr_scheduler_patience,
             )
         bce_loss = torch.nn.BCEWithLogitsLoss()
         classification = self.classification

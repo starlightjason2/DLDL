@@ -19,7 +19,7 @@
     "early_stopping_patience_min": 1,
     "early_stopping_patience_max": 40
   },
-  "training": {
+  "defaultTraining": {
     "early_stopping_patience": 10,
     "learning_rate": 0.0005,
     "num_epochs": 200,
@@ -27,7 +27,6 @@
     "weight_decay": 0.0001,
     "dropout_rate": 0.35,
     "batch_size": 128,
-    "dataloader_num_workers": 4,
     "lr_scheduler": true,
     "lr_scheduler_factor": 0.5,
     "lr_scheduler_patience": 5,

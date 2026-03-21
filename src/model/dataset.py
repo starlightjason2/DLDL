@@ -139,7 +139,10 @@ class IpDataset(Dataset):
         self.logger.info(f"{desc}: {self.num_shots} files, {workers} workers")
         with ProcessPoolExecutor(max_workers=workers) as executor:
             it = executor.map(
-                func, self.file_list, [_DATA_DIR] * self.num_shots, *args,
+                func,
+                self.file_list,
+                [_DATA_DIR] * self.num_shots,
+                *args,
                 chunksize=chunksize,
             )
             return np.asarray(list(it))
@@ -147,9 +150,7 @@ class IpDataset(Dataset):
     def _get_max_length(self) -> int:
         """Compute maximum time series length across all shots."""
         max_len = int(
-            np.max(
-                self._process_files_parallel(get_length, desc="Getting max length")
-            )
+            np.max(self._process_files_parallel(get_length, desc="Getting max length"))
         )
         self.logger.info(f"Maximum time series length: {max_len} timesteps")
         return max_len
@@ -230,8 +231,7 @@ class IpDataset(Dataset):
             f"Loading and normalizing: {self.num_shots} files, {workers} workers"
         )
         with ProcessPoolExecutor(max_workers=workers) as executor:
-            it = executor.map(loader_func, *loader_args, chunksize=chunksize)
-            results = list(it)
+            results = list(executor.map(loader_func, *loader_args, chunksize=chunksize))
 
         sorted_data = sorted(results, key=lambda x: x[0])
         sorted_shot_numbers, dataset_data = zip(*sorted_data)

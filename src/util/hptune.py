@@ -42,6 +42,7 @@ TRIAL_LOG_COLUMNS = [
     "status",
 ]
 
+
 def next_trial_numbered_id(trials_dir: str, df: pd.DataFrame) -> str:
     """Next sequential directory name: ``trial_1``, ``trial_2``, ...
 
@@ -98,7 +99,9 @@ def load_trials(trials_dir: str, csv_path: str) -> pd.DataFrame:
     return df[TRIAL_LOG_COLUMNS]
 
 
-def load_env_template(project_root: str, skip_vars: tuple[str, ...] = ENV_SKIP_VARS) -> list[str]:
+def load_env_template(
+    project_root: str, skip_vars: tuple[str, ...] = ENV_SKIP_VARS
+) -> list[str]:
     """Load base .env lines, excluding vars we override per trial."""
     for name in (".env.polaris", ".env"):
         path = os.path.join(project_root, name)
@@ -130,7 +133,7 @@ def create_run_script(
             "# .env is loaded by Python (config.settings.load_settings) when the script runs",
             f"set -a\nsource {env_path}\nset +a\n"
             f"# Single merged log via tee; discard PBS -o/-e to avoid duplicating the same stream\n"
-            f"exec > >(tee \"$PROG_DIR/train_${{PBS_JOBID}}.log\") 2>&1",
+            f'exec > >(tee "$PROG_DIR/train_${{PBS_JOBID}}.log") 2>&1',
         )
     )
     script = re.sub(r"#PBS -o .*", "#PBS -o /dev/null", script)

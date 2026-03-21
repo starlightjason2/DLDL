@@ -46,9 +46,18 @@ class Settings:
             "epochs": (float(min(eps)), float(max(eps))),
             "gradient_clip": (h.gradient_clip_min, h.gradient_clip_max),
             "lr_scheduler_u": (0.0, 1.0),
-            "lr_scheduler_factor": (h.lr_scheduler_factor_min, h.lr_scheduler_factor_max),
-            "lr_sched_patience": (float(h.lr_scheduler_patience_min), float(h.lr_scheduler_patience_max)),
-            "early_stop_patience": (float(h.early_stopping_patience_min), float(h.early_stopping_patience_max)),
+            "lr_scheduler_factor": (
+                h.lr_scheduler_factor_min,
+                h.lr_scheduler_factor_max,
+            ),
+            "lr_sched_patience": (
+                float(h.lr_scheduler_patience_min),
+                float(h.lr_scheduler_patience_max),
+            ),
+            "early_stop_patience": (
+                float(h.early_stopping_patience_min),
+                float(h.early_stopping_patience_max),
+            ),
             "batch_idx": (0.0, float(n)),
         }
 
@@ -62,15 +71,22 @@ def load_settings() -> Settings:
     cfg_path = (
         Path(raw).resolve()
         if raw and os.path.isabs(raw)
-        else (root / raw).resolve() if raw
-        else Path(__file__).resolve().parent / "dldl.json"
+        else (
+            (root / raw).resolve()
+            if raw
+            else Path(__file__).resolve().parent / "dldl.json"
+        )
     )
     if not cfg_path.is_file():
         raise FileNotFoundError(f"DLDL config missing: {cfg_path}")
 
-    cfg = DldlConfigFile.model_validate(json.loads(cfg_path.read_text(encoding="utf-8")))
+    cfg = DldlConfigFile.model_validate(
+        json.loads(cfg_path.read_text(encoding="utf-8"))
+    )
     r = str(root)
-    tr, ar = TrainingConfig.merge_env(cfg.training), ArchitectureConfig.merge_env(cfg.architecture)
+    tr, ar = TrainingConfig.merge_env(
+        cfg.default_training
+    ), ArchitectureConfig.merge_env(cfg.architecture)
     return Settings(
         project_root=r,
         cfg=cfg,
