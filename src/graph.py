@@ -3,17 +3,31 @@
 import argparse
 import os
 import sys
+from pathlib import Path
 
+from dotenv import load_dotenv
 from loguru import logger
 
-from constants import GRAPH_DIR, JOB_ID, PROG_DIR
+_REPO = Path(__file__).resolve().parents[1]
+if (_env := _REPO / ".env").is_file():
+    load_dotenv(_env)
+
+
+def _abs(p: str) -> str:
+    return p if os.path.isabs(p) else str(_REPO / p)
+
+
+prog_dir = _abs(os.environ["PROG_DIR"])
+job_id = os.environ["JOB_ID"]
+graph_dir = prog_dir
+os.makedirs(prog_dir, exist_ok=True)
 
 # Configure logging: stderr + file
 logger.remove()
 log_format = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
 logger.add(sys.stderr, format=log_format, colorize=True, level="INFO")
 logger.add(
-    os.path.join(PROG_DIR, "graph.log"),
+    os.path.join(prog_dir, "graph.log"),
     format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
     level="INFO",
 )
@@ -156,7 +170,7 @@ def plot_training_log(
                 )
                 if not output_path:
                     output_path = os.path.join(
-                        GRAPH_DIR, f"{JOB_ID}_training_log_plot.png"
+                        graph_dir, f"{job_id}_training_log_plot.png"
                     )
                     plt.savefig(output_path, dpi=300, bbox_inches="tight")
                     logger.info(f"Saved graph to {output_path}")
@@ -167,7 +181,7 @@ def plot_training_log(
                 f"Could not display plot interactively: {e}. Plot will be saved but not displayed."
             )
             if not output_path:
-                output_path = os.path.join(GRAPH_DIR, f"{JOB_ID}_training_log_plot.png")
+                output_path = os.path.join(graph_dir, f"{job_id}_training_log_plot.png")
                 plt.savefig(output_path, dpi=300, bbox_inches="tight")
                 logger.info(f"Saved graph to {output_path}")
     plt.close()
@@ -181,13 +195,13 @@ if __name__ == "__main__":
         "--csv",
         type=str,
         default=None,
-        help=f"Path to training log CSV file (default: {PROG_DIR}/{JOB_ID}_training_log.csv)",
+        help=f"Path to training log CSV file (default: {prog_dir}/{job_id}_training_log.csv)",
     )
     parser.add_argument(
         "--output",
         type=str,
         default=None,
-        help=f"Path to save the plot image (default: {GRAPH_DIR}/{JOB_ID}_training_log_plot.png)",
+        help=f"Path to save the plot image (default: {graph_dir}/{job_id}_training_log_plot.png)",
     )
     parser.add_argument(
         "--show",
@@ -197,9 +211,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    csv_path = args.csv or os.path.join(PROG_DIR, f"{JOB_ID}_training_log.csv")
+    csv_path = args.csv or os.path.join(prog_dir, f"{job_id}_training_log.csv")
     output_path = args.output or (
-        os.path.join(GRAPH_DIR, f"{JOB_ID}_training_log_plot.png")
+        os.path.join(graph_dir, f"{job_id}_training_log_plot.png")
         if not args.show
         else None
     )

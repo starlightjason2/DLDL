@@ -3,17 +3,39 @@
 import argparse
 import os
 import sys
+from pathlib import Path
 
+from dotenv import load_dotenv
 from loguru import logger
 
-from constants import DATASET_DIR, NORMALIZATION_TYPE, PROG_DIR
+from config.schema import DatasetEnv
+
+_REPO = Path(__file__).resolve().parents[1]
+if (_env := _REPO / ".env").is_file():
+    load_dotenv(_env)
+
+
+def _abs(p: str) -> str:
+    return p if os.path.isabs(p) else str(_REPO / p)
+
+
+os.makedirs(_abs(os.environ["PROG_DIR"]), exist_ok=True)
+for _parent in {
+    Path(_abs(os.environ["DATA_PATH"])).parent,
+    Path(_abs(os.environ["TRAIN_LABELS_PATH"])).parent,
+}:
+    os.makedirs(_parent, exist_ok=True)
+
+prog_dir = _abs(os.environ["PROG_DIR"])
+data_path = _abs(os.environ["DATA_PATH"])
+labels_pt_path = _abs(os.environ["TRAIN_LABELS_PATH"])
 
 # Configure logging
 logger.remove()
 log_format = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
 logger.add(sys.stderr, format=log_format, colorize=True, level="INFO")
 logger.add(
-    os.path.join(PROG_DIR, "validate.log"),
+    os.path.join(prog_dir, "validate.log"),
     format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
     level="INFO",
 )
@@ -23,18 +45,14 @@ from model.dataset import IpDataset
 
 def validate_preprocessed_files() -> None:
     """Validate that preprocessed files exist (IpCNN.validate_preprocessed_files)."""
-    suffix = f"_{NORMALIZATION_TYPE}" if NORMALIZATION_TYPE else ""
-    data_path = os.path.join(DATASET_DIR, f"processed_dataset{suffix}.pt")
-    labels_path = os.path.join(DATASET_DIR, f"processed_labels{suffix}.pt")
-
-    if not os.path.exists(data_path) or not os.path.exists(labels_path):
+    if not os.path.exists(data_path) or not os.path.exists(labels_pt_path):
         missing = [
             f"Dataset: {data_path}" if not os.path.exists(data_path) else None,
-            f"Labels: {labels_path}" if not os.path.exists(labels_path) else None,
+            f"Labels: {labels_pt_path}" if not os.path.exists(labels_pt_path) else None,
         ]
         missing = [m for m in missing if m]
         logger.error(
-            f"Preprocessed files not found for NORMALIZATION_TYPE='{NORMALIZATION_TYPE}'. "
+            "Preprocessed tensor files not found (see DATA_PATH, TRAIN_LABELS_PATH). "
             f"Missing: {', '.join(missing)}"
         )
         raise FileNotFoundError(
@@ -45,7 +63,7 @@ def validate_preprocessed_files() -> None:
 
 def check_dataset(num_checks: int = 100, scale_labels: bool = True, verbose: bool = False) -> None:
     """Run dataset integrity check (IpDataset.check_dataset)."""
-    dataset = IpDataset(normalization_type=NORMALIZATION_TYPE)
+    dataset = IpDataset(normalization_type=DatasetEnv.from_os().normalization_type)
     dataset.check_dataset(scale_labels=scale_labels, num_checks=num_checks, verbose=verbose)
 
 

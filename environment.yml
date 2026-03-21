@@ -1,0 +1,14 @@
+# Clean env: Python 3.12 + NumPy 2.2.6 (ALCF Polaris shared conda).
+# Create:  bash scripts/setup_conda_env.sh
+# If NumPy import fails: bash scripts/repair_numpy_dldl.sh
+# Activate: source /soft/applications/conda/2025-09-25/mconda3/etc/profile.d/conda.sh && conda activate dldl
+name: dldl
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy=2.2.6
+  - pandas
+  - matplotlib
+  - scikit-learn
+  - tensorboard

@@ -41,7 +41,14 @@ submit_worker_and_chain() {
     cd "$PROJECT_ROOT"
     worker_job_id=$(cd "$HPTUNE_DIR/trials/$trial_dir" && qsub -A fusiondl_aesp -q debug -l select=1:system=polaris -l place=scatter -l walltime=1:00:00 -l filesystems=home:eagle -v "PROJECT_ROOT=$PROJECT_ROOT" run.sh 2>&1 | tail -1)
     echo "[controller] Worker job: $worker_job_id"
-    qsub -A fusiondl_aesp -q debug -l select=1:system=polaris -l place=scatter -l walltime=0:10:00 -l filesystems=home:eagle -v "PROJECT_ROOT=$PROJECT_ROOT" -o "$HPTUNE_DIR/controller_%j.out" -e "$HPTUNE_DIR/controller_%j.err" -W depend=afterany:$worker_job_id "$CONTROLLER_SCRIPT" "$CHAIN_ID"
+    # PBS depend=afterany: expects numeric job id only (not server-qualified PBS_JOBID)
+    worker_job_num="${worker_job_id%%.*}"
+    echo "[controller] Chaining next controller after worker job id: $worker_job_num"
+    next_controller_job_id=$(
+        set -o pipefail
+        qsub -A fusiondl_aesp -q debug -l select=1:system=polaris -l place=scatter -l walltime=0:10:00 -l filesystems=home:eagle -v "PROJECT_ROOT=$PROJECT_ROOT" -o "$HPTUNE_DIR/controller_%j.out" -e "$HPTUNE_DIR/controller_%j.err" -W depend=afterany:"$worker_job_num" "$CONTROLLER_SCRIPT" "$CHAIN_ID" 2>&1 | tail -1
+    )
+    echo "[controller] Next controller job (chained, depend=afterany:$worker_job_num): $next_controller_job_id"
 }
 
 echo "[controller] Running bayesian_hp_tuning..."
@@ -49,14 +56,15 @@ cd "$PROJECT_ROOT"
 source /soft/applications/conda/2025-09-25/mconda3/etc/profile.d/conda.sh
 conda activate base
 
-# Load env so constants.py can resolve DATA_DIR, etc.
+# Load env so load_settings() can resolve DATA_DIR, etc.
 set -a
 [ -f .env.polaris ] && source .env.polaris
 [ -f .env ] && source .env
 set +a
 
 HPTUNE_OUTPUT=$(python -m src.bayesian_hp_tuning --chain-id "$CHAIN_ID" 2>&1)
-NEXT_TRIAL=$(echo "$HPTUNE_OUTPUT" | grep "Next trial ->" | awk -F' -> ' '{print $2}')
+# Parse dirname from loguru line: "... | Next trial -> <dir_name>"
+NEXT_TRIAL=$(echo "$HPTUNE_OUTPUT" | grep "Next trial ->" | tail -1 | sed 's/.*Next trial -> //')
 
 echo "[controller] Next trial: '$NEXT_TRIAL'"
 

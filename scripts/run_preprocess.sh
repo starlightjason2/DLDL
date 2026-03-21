@@ -19,7 +19,7 @@ cd "${PBS_O_WORKDIR:-$(pwd)}"
 source /soft/applications/conda/2025-09-25/mconda3/etc/profile.d/conda.sh
 conda activate base
 
-# .env is loaded by Python (constants.py) when the script runs
+# .env is loaded by Python (config.settings.load_settings) when the script runs
 
 # HPC-friendly settings (avoids thread exhaustion)
 export OPENBLAS_NUM_THREADS=1

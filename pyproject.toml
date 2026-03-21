@@ -36,6 +36,7 @@ dependencies = [
     "matplotlib>=3.5.0",
     "PyQt6>=6.0.0",
     "bayesian-optimization>=1.4.0",
+    "pydantic>=2.5.0",
 ]
 
 [project.optional-dependencies]
@@ -58,3 +59,4 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "*" = ["*.txt", "*.md", "LICENSE"]
+config = ["dldl.json"]

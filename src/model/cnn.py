@@ -8,6 +8,7 @@ from loguru import logger
 
 import pandas as pd
 import torch
+import torch.distributed as dist
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -22,24 +23,12 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from constants import (
-    CLASSIFICATION_LOSS,
-    TIME_PREDICTION_LOSS,
-    LEARNING_RATE,
-    NUM_EPOCHS,
-    LOG_INTERVAL,
-    WEIGHT_DECAY,
-    BATCH_SIZE,
-    DATALOADER_NUM_WORKERS,
-    LR_SCHEDULER,
-    LR_SCHEDULER_FACTOR,
-    LR_SCHEDULER_PATIENCE,
-    EARLY_STOPPING_PATIENCE,
-    GRADIENT_CLIP,
-)
+from config.settings import load_settings
 from util.distributed import cleanup, setup
 from util.processing import split
 from model.dataset import IpDataset
+
+_s = load_settings()
 
 
 class IpCNN(nn.Module):
@@ -68,6 +57,8 @@ class IpCNN(nn.Module):
         self.prog_dir = prog_dir
         self.classification = classification
         self.normalization_type = normalization_type
+        self._cls_loss = nn.BCEWithLogitsLoss()
+        self._time_loss = nn.MSELoss()
 
         # Log hyperparameters
         self.logger.info("=" * 60)
@@ -167,10 +158,10 @@ class IpCNN(nn.Module):
 
     def _loss(self, outputs: Tensor, labels: Tensor) -> Tensor:
         """Combined loss for classification and time prediction."""
-        class_loss = CLASSIFICATION_LOSS(outputs[:, 0], labels[:, 0])
+        class_loss = self._cls_loss(outputs[:, 0], labels[:, 0])
         disruptive_mask = labels[:, 0] == 1
         time_loss = (
-            TIME_PREDICTION_LOSS(
+            self._time_loss(
                 outputs[disruptive_mask, 1], labels[disruptive_mask, 1]
             )
             if disruptive_mask.any()
@@ -284,17 +275,17 @@ class IpCNN(nn.Module):
             self.logger.info("Single-process training (world_size=1)")
         torch.manual_seed(42 + rank)
 
-        # Use provided values or defaults from constants
-        lr = lr if lr is not None else LEARNING_RATE
-        num_epochs = num_epochs if num_epochs is not None else NUM_EPOCHS
-        log_interval = log_interval if log_interval is not None else LOG_INTERVAL
-        weight_decay = weight_decay if weight_decay is not None else WEIGHT_DECAY
-        lr_scheduler_enabled = lr_scheduler if lr_scheduler is not None else LR_SCHEDULER
-        lr_scheduler_factor = lr_scheduler_factor if lr_scheduler_factor is not None else LR_SCHEDULER_FACTOR
-        lr_scheduler_patience = lr_scheduler_patience if lr_scheduler_patience is not None else LR_SCHEDULER_PATIENCE
-        early_stopping_patience = early_stopping_patience if early_stopping_patience is not None else EARLY_STOPPING_PATIENCE
-        gradient_clip = gradient_clip if gradient_clip is not None else GRADIENT_CLIP
-        batch_size = batch_size if batch_size is not None else BATCH_SIZE
+        t = _s.training_config
+        lr = lr if lr is not None else t.learning_rate
+        num_epochs = num_epochs if num_epochs is not None else t.num_epochs
+        log_interval = log_interval if log_interval is not None else t.log_interval
+        weight_decay = weight_decay if weight_decay is not None else t.weight_decay
+        lr_scheduler_enabled = lr_scheduler if lr_scheduler is not None else t.lr_scheduler
+        lr_scheduler_factor = lr_scheduler_factor if lr_scheduler_factor is not None else t.lr_scheduler_factor
+        lr_scheduler_patience = lr_scheduler_patience if lr_scheduler_patience is not None else t.lr_scheduler_patience
+        early_stopping_patience = early_stopping_patience if early_stopping_patience is not None else t.early_stopping_patience
+        gradient_clip = gradient_clip if gradient_clip is not None else t.gradient_clip
+        batch_size = batch_size if batch_size is not None else t.batch_size
 
         # Log training hyperparameters
         self.logger.info("=" * 60)
@@ -309,12 +300,12 @@ class IpCNN(nn.Module):
             self.logger.info(f"    Factor: {lr_scheduler_factor}, Patience: {lr_scheduler_patience}")
         self.logger.info(f"  Early stopping patience: {early_stopping_patience}")
         self.logger.info(f"  Gradient clip: {gradient_clip}")
-        self.logger.info(f"  DataLoader num_workers: {DATALOADER_NUM_WORKERS} (0 when no GPU)")
+        self.logger.info(f"  DataLoader num_workers: {t.dataloader_num_workers} (0 when no GPU)")
         self.logger.info("=" * 60)
 
         train, dev, _ = split(self.dataset)
 
-        num_workers = DATALOADER_NUM_WORKERS if torch.cuda.is_available() else 0
+        num_workers = t.dataloader_num_workers if torch.cuda.is_available() else 0
         loader_kw = dict(
             batch_size=batch_size,
             pin_memory=torch.cuda.is_available(),
@@ -398,6 +389,7 @@ class IpCNN(nn.Module):
                         )
                         writer.add_scalar("Training Time Loss", loss_time.item(), step)
 
+            val_loss_t = torch.zeros(1, device="cuda", dtype=torch.float64)
             if rank == 0:
                 self._validate_epoch(
                     model=model,
@@ -411,12 +403,19 @@ class IpCNN(nn.Module):
                     train_loader=train_loader,
                     logs=logs,
                 )
-                avg_val_loss = logs[-1]["validation_loss"] if logs else float("inf")
-                
+                val_loss_t[0] = logs[-1]["validation_loss"] if logs else float("inf")
+            if use_distributed:
+                dist.broadcast(val_loss_t, src=0)
+            avg_val_loss = val_loss_t.item()
+
+            if lr_scheduler_enabled:
+                scheduler.step(avg_val_loss)
+
+            if rank == 0:
                 if lr_scheduler_enabled:
-                    scheduler.step(avg_val_loss)
-                    current_lr = optimizer.param_groups[0]["lr"]
-                    writer.add_scalar("Learning Rate", current_lr, epoch)
+                    writer.add_scalar(
+                        "Learning Rate", optimizer.param_groups[0]["lr"], epoch
+                    )
 
                 if avg_val_loss < best_val_loss:
                     best_val_loss = avg_val_loss

@@ -10,7 +10,7 @@ cd "$PROJECT_ROOT"
 
 mkdir -p "$SCRIPT_DIR/hptune/trials"
 HPTUNE_DIR="$PROJECT_ROOT/scripts/hptune"
-[ -f "$HPTUNE_DIR/trials_log.csv" ] || echo "lr,epochs,dropout,val_loss,status" > "$HPTUNE_DIR/trials_log.csv"
+[ -f "$HPTUNE_DIR/trials_log.csv" ] || echo "trial_id,lr,epochs,dropout,weight_decay,batch_size,gradient_clip,lr_scheduler,lr_scheduler_factor,lr_scheduler_patience,early_stopping_patience,val_loss,status" > "$HPTUNE_DIR/trials_log.csv"
 
 echo "Starting HPTune chain..."
 LOG_DIR="$HPTUNE_DIR"
