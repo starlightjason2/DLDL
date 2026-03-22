@@ -4,10 +4,10 @@
 #PBS -l place=scatter
 #PBS -l walltime=1:00:00
 #PBS -l filesystems=home:eagle
-#PBS -q debug
+#PBS -q small
 #PBS -A fusiondl_aesp
-#PBS -o /eagle/fusiondl_aesp/starlightjason2/DLDL/preprocess_%j.out
-#PBS -e /eagle/fusiondl_aesp/starlightjason2/DLDL/preprocess_%j.err
+#PBS -o /lus/eagle/projects/fusiondl_aesp/starlightjason2/DLDL/data/processed_data
+#PBS -e /lus/eagle/projects/fusiondl_aesp/starlightjason2/DLDL/data/processed_data
 
 # DLDL preprocessing - runs on compute node (CPU-only)
 
