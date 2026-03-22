@@ -28,8 +28,9 @@ export OPENBLAS_NUM_THREADS=1
 export OMP_NUM_THREADS=1
 
 # Run training
-if [ -f "$PROG_DIR/training_best_params.pt" ]; then
-    echo "Existing checkpoint found at $PROG_DIR/training_best_params.pt; skipping retraining."
+BEST_PARAMS_PATH="$PROG_DIR/${JOB_ID}_best_params.pt"
+if [ -f "$BEST_PARAMS_PATH" ]; then
+    echo "Existing checkpoint found at $BEST_PARAMS_PATH; skipping retraining."
 else
     python src/train.py
 fi

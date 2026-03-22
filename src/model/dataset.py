@@ -30,8 +30,7 @@ from util.processing import (
 )
 
 _ROOT = Path(__file__).resolve().parents[2]
-if (_env := _ROOT / ".env").is_file():
-    load_dotenv(_env)
+load_dotenv(_ROOT / ".env")
 
 
 def _abs(p: str) -> str:

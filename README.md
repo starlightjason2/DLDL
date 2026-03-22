@@ -20,6 +20,35 @@ A 1D CNN that uses plasma current to predict disruption time. For labeling D-III
 
 `.env` is loaded when you call ``load_settings()`` from ``config.settings`` (typically at script startup).
 
+## Testing
+
+Install the test tools:
+
+```bash
+python3.11 -m pip install pytest pytest-cov
+```
+
+Run the test suite:
+
+```bash
+python3.11 -m pytest
+```
+
+Run the test suite with coverage and a terminal summary:
+
+```bash
+python3.11 -m pytest --cov=src --cov-report=term-missing
+```
+
+Generate an HTML coverage report:
+
+```bash
+python3.11 -m pytest --cov=src --cov-report=html
+```
+
+The HTML report is written to `htmlcov/index.html`.
+If `pytest-cov` fails with an `sqlite3` import error, use a Python build that includes `sqlite3`.
+
 ### Environment Variables
 
 | Variable | Required | Description |

@@ -10,11 +10,10 @@ LOG_DIR="$HPTUNE_DATA_DIR/controller_logs"
 
 # Clean old HPTune files, but keep per-trial .env and best-checkpoint artifacts.
 mkdir -p "$HPTUNE_DATA_DIR/trials" "$LOG_DIR"
-find "$HPTUNE_DATA_DIR" -type f ! -name ".env" ! -name "training_best_params.pt" -delete
+find "$HPTUNE_DATA_DIR" -type f ! -name ".env" ! -name "*_best_params.pt" -delete
 
 cd "$PROJECT_ROOT"
 
-# --- 2. Submit the Controller ---
 echo "Submitting Controller..."
 FIRST_JOB_ID=$(qsub \
     -k doe \

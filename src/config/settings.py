@@ -16,8 +16,7 @@ from config.schema import ArchitectureConfig, DldlConfigFile, TrainingConfig
 @functools.lru_cache(maxsize=1)
 def _dotenv() -> None:
     p = Path(__file__).resolve().parents[2] / ".env"
-    if p.is_file():
-        load_dotenv(p)
+    load_dotenv(p)
 
 
 @dataclass(frozen=True)

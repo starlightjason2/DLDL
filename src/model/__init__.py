@@ -3,9 +3,10 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .bayesian_hptuner import BayesianHPTuner, HPTuneTrial
+    from .bayesian_hptuner import BayesianHPTuner
     from .cnn import IpCNN
     from .dataset import IpDataset
+    from .hptune_trial import HPTuneTrial
 
 __all__ = [
     "BayesianHPTuner",
@@ -21,7 +22,7 @@ def __getattr__(name: str):
 
         return BayesianHPTuner
     if name == "HPTuneTrial":
-        from .bayesian_hptuner import HPTuneTrial
+        from .hptune_trial import HPTuneTrial
 
         return HPTuneTrial
     if name == "IpCNN":

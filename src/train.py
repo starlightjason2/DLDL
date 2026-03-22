@@ -11,8 +11,7 @@ from config.schema import DatasetEnv
 from config.settings import load_settings
 
 _REPO = Path(__file__).resolve().parents[1]  # project root (src/..)
-if (_env := _REPO / ".env").is_file():
-    load_dotenv(_env)
+load_dotenv(_REPO / ".env")
 
 
 def _abs(p: str) -> str:

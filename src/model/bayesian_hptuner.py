@@ -1,9 +1,7 @@
 """Bayesian hyperparameter tuning orchestration (trial log, acquisition, trial dirs)."""
 
 import os
-import shutil
-from dataclasses import dataclass, replace
-from typing import Optional
+from dataclasses import replace
 
 import numpy as np
 import pandas as pd
@@ -12,110 +10,15 @@ from bayes_opt import acquisition
 from loguru import logger
 
 from config.settings import load_settings
+from model.hptune_trial import HPTuneTrial
 from util.hptune import (
     create_run_script,
     load_env_template,
     load_trials,
     next_trial_numbered_id,
     parse_val_loss,
+    sync_best_trial_artifacts,
 )
-
-
-@dataclass
-class HPTuneTrial:
-    """One hyperparameter trial: non-architecture training hparams, log status, identity."""
-
-    lr: float
-    epochs: int
-    dropout: float
-    weight_decay: float
-    batch_size: int
-    gradient_clip: float
-    lr_scheduler: bool
-    lr_scheduler_factor: float
-    lr_scheduler_patience: int
-    early_stopping_patience: int
-    trial_id: Optional[str] = None
-    val_loss: float = -1.0
-    status: int = -1
-
-    @property
-    def dir_name(self) -> str:
-        """Folder under ``trials/`` (``trial_1``, ``trial_2``, …). Requires ``trial_id``."""
-        if not self.trial_id:
-            raise ValueError("trial_id must be set before using dir_name or path_under")
-        return self.trial_id
-
-    def path_under(self, trials_dir: str) -> str:
-        return os.path.join(trials_dir, self.dir_name)
-
-    @classmethod
-    def from_series(cls, row: pd.Series) -> "HPTuneTrial":
-        ls = row["lr_scheduler"]
-        lr_scheduler = bool(int(ls)) if not pd.isna(ls) else True
-        raw_tid = row["trial_id"]
-        if raw_tid is None or (isinstance(raw_tid, float) and pd.isna(raw_tid)):
-            raise ValueError("trials_log.csv row is missing trial_id (required)")
-        tid = str(raw_tid).strip()
-        if not tid or tid.lower() in ("nan", "none"):
-            raise ValueError("trials_log.csv row has empty trial_id (required)")
-        return cls(
-            lr=float(row["lr"]),
-            epochs=int(row["epochs"]),
-            dropout=float(row["dropout"]),
-            weight_decay=float(row["weight_decay"]),
-            batch_size=int(row["batch_size"]),
-            gradient_clip=float(row["gradient_clip"]),
-            lr_scheduler=lr_scheduler,
-            lr_scheduler_factor=float(row["lr_scheduler_factor"]),
-            lr_scheduler_patience=int(row["lr_scheduler_patience"]),
-            early_stopping_patience=int(row["early_stopping_patience"]),
-            trial_id=tid,
-            val_loss=float(row["val_loss"]),
-            status=int(row["status"]),
-        )
-
-    def to_csv_row(self) -> dict[str, float | int | str]:
-        if not self.trial_id:
-            raise ValueError("trial_id must be set before serializing to CSV")
-        return {
-            "trial_id": self.trial_id,
-            "lr": self.lr,
-            "epochs": self.epochs,
-            "dropout": self.dropout,
-            "weight_decay": self.weight_decay,
-            "batch_size": self.batch_size,
-            "gradient_clip": self.gradient_clip,
-            "lr_scheduler": int(self.lr_scheduler),
-            "lr_scheduler_factor": self.lr_scheduler_factor,
-            "lr_scheduler_patience": self.lr_scheduler_patience,
-            "early_stopping_patience": self.early_stopping_patience,
-            "val_loss": self.val_loss,
-            "status": self.status,
-        }
-
-    def bayesian_params(self, batch_sizes: tuple[int, ...]) -> dict[str, float]:
-        """Float-only parameter dict aligned with BayesianOptimization pbounds."""
-        bi = self._batch_index(batch_sizes)
-        return {
-            "lr": self.lr,
-            "dropout": self.dropout,
-            "log_wd": float(np.log10(max(self.weight_decay, 1e-20))),
-            "epochs": float(self.epochs),
-            "gradient_clip": self.gradient_clip,
-            "lr_scheduler_u": 1.0 if self.lr_scheduler else 0.0,
-            "lr_scheduler_factor": self.lr_scheduler_factor,
-            "lr_sched_patience": float(self.lr_scheduler_patience),
-            "early_stop_patience": float(self.early_stopping_patience),
-            "batch_idx": float(bi),
-        }
-
-    def _batch_index(self, batch_sizes: tuple[int, ...]) -> int:
-        if self.batch_size in batch_sizes:
-            return batch_sizes.index(self.batch_size)
-        return min(
-            range(len(batch_sizes)), key=lambda i: abs(batch_sizes[i] - self.batch_size)
-        )
 
 
 class BayesianHPTuner:
@@ -166,62 +69,6 @@ class BayesianHPTuner:
             format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
             level="DEBUG",
             enqueue=True,
-        )
-
-    def _best_checkpoint_path(self, trial: HPTuneTrial) -> str | None:
-        """Return the best-checkpoint path for a completed trial if it exists."""
-        trial_dir = trial.path_under(self.trials_dir)
-        path = os.path.join(trial_dir, f"{trial.trial_id}_best_params.pt")
-        return path if os.path.exists(path) else None
-
-    def _sync_best_trial_artifacts(self, df: pd.DataFrame) -> None:
-        """Copy the current overall best trial's .env and checkpoint into best_trial/."""
-        completed = df[df["status"] == 0]
-        if completed.empty:
-            return
-
-        best_row = completed.loc[completed["val_loss"].idxmin()]
-        best_trial = HPTuneTrial.from_series(best_row)
-        best_trial_path = best_trial.path_under(self.trials_dir)
-        env_source = os.path.join(best_trial_path, ".env")
-        checkpoint_source = self._best_checkpoint_path(best_trial)
-
-        if not os.path.exists(env_source):
-            self.logger.warning(
-                "Best-trial sync skipped: missing .env for {} at {}",
-                best_trial.trial_id,
-                env_source,
-            )
-            return
-        if checkpoint_source is None:
-            self.logger.warning(
-                "Best-trial sync skipped: missing best checkpoint for {} under {}",
-                best_trial.trial_id,
-                best_trial_path,
-            )
-            return
-
-        os.makedirs(self.best_trial_dir, exist_ok=True)
-
-        # Keep best_trial/ as a single-current-best snapshot instead of an archive.
-        for existing_name in os.listdir(self.best_trial_dir):
-            existing_path = os.path.join(self.best_trial_dir, existing_name)
-            if not os.path.isfile(existing_path):
-                continue
-            if existing_name == ".env" or existing_name.endswith("_best_params.pt"):
-                os.remove(existing_path)
-
-        shutil.copy2(env_source, os.path.join(self.best_trial_dir, ".env"))
-        checkpoint_name = os.path.basename(checkpoint_source)
-        shutil.copy2(
-            checkpoint_source,
-            os.path.join(self.best_trial_dir, checkpoint_name),
-        )
-        self.logger.info(
-            "Best-trial snapshot updated: trial_id={} val_loss={:.6f} -> {}",
-            best_trial.trial_id,
-            float(best_row["val_loss"]),
-            self.best_trial_dir,
         )
 
     def _pbounds(self) -> dict[str, tuple[float, float]]:
@@ -305,7 +152,7 @@ class BayesianHPTuner:
         if completed_n == 0 and len(in_progress) > 0:
             self.logger.debug("Sync: no new completions from training logs yet")
         elif completed_n:
-            self._sync_best_trial_artifacts(df)
+            sync_best_trial_artifacts(df, self.trials_dir, self.best_trial_dir)
             self.logger.info(
                 "Sync: wrote {} newly completed trial(s) to {}",
                 completed_n,
@@ -422,29 +269,7 @@ fi
         self.logger.info("Materialize trial: dir={} path={}", trial.dir_name, trial_dir)
 
         env_path = os.path.join(trial_dir, ".env")
-        ls_str = "true" if trial.lr_scheduler else "false"
-        env_content = (
-            "\n".join(env_lines)
-            + f"""
-    # HPTune overrides
-    LEARNING_RATE={trial.lr}
-    NUM_EPOCHS={trial.epochs}
-    DROPOUT_RATE={trial.dropout}
-    WEIGHT_DECAY={trial.weight_decay}
-    BATCH_SIZE={trial.batch_size}
-    GRADIENT_CLIP={trial.gradient_clip}
-    LR_SCHEDULER={ls_str}
-    LR_SCHEDULER_FACTOR={trial.lr_scheduler_factor}
-    LR_SCHEDULER_PATIENCE={trial.lr_scheduler_patience}
-    EARLY_STOPPING_PATIENCE={trial.early_stopping_patience}
-    PROG_DIR={trial_dir}
-    JOB_ID={trial.trial_id}
-    # run.sh tee already writes full stderr to train_${{PBS_JOBID}}.log; skip duplicate training.log
-    TRAIN_LOGURU_FILE=0
-    """
-        )
-        with open(env_path, "w") as f:
-            f.write(env_content)
+        trial.write_env_file(env_path, env_lines)
 
         template_path = os.path.join(self.project_root, "scripts", "run_train.sh")
         script = create_run_script(

@@ -3,8 +3,12 @@
 import glob
 import os
 import re
+import shutil
 
 import pandas as pd
+from loguru import logger
+
+from model.hptune_trial import HPTuneTrial
 
 # Enumerated trial folders: trial_1, trial_2, ...
 _TRIAL_NUM_DIR_RE = re.compile(r"^trial_(\d+)$")
@@ -133,9 +137,6 @@ def load_env_template(
     """
     lines: list[str] = []
     path = os.path.join(project_root, ".env")
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Required HPTune env template not found: {path}")
-
     with open(path) as f:
         for line in f:
             stripped = line.strip()
@@ -191,3 +192,64 @@ def create_run_script(
     )
 
     return script
+
+
+def best_checkpoint_path(trials_dir: str, trial: HPTuneTrial) -> str | None:
+    """Return the best-checkpoint path for a completed trial if it exists."""
+    path = os.path.join(trial.path_under(trials_dir), f"{trial.trial_id}_best_params.pt")
+    return path if os.path.exists(path) else None
+
+
+def sync_best_trial_artifacts(
+    df: pd.DataFrame,
+    trials_dir: str,
+    best_trial_dir: str,
+) -> None:
+    """Copy the current overall best trial's .env and checkpoint into best_trial/."""
+    completed = df[df["status"] == 0]
+    if completed.empty:
+        return
+
+    best_row = completed.loc[completed["val_loss"].idxmin()]
+    best_trial = HPTuneTrial.from_series(best_row)
+    best_trial_path = best_trial.path_under(trials_dir)
+    env_source = os.path.join(best_trial_path, ".env")
+    checkpoint_source = best_checkpoint_path(trials_dir, best_trial)
+
+    if not os.path.exists(env_source):
+        logger.warning(
+            "Best-trial sync skipped: missing .env for {} at {}",
+            best_trial.trial_id,
+            env_source,
+        )
+        return
+    if checkpoint_source is None:
+        logger.warning(
+            "Best-trial sync skipped: missing best checkpoint for {} under {}",
+            best_trial.trial_id,
+            best_trial_path,
+        )
+        return
+
+    os.makedirs(best_trial_dir, exist_ok=True)
+
+    # Keep best_trial/ as a single-current-best snapshot instead of an archive.
+    for existing_name in os.listdir(best_trial_dir):
+        existing_path = os.path.join(best_trial_dir, existing_name)
+        if not os.path.isfile(existing_path):
+            continue
+        if existing_name == ".env" or existing_name.endswith("_best_params.pt"):
+            os.remove(existing_path)
+
+    shutil.copy2(env_source, os.path.join(best_trial_dir, ".env"))
+    checkpoint_name = os.path.basename(checkpoint_source)
+    shutil.copy2(
+        checkpoint_source,
+        os.path.join(best_trial_dir, checkpoint_name),
+    )
+    logger.info(
+        "Best-trial snapshot updated: trial_id={} val_loss={:.6f} -> {}",
+        best_trial.trial_id,
+        float(best_row["val_loss"]),
+        best_trial_dir,
+    )
