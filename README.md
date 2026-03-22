@@ -137,7 +137,7 @@ python -m src.graph --csv custom_log.csv --output plot.png
 Run preprocessing and training on compute nodes (not login nodes):
 
 ```bash
-# From DLDL project root, with .env symlinked to .env.polaris
+# From DLDL project root, with `.env` configured
 cd /path/to/DLDL
 
 # Edit scripts/run_preprocess.sh and scripts/run_train.sh:
@@ -158,18 +158,19 @@ Output logs: `preprocess_<jobid>.out`, `train_<jobid>.out` (and `.err`).
 
 ### Bayesian Hyperparameter Tuning
 
+Same pattern as FusionTransformer `job_setup/controller.sh`: Bayes step → worker → next controller (PBS `depend=afterany`).
+
+HPTune reads the same project-root `.env` as the rest of the workflow. On Polaris, that is typically a symlink to `.env.polaris`.
+
 ```bash
-# From project root (with .env.polaris configured)
 ./scripts/start_hptune.sh
 ```
 
-`start_hptune.sh` starts a **fresh** chain: it removes `scripts/hptune/trials/` (all `trial_*` directories), rewrites `scripts/hptune/trials_log.csv` with headers only, and deletes prior `scripts/hptune/controller_logs/controller_*.txt` plus `scripts/hptune/controller_*_stdout.txt` and `controller_*_stderr.txt` before submitting.
+**Loguru** writes **`data/hptune/controller_logs/hptune_<PBS_JOBID>.txt`** when `PBS_JOBID` is set. Shell scripts do not configure logging.
 
-Runs a chain of jobs: each controller picks or creates a trial (lr, epochs, dropout), submits a training job, then chains the next controller. Uses random sampling for the first 5 trials, then Bayesian optimization. Results in `scripts/hptune/trials_log.csv` and `scripts/hptune/trials/`.
+**Training:** `data/hptune/trials/trial_N/train_<jobid>.log`. **Env:** `HPTUNE_TRAIN_WALLTIME`, `HPTUNE_MAX_TRIALS` (default `20`), `DLDL_HPTUNE_CHAIN_ID`, `DLDL_HPTUNE_DIR`.
 
-**Validate chaining locally (no PBS):** from the repo root, `bash scripts/validate_hptune_chain.sh` checks that the same `grep`/`sed` used in `controller.sh` correctly extracts the `trial_N` id from log output, that PBS job ids strip to a numeric id for `depend=afterany`, and (if `loguru` is installed) that the Python logger emits a parseable `Next trial ->` line.
-
-**If the chain stops after the worker is submitted:** open `scripts/hptune/controller_logs/controller_<full PBS job id>.txt` (combined stdout/stderr after `exec`; `.txt` so IDE file trees are not hiding `*.log`). `controller.sh` waits until the worker leaves **Q** before submitting the next controller (avoids two jobs in **Q** and Polaris `would exceed … per-user limit of jobs in 'Q' state`). Controller jobs use **1h** walltime (Polaris **debug** queue maximum). This wait can run up to `HPTUNE_CHAIN_WAIT_SEC` (default **3000** s ≈ 50 min). Poll interval: `HPTUNE_CHAIN_POLL_SEC` (default 3). If the worker is still **Q** after that wait, the script **exits without** chaining (manual `qsub` of `controller.sh` later). If the log ends at the chained-controller step with an error, the script prints the full PBS message. PBS streams: `scripts/hptune/controller_<numeric id>_stdout.txt` and `scripts/hptune/controller_<numeric id>_stderr.txt`.
+**Local parse check:** `bash scripts/validate_hptune_chain.sh`
 
 ## Quick Reference
 

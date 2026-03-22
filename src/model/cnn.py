@@ -361,7 +361,7 @@ class IpCNN(nn.Module):
 
         logs = []
         if rank == 0:
-            writer = SummaryWriter(os.path.join(self.prog_dir, job_id))
+            writer = SummaryWriter(self.prog_dir, filename_suffix=f"-job_{job_id}")
 
         best_val_loss = float("inf")
         epochs_without_improvement = 0

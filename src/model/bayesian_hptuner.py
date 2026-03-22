@@ -1,6 +1,7 @@
 """Bayesian hyperparameter tuning orchestration (trial log, acquisition, trial dirs)."""
 
 import os
+import shutil
 from dataclasses import dataclass, replace
 from typing import Optional
 
@@ -133,41 +134,95 @@ class BayesianHPTuner:
                     hd if os.path.isabs(hd) else os.path.normpath(os.path.join(r, hd))
                 )
             )
-            or os.path.join(r, "scripts", "hptune")
+            or os.path.join(r, "data", "hptune")
         )
         self.trials_dir = os.path.join(hdir, "trials")
-        self.csv_path = os.path.join(hdir, "trials_log.csv")
+        self.best_trial_dir = os.path.join(hdir, "best_trial")
+        self.csv_path = os.path.join(self.trials_dir, "trials_log.csv")
         self.project_root = r
         hp = settings.cfg.hptune
         self.num_initial_trials = hp.num_initial_trials
+        self.max_trials = int(os.environ.get("HPTUNE_MAX_TRIALS", "10"))
+        if self.max_trials < 1:
+            raise ValueError("HPTUNE_MAX_TRIALS must be >= 1")
         self.allowed_epochs = tuple(hp.allowed_epochs)
         self.batch_sizes = tuple(hp.allowed_batch_sizes)
         self.bounds = settings.default_hptune_param_bounds(
             self.allowed_epochs, self.batch_sizes
         )
         self.logger = logger.bind(name=__name__)
+        self._configure_loguru_file()
 
-    def _log_controller_job_log_paths(self) -> None:
-        """Print where this process's logs live when run under PBS (matches controller.sh / qsub)."""
-        d = os.path.abspath(os.path.dirname(self.csv_path))
-        job_id = os.environ.get("PBS_JOBID")
-        if job_id:
-            jnum = job_id.split(".", 1)[0]
-            log_p = os.path.join(d, "controller_logs", f"controller_{job_id}.txt")
-            out_p = os.path.join(d, f"controller_{jnum}_stdout.txt")
-            err_p = os.path.join(d, f"controller_{jnum}_stderr.txt")
-            self.logger.info(
-                "HPTune job id {} — controller logs: {} | {} | {}",
-                job_id,
-                log_p,
-                out_p,
-                err_p,
+    def _configure_loguru_file(self) -> None:
+        """Under PBS, write loguru to data/hptune/controller_logs/hptune_<PBS_JOBID>.txt."""
+        jid = os.environ.get("PBS_JOBID")
+        if not jid:
+            return
+        log_dir = os.path.join(os.path.dirname(self.trials_dir), "controller_logs")
+        os.makedirs(log_dir, exist_ok=True)
+        path = os.path.join(log_dir, f"hptune_{jid}.txt")
+        logger.add(
+            path,
+            format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
+            level="DEBUG",
+            enqueue=True,
+        )
+
+    def _best_checkpoint_path(self, trial: HPTuneTrial) -> str | None:
+        """Return the best-checkpoint path for a completed trial if it exists."""
+        trial_dir = trial.path_under(self.trials_dir)
+        path = os.path.join(trial_dir, f"{trial.trial_id}_best_params.pt")
+        return path if os.path.exists(path) else None
+
+    def _sync_best_trial_artifacts(self, df: pd.DataFrame) -> None:
+        """Copy the current overall best trial's .env and checkpoint into best_trial/."""
+        completed = df[df["status"] == 0]
+        if completed.empty:
+            return
+
+        best_row = completed.loc[completed["val_loss"].idxmin()]
+        best_trial = HPTuneTrial.from_series(best_row)
+        best_trial_path = best_trial.path_under(self.trials_dir)
+        env_source = os.path.join(best_trial_path, ".env")
+        checkpoint_source = self._best_checkpoint_path(best_trial)
+
+        if not os.path.exists(env_source):
+            self.logger.warning(
+                "Best-trial sync skipped: missing .env for {} at {}",
+                best_trial.trial_id,
+                env_source,
             )
-        else:
-            self.logger.info(
-                "HPTune (PBS_JOBID unset): loguru on stderr; hptune dir={}",
-                d,
+            return
+        if checkpoint_source is None:
+            self.logger.warning(
+                "Best-trial sync skipped: missing best checkpoint for {} under {}",
+                best_trial.trial_id,
+                best_trial_path,
             )
+            return
+
+        os.makedirs(self.best_trial_dir, exist_ok=True)
+
+        # Keep best_trial/ as a single-current-best snapshot instead of an archive.
+        for existing_name in os.listdir(self.best_trial_dir):
+            existing_path = os.path.join(self.best_trial_dir, existing_name)
+            if not os.path.isfile(existing_path):
+                continue
+            if existing_name == ".env" or existing_name.endswith("_best_params.pt"):
+                os.remove(existing_path)
+
+        shutil.copy2(env_source, os.path.join(self.best_trial_dir, ".env"))
+        checkpoint_name = os.path.basename(checkpoint_source)
+        shutil.copy2(
+            checkpoint_source,
+            os.path.join(self.best_trial_dir, checkpoint_name),
+        )
+        self.logger.info(
+            "Best-trial snapshot updated: trial_id={} val_loss={:.6f} -> {}",
+            best_trial.trial_id,
+            float(best_row["val_loss"]),
+            self.best_trial_dir,
+        )
 
     def _pbounds(self) -> dict[str, tuple[float, float]]:
         return dict(self.bounds)
@@ -222,11 +277,14 @@ class BayesianHPTuner:
         )
 
     def _log_next_trial_marker(self, dir_name: str) -> None:
+        # NOTE: controller.sh parses this exact format via: grep 'Next trial ->'
+        # Do not change this string without updating the grep in controller.sh.
         self.logger.info("Next trial -> {}", dir_name)
+        print(f"Next trial -> {dir_name}", flush=True)
 
     def update_trials(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Update in-progress trials (val_loss=-1) by checking training logs."""
-        in_progress = df[df["val_loss"] == -1]
+        """Update in-progress trials (status=-1) by checking training logs."""
+        in_progress = df[df["status"] == -1]
         self.logger.info(
             "Sync: checking {} in-progress trial(s) under {}",
             len(in_progress),
@@ -247,6 +305,7 @@ class BayesianHPTuner:
         if completed_n == 0 and len(in_progress) > 0:
             self.logger.debug("Sync: no new completions from training logs yet")
         elif completed_n:
+            self._sync_best_trial_artifacts(df)
             self.logger.info(
                 "Sync: wrote {} newly completed trial(s) to {}",
                 completed_n,
@@ -338,8 +397,22 @@ class BayesianHPTuner:
         )
         return self.sample_bayesian(df)
 
+    def _post_run_checkpoint_cleanup_block(self) -> str:
+        """Shell snippet that removes epoch checkpoints after best checkpoint exists."""
+        return """
+
+# Post-run cleanup: keep only the best checkpoint for this trial.
+BEST_PARAMS_PATH="$PROG_DIR/${JOB_ID}_best_params.pt"
+if [ -f "$BEST_PARAMS_PATH" ]; then
+    for checkpoint in "$PROG_DIR/${JOB_ID}_params_epoch"*.pt; do
+        [ -e "$checkpoint" ] || continue
+        rm -f "$checkpoint"
+    done
+fi
+"""
+
     def create_trial(self, trial: HPTuneTrial, env_lines: list[str]) -> str:
-        """Create trial directory with run.sh and .env. ``trial.trial_id`` must be set for new trials."""
+        """Create trial directory with run.sh and .env. ``trial.trial_id`` must be set."""
         if not trial.trial_id:
             raise ValueError(
                 "HPTuneTrial.trial_id must be set (use next_trial_numbered_id()) before create_trial"
@@ -353,22 +426,22 @@ class BayesianHPTuner:
         env_content = (
             "\n".join(env_lines)
             + f"""
-# HPTune overrides
-LEARNING_RATE={trial.lr}
-NUM_EPOCHS={trial.epochs}
-DROPOUT_RATE={trial.dropout}
-WEIGHT_DECAY={trial.weight_decay}
-BATCH_SIZE={trial.batch_size}
-GRADIENT_CLIP={trial.gradient_clip}
-LR_SCHEDULER={ls_str}
-LR_SCHEDULER_FACTOR={trial.lr_scheduler_factor}
-LR_SCHEDULER_PATIENCE={trial.lr_scheduler_patience}
-EARLY_STOPPING_PATIENCE={trial.early_stopping_patience}
-PROG_DIR={trial_dir}
-JOB_ID=training
-# run.sh tee already writes full stderr to train_${{PBS_JOBID}}.log; skip duplicate training.log
-TRAIN_LOGURU_FILE=0
-"""
+    # HPTune overrides
+    LEARNING_RATE={trial.lr}
+    NUM_EPOCHS={trial.epochs}
+    DROPOUT_RATE={trial.dropout}
+    WEIGHT_DECAY={trial.weight_decay}
+    BATCH_SIZE={trial.batch_size}
+    GRADIENT_CLIP={trial.gradient_clip}
+    LR_SCHEDULER={ls_str}
+    LR_SCHEDULER_FACTOR={trial.lr_scheduler_factor}
+    LR_SCHEDULER_PATIENCE={trial.lr_scheduler_patience}
+    EARLY_STOPPING_PATIENCE={trial.early_stopping_patience}
+    PROG_DIR={trial_dir}
+    JOB_ID={trial.trial_id}
+    # run.sh tee already writes full stderr to train_${{PBS_JOBID}}.log; skip duplicate training.log
+    TRAIN_LOGURU_FILE=0
+    """
         )
         with open(env_path, "w") as f:
             f.write(env_content)
@@ -377,6 +450,38 @@ TRAIN_LOGURU_FILE=0
         script = create_run_script(
             self.project_root, trial_dir, env_path, template_path
         )
+        script += self._post_run_checkpoint_cleanup_block()
+
+        # Append the next-controller submission block.
+        # run_train.sh stays standalone — chaining is only added to hptune trial copies.
+        # The debug queue limit is max_run=1 per user, so the next controller must be
+        # submitted from inside the trial job (not from the controller) to keep only
+        # 1 job active at a time.
+        hptune_dir = os.path.dirname(self.trials_dir)
+        log_dir = os.path.join(hptune_dir, "controller_logs")
+        controller_path = os.path.join(self.project_root, "scripts", "controller.sh")
+        script += f"""
+    # --- Submit Next Controller (HPTune Job Chain) ---
+    # Appended by create_trial in bayesian_hp_tuning.py. Not present in run_train.sh.
+    # Submits the next controller after training completes, continuing the chain.
+    if [ -n "$DLDL_HPTUNE_CHAIN_ID" ] && [ -n "$PROJECT_ROOT" ]; then
+        echo "Training complete. Submitting next controller..."
+        NEXT_CTL_JOB_ID=$(qsub \\
+            -A fusiondl_aesp \\
+            -q "${{HPTUNE_QUEUE:-small}}" \\
+            -l select=1:system=polaris,place=scatter,walltime=1:00:00,filesystems=home:eagle \\
+            -k doe \\
+            -o "{log_dir}/" \\
+            -e "{log_dir}/" \\
+            -v "PROJECT_ROOT=$PROJECT_ROOT,DLDL_HPTUNE_CHAIN_ID=$DLDL_HPTUNE_CHAIN_ID,HPTUNE_QUEUE=${{HPTUNE_QUEUE:-small}}" \\
+            "{controller_path}") || {{
+                echo "ERROR: Next controller qsub failed. Chain will not continue."
+                exit 1
+            }}
+        echo "Next controller queued: $NEXT_CTL_JOB_ID"
+    fi
+    """
+
         run_path = os.path.join(trial_dir, "run.sh")
         with open(run_path, "w") as f:
             f.write(script)
@@ -385,18 +490,17 @@ TRAIN_LOGURU_FILE=0
         return trial.dir_name
 
     def find_pending_trial(self, df: pd.DataFrame) -> HPTuneTrial | None:
-        for status_val in (-1, -2):
-            candidates = df[df["val_loss"] == status_val]
-            if not candidates.empty:
-                return HPTuneTrial.from_series(candidates.iloc[0])
+        """Return the first trial with status -1 (running) or -2 (queued), if any."""
+        candidates = df[df["status"].isin([-1, -2])]
+        if not candidates.empty:
+            return HPTuneTrial.from_series(candidates.iloc[0])
         self.logger.debug(
-            "No pending trial rows (val_loss in -1, -2); will propose a new trial"
+            "No pending trial rows (status in -1, -2); will propose a new trial"
         )
         return None
 
     def run(self) -> None:
         """One controller step: sync logs, resume pending work, or enqueue a new trial."""
-        self._log_controller_job_log_paths()
         self.logger.info(
             "=== HPTune pass start csv={} trials_dir={} ===",
             self.csv_path,
@@ -404,8 +508,8 @@ TRAIN_LOGURU_FILE=0
         )
         df = self.update_trials(load_trials(self.trials_dir, self.csv_path))
         done = int((df["status"] == 0).sum())
-        running = int((df["val_loss"] == -1).sum())
-        queued = int((df["val_loss"] == -2).sum())
+        running = int((df["status"] == -1).sum())
+        queued = int((df["status"] == -2).sum())
         self.logger.info(
             "Trial log snapshot: rows={} done={} running={} queued={}",
             len(df),
@@ -423,16 +527,28 @@ TRAIN_LOGURU_FILE=0
             self.logger.info("=== HPTune pass end (pending) ===")
             return
 
-        trial = self.sample_hyperparameters(df)
-        self.logger.info("Next trial: " + next_trial_numbered_id(self.trials_dir, df))
-        trial = replace(trial, trial_id=next_trial_numbered_id(self.trials_dir, df))
+        if len(df) >= self.max_trials:
+            self.logger.info(
+                "Reached HPTUNE_MAX_TRIALS={} with {} trial row(s); not scheduling a new trial",
+                self.max_trials,
+                len(df),
+            )
+            self.logger.info("=== HPTune pass end (max trials reached) ===")
+            return
+
+        # Assign trial_id once; use it for both logging and materialization
+        trial_id = next_trial_numbered_id(self.trials_dir, df)
+        trial = replace(self.sample_hyperparameters(df), trial_id=trial_id)
 
         self._log_pass_hyperparameters(trial, context="newly proposed (this pass)")
+
+        # Create files first — if this fails, we do NOT write the CSV row.
+        # That prevents a zombie row with no run.sh on the next controller pass.
+        self.create_trial(trial, load_env_template(self.project_root))
 
         new_row = pd.DataFrame([trial.to_csv_row()])
         pd.concat([df, new_row], ignore_index=True).to_csv(self.csv_path, index=False)
         self.logger.info("Appended new trial row to {}", self.csv_path)
 
-        self.create_trial(trial, load_env_template(self.project_root))
         self._log_next_trial_marker(trial.dir_name)
         self.logger.info("=== HPTune pass end (new trial scheduled) ===")
