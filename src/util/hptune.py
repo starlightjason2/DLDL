@@ -65,6 +65,7 @@ def next_trial_numbered_id(trials_dir: str, df: pd.DataFrame) -> str:
                         max_n = max(max_n, int(m.group(1)))
         except OSError:
             pass
+
     return f"trial_{max_n + 1}"
 
 

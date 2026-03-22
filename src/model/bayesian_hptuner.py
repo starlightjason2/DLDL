@@ -19,9 +19,6 @@ from util.hptune import (
     parse_val_loss,
 )
 
-# Parameters sampled in BO / random search (extend by updating HPTuneTrial + create_trial + Settings.default_hptune_param_bounds)
-_BO_PARAM_KEYS = frozenset(load_settings().default_hptune_param_bounds().keys())
-
 
 @dataclass
 class HPTuneTrial:
@@ -123,20 +120,10 @@ class HPTuneTrial:
 class BayesianHPTuner:
     """Bayesian search over non-architecture training hyperparameters."""
 
-    def __init__(
-        self,
-        trials_dir: str | None = None,
-        csv_path: str | None = None,
-        project_root: str | None = None,
-        num_initial_trials: int | None = None,
-        param_bounds: Optional[dict[str, tuple[float, float]]] = None,
-        allowed_epochs: Optional[tuple[int, ...]] = None,
-        batch_sizes: Optional[tuple[int, ...]] = None,
-        chain_id: Optional[str] = None,
-    ) -> None:
-        s = load_settings()
-        r = s.project_root
-        hd = s.cfg.hptune.dir
+    def __init__(self) -> None:
+        settings = load_settings()
+        r = settings.project_root
+        hd = settings.cfg.hptune.dir
         hdir = (
             os.environ.get("DLDL_HPTUNE_DIR")
             or (
@@ -148,44 +135,39 @@ class BayesianHPTuner:
             )
             or os.path.join(r, "scripts", "hptune")
         )
-        tdir, logp = os.path.join(hdir, "trials"), os.path.join(hdir, "trials_log.csv")
-        self.trials_dir = trials_dir if trials_dir is not None else tdir
-        self.csv_path = csv_path if csv_path is not None else logp
-        self.project_root = project_root if project_root is not None else s.project_root
-        hp = s.cfg.hptune
-        self.num_initial_trials = (
-            num_initial_trials
-            if num_initial_trials is not None
-            else hp.num_initial_trials
+        self.trials_dir = os.path.join(hdir, "trials")
+        self.csv_path = os.path.join(hdir, "trials_log.csv")
+        self.project_root = r
+        hp = settings.cfg.hptune
+        self.num_initial_trials = hp.num_initial_trials
+        self.allowed_epochs = tuple(hp.allowed_epochs)
+        self.batch_sizes = tuple(hp.allowed_batch_sizes)
+        self.bounds = settings.default_hptune_param_bounds(
+            self.allowed_epochs, self.batch_sizes
         )
-        self.allowed_epochs = (
-            tuple(allowed_epochs)
-            if allowed_epochs is not None
-            else tuple(hp.allowed_epochs)
-        )
-        self.batch_sizes = (
-            tuple(batch_sizes)
-            if batch_sizes is not None
-            else tuple(hp.allowed_batch_sizes)
-        )
-        base = s.default_hptune_param_bounds(self.allowed_epochs, self.batch_sizes)
-        if param_bounds is not None:
-            bad = set(param_bounds) - _BO_PARAM_KEYS
-            if bad:
-                raise ValueError(
-                    f"param_bounds has unknown keys {sorted(bad)}; "
-                    f"allowed: {sorted(_BO_PARAM_KEYS)}",
-                )
-            for k, bounds in param_bounds.items():
-                low, high = bounds
-                if low >= high:
-                    raise ValueError(
-                        f"param_bounds[{k!r}] must have min < max, got {bounds}"
-                    )
-            base = {**base, **param_bounds}
-        self.bounds = base
-        self.chain_id = chain_id
         self.logger = logger.bind(name=__name__)
+
+    def _log_controller_job_log_paths(self) -> None:
+        """Print where this process's logs live when run under PBS (matches controller.sh / qsub)."""
+        d = os.path.abspath(os.path.dirname(self.csv_path))
+        job_id = os.environ.get("PBS_JOBID")
+        if job_id:
+            jnum = job_id.split(".", 1)[0]
+            log_p = os.path.join(d, "controller_logs", f"controller_{job_id}.txt")
+            out_p = os.path.join(d, f"controller_{jnum}_stdout.txt")
+            err_p = os.path.join(d, f"controller_{jnum}_stderr.txt")
+            self.logger.info(
+                "HPTune job id {} — controller logs: {} | {} | {}",
+                job_id,
+                log_p,
+                out_p,
+                err_p,
+            )
+        else:
+            self.logger.info(
+                "HPTune (PBS_JOBID unset): loguru on stderr; hptune dir={}",
+                d,
+            )
 
     def _pbounds(self) -> dict[str, tuple[float, float]]:
         return dict(self.bounds)
@@ -414,9 +396,9 @@ TRAIN_LOGURU_FILE=0
 
     def run(self) -> None:
         """One controller step: sync logs, resume pending work, or enqueue a new trial."""
+        self._log_controller_job_log_paths()
         self.logger.info(
-            "=== HPTune pass start chain_id={} csv={} trials_dir={} ===",
-            self.chain_id,
+            "=== HPTune pass start csv={} trials_dir={} ===",
             self.csv_path,
             self.trials_dir,
         )
@@ -442,7 +424,9 @@ TRAIN_LOGURU_FILE=0
             return
 
         trial = self.sample_hyperparameters(df)
+        self.logger.info("Next trial: " + next_trial_numbered_id(self.trials_dir, df))
         trial = replace(trial, trial_id=next_trial_numbered_id(self.trials_dir, df))
+
         self._log_pass_hyperparameters(trial, context="newly proposed (this pass)")
 
         new_row = pd.DataFrame([trial.to_csv_row()])

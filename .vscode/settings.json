@@ -1,3 +1,4 @@
 {
-   "editor.multiCursorModifier": "alt"
+   "editor.multiCursorModifier": "alt",
+   "editor.formatOnSave": true
 }

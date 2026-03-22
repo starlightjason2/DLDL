@@ -33,7 +33,7 @@ A 1D CNN that uses plasma current to predict disruption time. For labeling D-III
 | `NORMALIZATION_TYPE` | | `scale`, `meanvar-whole`, or `meanvar-single` (default `meanvar-whole`). |
 | `CPU_USE` | | Fraction of CPU cores for preprocessing, 0-1 (default `0.2`; use `0.5-1.0` on HPC with more RAM) |
 | `PREPROCESSOR_MAX_WORKERS` | | Hard cap on preprocessing workers (default `4`; avoids fork/resource issues on HPC) |
-| `DATALOADER_NUM_WORKERS` | | DataLoader workers for training (default `4`; 0 when no GPU) |
+| `DATALOADER_NUM_WORKERS` | | DataLoader workers for training (default `4`; forced to `0` when no GPU) |
 | `PMI_LOCAL_RANK` | | Distributed training (scheduler) |
 | `PMI_RANK` | | Process rank (default 0) |
 | `PMI_SIZE` | | World size (default 1) |
@@ -44,7 +44,7 @@ A 1D CNN that uses plasma current to predict disruption time. For labeling D-III
 Raw .txt → preprocess_data.py → .pt files → train.py → Model + logs → graph.py → Visualizations
 ```
 
-**Config:** Set `NORMALIZATION_TYPE` and `CPU_USE` in `.env` (or env). Point `DATA_PATH` / `TRAIN_LABELS_PATH` at the `.pt` files that match that normalization (e.g. filenames containing `meanvar-whole`). Scripts call `load_settings()` for hyperparameters from `dldl.json` (with env overrides).
+**Config:** Set `NORMALIZATION_TYPE` and `CPU_USE` in `.env` (or env). Point `DATA_PATH` / `TRAIN_LABELS_PATH` at the `.pt` files that match that normalization (e.g. filenames containing `meanvar-whole`). Scripts call `load_settings()` for hyperparameters from `dldl.json` (defaults under `defaultTraining`, architecture under `architecture`, plus env overrides).
 
 ### 1. Preprocessing
 
@@ -163,7 +163,13 @@ Output logs: `preprocess_<jobid>.out`, `train_<jobid>.out` (and `.err`).
 ./scripts/start_hptune.sh
 ```
 
+`start_hptune.sh` starts a **fresh** chain: it removes `scripts/hptune/trials/` (all `trial_*` directories), rewrites `scripts/hptune/trials_log.csv` with headers only, and deletes prior `scripts/hptune/controller_logs/controller_*.txt` plus `scripts/hptune/controller_*_stdout.txt` and `controller_*_stderr.txt` before submitting.
+
 Runs a chain of jobs: each controller picks or creates a trial (lr, epochs, dropout), submits a training job, then chains the next controller. Uses random sampling for the first 5 trials, then Bayesian optimization. Results in `scripts/hptune/trials_log.csv` and `scripts/hptune/trials/`.
+
+**Validate chaining locally (no PBS):** from the repo root, `bash scripts/validate_hptune_chain.sh` checks that the same `grep`/`sed` used in `controller.sh` correctly extracts the `trial_N` id from log output, that PBS job ids strip to a numeric id for `depend=afterany`, and (if `loguru` is installed) that the Python logger emits a parseable `Next trial ->` line.
+
+**If the chain stops after the worker is submitted:** open `scripts/hptune/controller_logs/controller_<full PBS job id>.txt` (combined stdout/stderr after `exec`; `.txt` so IDE file trees are not hiding `*.log`). `controller.sh` waits until the worker leaves **Q** before submitting the next controller (avoids two jobs in **Q** and Polaris `would exceed … per-user limit of jobs in 'Q' state`). Controller jobs use **1h** walltime (Polaris **debug** queue maximum). This wait can run up to `HPTUNE_CHAIN_WAIT_SEC` (default **3000** s ≈ 50 min). Poll interval: `HPTUNE_CHAIN_POLL_SEC` (default 3). If the worker is still **Q** after that wait, the script **exits without** chaining (manual `qsub` of `controller.sh` later). If the log ends at the chained-controller step with an error, the script prints the full PBS message. PBS streams: `scripts/hptune/controller_<numeric id>_stdout.txt` and `scripts/hptune/controller_<numeric id>_stderr.txt`.
 
 ## Quick Reference
 

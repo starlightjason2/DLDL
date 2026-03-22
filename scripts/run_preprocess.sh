@@ -28,4 +28,7 @@ export OMP_NUM_THREADS=1
 # Run preprocessing
 python src/preprocess_data.py
 
-
+_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+echo "---- tail PBS stdout (last 100 lines): ${_REPO}/preprocess_${PBS_JOBID%%.*}.out ----"
+tail -n 100 "${_REPO}/preprocess_${PBS_JOBID%%.*}.out" 2>/dev/null || tail -n 100 "${_REPO}/preprocess_${PBS_JOBID}.out" 2>/dev/null || true
+echo "---- LIVE follow (run on login node): tail -F ${_REPO}/preprocess_${PBS_JOBID%%.*}.out ----"

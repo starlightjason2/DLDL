@@ -9,21 +9,11 @@ Workflow:
     4) Create trial dir with run.sh and .env, print trial name for controller
 """
 
-import argparse
-
 from model.bayesian_hptuner import BayesianHPTuner
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="DLDL Bayesian hyperparameter optimization"
-    )
-    parser.add_argument(
-        "--chain-id", default=None, help="Optional unique chain identifier"
-    )
-    args = parser.parse_args()
-
-    BayesianHPTuner(chain_id=args.chain_id).run()
+    BayesianHPTuner().run()
 
 
 if __name__ == "__main__":
