@@ -1,6 +1,8 @@
 """Bayesian hyperparameter tuning orchestration (trial log, acquisition, trial dirs)."""
 
+import fcntl
 import os
+from contextlib import contextmanager
 from dataclasses import replace
 
 import numpy as np
@@ -42,9 +44,19 @@ class BayesianHPTuner:
         self.trials_dir = os.path.join(hdir, "trials")
         self.best_trial_dir = os.path.join(hdir, "best_trial")
         self.csv_path = os.path.join(self.trials_dir, "trials_log.csv")
+        self.state_lock_path = os.path.join(hdir, ".state.lock")
         self.project_root = r
         hp = settings.cfg.hptune
         self.num_initial_trials = hp.num_initial_trials
+        self.parallelism = int(os.environ.get("HPTUNE_PARALLELISM", "1"))
+        if self.parallelism < 1:
+            raise ValueError("HPTUNE_PARALLELISM must be >= 1")
+        self.random_insert_every = int(os.environ.get("HPTUNE_RANDOM_INSERT_EVERY", "5"))
+        if self.random_insert_every < 0:
+            raise ValueError("HPTUNE_RANDOM_INSERT_EVERY must be >= 0")
+        self.expected_improvement_xi = float(os.environ.get("HPTUNE_EI_XI", "0.05"))
+        if self.expected_improvement_xi < 0:
+            raise ValueError("HPTUNE_EI_XI must be >= 0")
         self.max_trials = int(os.environ.get("HPTUNE_MAX_TRIALS", "10"))
         if self.max_trials < 1:
             raise ValueError("HPTUNE_MAX_TRIALS must be >= 1")
@@ -73,6 +85,75 @@ class BayesianHPTuner:
 
     def _pbounds(self) -> dict[str, tuple[float, float]]:
         return dict(self.bounds)
+
+    @contextmanager
+    def _state_lock(self, *, context: str):
+        """Serialize shared HPTune state updates across controller invocations."""
+        os.makedirs(os.path.dirname(self.state_lock_path), exist_ok=True)
+        with open(self.state_lock_path, "a+", encoding="utf-8") as lock_file:
+            self.logger.debug(
+                "Waiting for HPTune state lock ({}) at {}",
+                context,
+                self.state_lock_path,
+            )
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            self.logger.debug("Acquired HPTune state lock ({})", context)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                self.logger.debug("Released HPTune state lock ({})", context)
+
+    @staticmethod
+    def _trial_signature(trial: HPTuneTrial) -> tuple[object, ...]:
+        """Normalize a trial into a hashable signature for duplicate detection."""
+        return (
+            f"{trial.lr:.12g}",
+            int(trial.epochs),
+            f"{trial.dropout:.12g}",
+            f"{trial.weight_decay:.12g}",
+            int(trial.batch_size),
+            f"{trial.gradient_clip:.12g}",
+            int(trial.lr_scheduler),
+            f"{trial.lr_scheduler_factor:.12g}",
+            int(trial.lr_scheduler_patience),
+            int(trial.early_stopping_patience),
+        )
+
+    def _seen_trial_signatures(self, df: pd.DataFrame) -> set[tuple[object, ...]]:
+        """Collect signatures for all trial rows so new suggestions stay unique."""
+        seen: set[tuple[object, ...]] = set()
+        for _, row in df.iterrows():
+            seen.add(self._trial_signature(HPTuneTrial.from_series(row)))
+        return seen
+
+    def _sample_unique_random(
+        self,
+        seen_signatures: set[tuple[object, ...]],
+        *,
+        context: str,
+        max_attempts: int = 25,
+    ) -> HPTuneTrial:
+        """Draw random trials until one is not already present in the trial log."""
+        for attempt in range(1, max_attempts + 1):
+            trial = self.sample_random()
+            signature = self._trial_signature(trial)
+            if signature not in seen_signatures:
+                if attempt > 1:
+                    self.logger.info(
+                        "Random sampling found a unique candidate after {} attempt(s) ({})",
+                        attempt,
+                        context,
+                    )
+                return trial
+            self.logger.warning(
+                "Duplicate random candidate rejected on attempt {} ({})",
+                attempt,
+                context,
+            )
+        raise RuntimeError(
+            f"Unable to find a unique random HPTune candidate after {max_attempts} attempts ({context})"
+        )
 
     def _suggestion_to_trial(self, s: dict[str, float]) -> HPTuneTrial:
         bi = int(np.clip(round(s["batch_idx"]), 0, max(len(self.batch_sizes) - 1, 0)))
@@ -129,11 +210,19 @@ class BayesianHPTuner:
         self.logger.info("Next trial -> {}", dir_name)
         print(f"Next trial -> {dir_name}", flush=True)
 
+    def _emit_dispatch_status(self, *, done: int, active: int, total: int) -> None:
+        complete = int(active == 0 and total >= self.max_trials)
+        print(
+            f"Dispatch status -> done={done} active={active} total={total} "
+            f"parallelism={self.parallelism} complete={complete}",
+            flush=True,
+        )
+
     def update_trials(self, df: pd.DataFrame) -> pd.DataFrame:
         """Update in-progress trials (status=-1) by checking training logs."""
-        in_progress = df[df["status"] == -1]
+        in_progress = df[df["status"].isin([-1, -2])]
         self.logger.info(
-            "Sync: checking {} in-progress trial(s) under {}",
+            "Sync: checking {} active trial(s) under {}",
             len(in_progress),
             self.trials_dir,
         )
@@ -201,12 +290,20 @@ class BayesianHPTuner:
             self.logger.warning(
                 "BO: zero completed trials; falling back to random sampling"
             )
-            return self.sample_random()
+            return self._sample_unique_random(
+                self._seen_trial_signatures(df),
+                context="Bayesian fallback with zero completed trials",
+            )
+
+        seen_signatures = self._seen_trial_signatures(df)
 
         optimizer = BayesianOptimization(
             f=None,
             pbounds=self._pbounds(),
-            acquisition_function=acquisition.ExpectedImprovement(xi=0.0),
+            acquisition_function=acquisition.ExpectedImprovement(
+                xi=self.expected_improvement_xi
+            ),
+            allow_duplicate_points=True,
             verbose=0,
             random_state=42,
         )
@@ -217,12 +314,21 @@ class BayesianHPTuner:
                 target=-trial.val_loss,
             )
         self.logger.debug(
-            "BO: registered {} observation(s) (ExpectedImprovement xi=0)",
+            "BO: registered {} observation(s) (ExpectedImprovement xi={})",
             len(completed),
+            self.expected_improvement_xi,
         )
 
         suggestion = optimizer.suggest()
         trial = self._suggestion_to_trial(suggestion)
+        if self._trial_signature(trial) in seen_signatures:
+            self.logger.warning(
+                "BO suggested a duplicate trial; falling back to random exploration"
+            )
+            return self._sample_unique_random(
+                seen_signatures,
+                context="duplicate Bayesian suggestion",
+            )
         self.logger.debug("BO: raw suggestion (assign trial_id before materializing)")
         return trial
 
@@ -236,7 +342,28 @@ class BayesianHPTuner:
                 self.num_initial_trials,
                 total_rows,
             )
-            return self.sample_random()
+            return self._sample_unique_random(
+                self._seen_trial_signatures(df),
+                context="warmup",
+            )
+        post_warmup_completed = completed_count - self.num_initial_trials
+        if (
+            self.random_insert_every
+            and post_warmup_completed > 0
+            and post_warmup_completed % self.random_insert_every == 0
+        ):
+            self.logger.info(
+                "Sample strategy: periodic random insertion "
+                "(completed={} post_warmup={} every={} total_rows={})",
+                completed_count,
+                post_warmup_completed,
+                self.random_insert_every,
+                total_rows,
+            )
+            return self._sample_unique_random(
+                self._seen_trial_signatures(df),
+                context="periodic random insertion",
+            )
         self.logger.info(
             "Sample strategy: Bayesian (completed={}, total_rows={})",
             completed_count,
@@ -277,15 +404,12 @@ fi
         )
         script += self._post_run_checkpoint_cleanup_block()
 
-        # Append the next-controller submission block.
-        # run_train.sh stays standalone — chaining is only added to hptune trial copies.
-        # The debug queue limit is max_run=1 per user, so the next controller must be
-        # submitted from inside the trial job (not from the controller) to keep only
-        # 1 job active at a time.
-        hptune_dir = os.path.dirname(self.trials_dir)
-        log_dir = os.path.join(hptune_dir, "controller_logs")
-        controller_path = os.path.join(self.project_root, "scripts", "controller.sh")
-        script += f"""
+        if self.parallelism <= 1:
+            # Append the next-controller submission block only in serial chain mode.
+            hptune_dir = os.path.dirname(self.trials_dir)
+            log_dir = os.path.join(hptune_dir, "controller_logs")
+            controller_path = os.path.join(self.project_root, "scripts", "controller.sh")
+            script += f"""
     # --- Submit Next Controller (HPTune Job Chain) ---
     # Appended by create_trial in bayesian_hp_tuning.py. Not present in run_train.sh.
     # Submits the next controller after training completes, continuing the chain.
@@ -324,56 +448,105 @@ fi
         )
         return None
 
-    def run(self) -> None:
-        """One controller step: sync logs, resume pending work, or enqueue a new trial."""
-        self.logger.info(
-            "=== HPTune pass start csv={} trials_dir={} ===",
-            self.csv_path,
-            self.trials_dir,
-        )
-        df = self.update_trials(load_trials(self.trials_dir, self.csv_path))
-        done = int((df["status"] == 0).sum())
-        running = int((df["status"] == -1).sum())
-        queued = int((df["status"] == -2).sum())
-        self.logger.info(
-            "Trial log snapshot: rows={} done={} running={} queued={}",
-            len(df),
-            done,
-            running,
-            queued,
-        )
-
-        pending = self.find_pending_trial(df)
-        if pending:
-            self._log_pass_hyperparameters(
-                pending, context="pending (resume / awaiting worker)"
-            )
-            self._log_next_trial_marker(pending.dir_name)
-            self.logger.info("=== HPTune pass end (pending) ===")
+    def mark_trials_running(self, trial_ids: list[str]) -> None:
+        """Promote prepared trials from queued (-2) to running/submitted (-1)."""
+        if not trial_ids:
             return
-
-        if len(df) >= self.max_trials:
+        with self._state_lock(context="mark_trials_running"):
+            df = load_trials(self.trials_dir, self.csv_path)
+            mask = df["trial_id"].isin(trial_ids) & (df["status"] == -2)
+            updated = int(mask.sum())
+            df.loc[mask, "status"] = -1
+            df.to_csv(self.csv_path, index=False)
             self.logger.info(
-                "Reached HPTUNE_MAX_TRIALS={} with {} trial row(s); not scheduling a new trial",
-                self.max_trials,
+                "Marked {} queued trial(s) as running/submitted: {}",
+                updated,
+                ",".join(trial_ids),
+            )
+
+    def _plan_new_trials(self, df: pd.DataFrame) -> tuple[pd.DataFrame, list[HPTuneTrial]]:
+        """Create enough queued trials to fill the configured parallelism target."""
+        active = int(df["status"].isin([-1, -2]).sum())
+        available_slots = max(self.parallelism - active, 0)
+        remaining_trials = max(self.max_trials - len(df), 0)
+        plan_count = min(available_slots, remaining_trials)
+        if plan_count == 0:
+            return df, []
+
+        env_lines = load_env_template(self.project_root)
+        planned: list[HPTuneTrial] = []
+        for _ in range(plan_count):
+            trial_id = next_trial_numbered_id(self.trials_dir, df)
+            trial = replace(
+                self.sample_hyperparameters(df),
+                trial_id=trial_id,
+                status=-2,
+            )
+            self._log_pass_hyperparameters(trial, context="newly proposed (this pass)")
+            self.create_trial(trial, env_lines)
+            df = pd.concat([df, pd.DataFrame([trial.to_csv_row()])], ignore_index=True)
+            planned.append(trial)
+        df.to_csv(self.csv_path, index=False)
+        self.logger.info(
+            "Appended {} queued trial row(s) to {}",
+            len(planned),
+            self.csv_path,
+        )
+        return df, planned
+
+    def run(self) -> None:
+        """One dispatcher step: sync results and queue enough trials to fill capacity."""
+        with self._state_lock(context="dispatcher_run"):
+            self.logger.info(
+                "=== HPTune pass start csv={} trials_dir={} ===",
+                self.csv_path,
+                self.trials_dir,
+            )
+            df = self.update_trials(load_trials(self.trials_dir, self.csv_path))
+            done = int((df["status"] == 0).sum())
+            running = int((df["status"] == -1).sum())
+            queued = int((df["status"] == -2).sum())
+            self.logger.info(
+                "Trial log snapshot: rows={} done={} running={} queued={}",
+                len(df),
+                done,
+                running,
+                queued,
+            )
+
+            if len(df) >= self.max_trials and (running + queued) == 0:
+                self.logger.info(
+                    "Reached HPTUNE_MAX_TRIALS={} with {} trial row(s); dispatcher is complete",
+                    self.max_trials,
+                    len(df),
+                )
+                self._emit_dispatch_status(
+                    done=done, active=running + queued, total=len(df)
+                )
+                self.logger.info("=== HPTune pass end (max trials reached) ===")
+                return
+
+            queued_trials = [
+                HPTuneTrial.from_series(row)
+                for _, row in df[df["status"] == -2].iterrows()
+            ]
+            if queued_trials:
+                self.logger.info(
+                    "Dispatcher found {} queued trial(s) awaiting submission",
+                    len(queued_trials),
+                )
+
+            df, planned_trials = self._plan_new_trials(df)
+            dispatchable_trials = queued_trials + planned_trials
+            for trial in dispatchable_trials:
+                self._log_next_trial_marker(trial.dir_name)
+
+            done = int((df["status"] == 0).sum())
+            active = int(df["status"].isin([-1, -2]).sum())
+            self._emit_dispatch_status(done=done, active=active, total=len(df))
+            self.logger.info(
+                "=== HPTune pass end (dispatchable={} active={} total={}) ===",
+                len(dispatchable_trials),
+                active,
                 len(df),
             )
-            self.logger.info("=== HPTune pass end (max trials reached) ===")
-            return
-
-        # Assign trial_id once; use it for both logging and materialization
-        trial_id = next_trial_numbered_id(self.trials_dir, df)
-        trial = replace(self.sample_hyperparameters(df), trial_id=trial_id)
-
-        self._log_pass_hyperparameters(trial, context="newly proposed (this pass)")
-
-        # Create files first — if this fails, we do NOT write the CSV row.
-        # That prevents a zombie row with no run.sh on the next controller pass.
-        self.create_trial(trial, load_env_template(self.project_root))
-
-        new_row = pd.DataFrame([trial.to_csv_row()])
-        pd.concat([df, new_row], ignore_index=True).to_csv(self.csv_path, index=False)
-        self.logger.info("Appended new trial row to {}", self.csv_path)
-
-        self._log_next_trial_marker(trial.dir_name)
-        self.logger.info("=== HPTune pass end (new trial scheduled) ===")

@@ -83,6 +83,9 @@ def make_trial(**overrides) -> HPTuneTrial:
 def make_tuner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> BayesianHPTuner:
     """Construct a tuner rooted at a temporary project directory."""
     monkeypatch.delenv("DLDL_HPTUNE_DIR", raising=False)
+    monkeypatch.delenv("HPTUNE_PARALLELISM", raising=False)
+    monkeypatch.delenv("HPTUNE_RANDOM_INSERT_EVERY", raising=False)
+    monkeypatch.delenv("HPTUNE_EI_XI", raising=False)
     monkeypatch.setattr(_MODULE, "load_settings", lambda: fake_settings(tmp_path))
     return BayesianHPTuner()
 
@@ -112,6 +115,35 @@ def test_suggestion_to_trial_clamps_values(monkeypatch: pytest.MonkeyPatch) -> N
     assert trial.lr_scheduler_factor == pytest.approx(0.9)
     assert trial.lr_scheduler_patience == 6
     assert trial.early_stopping_patience == 2
+
+
+def test_tuner_reads_expected_improvement_xi_from_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Use the environment override for Expected Improvement xi."""
+    monkeypatch.setenv("HPTUNE_EI_XI", "0.2")
+    monkeypatch.delenv("DLDL_HPTUNE_DIR", raising=False)
+    monkeypatch.delenv("HPTUNE_RANDOM_INSERT_EVERY", raising=False)
+    monkeypatch.setattr(_MODULE, "load_settings", lambda: fake_settings(tmp_path))
+
+    tuner = BayesianHPTuner()
+
+    assert tuner.expected_improvement_xi == pytest.approx(0.2)
+
+
+def test_tuner_reads_parallelism_from_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Use the environment override for dispatcher parallelism."""
+    monkeypatch.setenv("HPTUNE_PARALLELISM", "4")
+    monkeypatch.delenv("DLDL_HPTUNE_DIR", raising=False)
+    monkeypatch.delenv("HPTUNE_RANDOM_INSERT_EVERY", raising=False)
+    monkeypatch.delenv("HPTUNE_EI_XI", raising=False)
+    monkeypatch.setattr(_MODULE, "load_settings", lambda: fake_settings(tmp_path))
+
+    tuner = BayesianHPTuner()
+
+    assert tuner.parallelism == 4
 
 
 def test_find_pending_trial_returns_first_pending(
@@ -163,7 +195,11 @@ def test_sample_hyperparameters_uses_random_before_warmup_is_complete(
     """Use random sampling until the configured number of completed warmup trials is reached."""
     tuner = make_tuner(tmp_path, monkeypatch)
     random_trial = make_trial(trial_id=None, status=-1)
-    monkeypatch.setattr(tuner, "sample_random", lambda: random_trial)
+    monkeypatch.setattr(
+        tuner,
+        "_sample_unique_random",
+        lambda seen_signatures, context: random_trial,
+    )
     monkeypatch.setattr(
         tuner,
         "sample_bayesian",
@@ -175,6 +211,81 @@ def test_sample_hyperparameters_uses_random_before_warmup_is_complete(
     )
 
     assert chosen is random_trial
+
+
+def test_sample_hyperparameters_inserts_random_trial_periodically(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Inject a unique random trial at the configured post-warmup cadence."""
+    tuner = make_tuner(tmp_path, monkeypatch)
+    tuner.random_insert_every = 3
+    random_trial = make_trial(
+        trial_id=None,
+        status=-1,
+        val_loss=-1.0,
+        lr=2e-3,
+        epochs=30,
+    )
+    monkeypatch.setattr(
+        tuner,
+        "_sample_unique_random",
+        lambda seen_signatures, context: random_trial,
+    )
+    monkeypatch.setattr(
+        tuner,
+        "sample_bayesian",
+        lambda _df: pytest.fail("Bayesian sampling should be skipped for periodic exploration"),
+    )
+    df = pd.DataFrame(
+        [
+            make_trial(trial_id=f"trial_{index}", status=0, epochs=10 + 10 * (index % 3)).to_csv_row()
+            for index in range(1, 6)
+        ]
+    )
+
+    chosen = tuner.sample_hyperparameters(df)
+
+    assert chosen is random_trial
+
+
+def test_sample_bayesian_falls_back_to_random_for_duplicate_suggestion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fallback to random sampling when BO proposes an already-seen trial."""
+    tuner = make_tuner(tmp_path, monkeypatch)
+    existing = make_trial(trial_id="trial_1", status=0, val_loss=0.25)
+    fallback_trial = make_trial(
+        trial_id=None,
+        status=-1,
+        val_loss=-1.0,
+        lr=3e-3,
+        epochs=30,
+        batch_size=64,
+    )
+    df = pd.DataFrame([existing.to_csv_row()])
+
+    class FakeOptimizer:
+        """Return a duplicate suggestion while accepting duplicate registration."""
+
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+
+        def register(self, params, target) -> None:
+            return None
+
+        def suggest(self) -> dict[str, float]:
+            return existing.bayesian_params(tuner.batch_sizes)
+
+    monkeypatch.setattr(_MODULE, "BayesianOptimization", FakeOptimizer)
+    monkeypatch.setattr(
+        tuner,
+        "_sample_unique_random",
+        lambda seen_signatures, context: fallback_trial,
+    )
+
+    chosen = tuner.sample_bayesian(df)
+
+    assert chosen is fallback_trial
 
 
 def test_update_trials_marks_completed_rows_and_syncs_best_snapshot(
@@ -247,24 +358,18 @@ def test_create_trial_writes_env_and_run_script(
 def test_run_reuses_pending_trial_without_creating_new_one(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Re-emit the pending trial marker instead of scheduling a new trial."""
+    """Avoid scheduling new work while active trial count already fills capacity."""
     tuner = make_tuner(tmp_path, monkeypatch)
     pending_trial = make_trial(trial_id="trial_2", status=-1, val_loss=-1.0)
     df = pd.DataFrame([pending_trial.to_csv_row()])
-    logged: list[str] = []
+    marker_calls: list[str] = []
 
     monkeypatch.setattr(_MODULE, "load_trials", lambda *_args: df)
     monkeypatch.setattr(tuner, "update_trials", lambda in_df: in_df)
-    monkeypatch.setattr(tuner, "find_pending_trial", lambda _df: pending_trial)
-    monkeypatch.setattr(
-        tuner,
-        "_log_pass_hyperparameters",
-        lambda trial, context: logged.append(f"{context}:{trial.trial_id}"),
-    )
     monkeypatch.setattr(
         tuner,
         "_log_next_trial_marker",
-        lambda dir_name: logged.append(f"marker:{dir_name}"),
+        lambda dir_name: marker_calls.append(dir_name),
     )
     monkeypatch.setattr(
         tuner,
@@ -274,10 +379,27 @@ def test_run_reuses_pending_trial_without_creating_new_one(
 
     tuner.run()
 
-    assert logged == [
-        "pending (resume / awaiting worker):trial_2",
-        "marker:trial_2",
-    ]
+    assert marker_calls == []
+
+
+def test_mark_trials_running_updates_queued_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Promote queued trials to running after worker submission succeeds."""
+    tuner = make_tuner(tmp_path, monkeypatch)
+    Path(tuner.trials_dir).mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(
+        [
+            make_trial(trial_id="trial_1", status=-2, val_loss=-1.0).to_csv_row(),
+            make_trial(trial_id="trial_2", status=0).to_csv_row(),
+        ]
+    )
+    df.to_csv(tuner.csv_path, index=False)
+
+    tuner.mark_trials_running(["trial_1"])
+
+    written = pd.read_csv(tuner.csv_path)
+    assert int(written.loc[written["trial_id"] == "trial_1", "status"].iloc[0]) == -1
 
 
 def test_run_stops_when_max_trials_are_already_present(
@@ -331,5 +453,5 @@ def test_run_appends_a_new_trial_row_to_csv(
 
     written = pd.read_csv(tuner.csv_path)
     assert written["trial_id"].tolist() == ["trial_9"]
-    assert int(written.loc[0, "status"]) == -1
+    assert int(written.loc[0, "status"]) == -2
     assert created == [("trial_9", ["BASE=1"])]
