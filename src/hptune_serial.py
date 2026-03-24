@@ -2,6 +2,7 @@
 """CLI entry for DLDL Bayesian hyperparameter tuning on Polaris."""
 
 import argparse
+import sys
 
 from model.bayesian_hptuner import BayesianHPTuner
 
@@ -23,4 +24,4 @@ def main(argv: list[str] | None = None) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])

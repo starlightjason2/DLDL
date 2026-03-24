@@ -1,66 +1,62 @@
 #!/bin/bash
 set -e
 
-# --- 1. Environment Setup ---
-PROJECT_ROOT="$(readlink -f "$(cd "$(dirname "$0")/.." && pwd)")"
-HPTUNE_SCRIPT_DIR="$PROJECT_ROOT/scripts"
-HPTUNE_DATA_DIR="$PROJECT_ROOT/data/hptune"
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+PROJECT_ROOT="${PROJECT_ROOT:-$(readlink -f "$SCRIPT_DIR/..")}"
+HPTUNE_DIR="${DLDL_HPTUNE_DIR:-$PROJECT_ROOT/data/hptune}"
 HPTUNE_QUEUE="${HPTUNE_QUEUE:-small}"
-HPTUNE_PARALLELISM="${HPTUNE_PARALLELISM:-1}"
-HPTUNE_DISPATCH_SLEEP_SECONDS="${HPTUNE_DISPATCH_SLEEP_SECONDS:-60}"
-HPTUNE_CONTROLLER_NODES="${HPTUNE_CONTROLLER_NODES:-}"
-LOG_DIR="$HPTUNE_DATA_DIR/controller_logs"
+HPTUNE_CONTROLLER_WALLTIME="${HPTUNE_CONTROLLER_WALLTIME:-1:00:00}"
+LOG_DIR="$HPTUNE_DIR/controller_logs"
+CONTROLLER_SCRIPT="$SCRIPT_DIR/controller.sh"
 
-# Serial mode keeps the original 1-node controller job.
-# In prod parallel mode, the controller owns a larger allocation and launches
-# one-node workers internally across that allocation.
-CONTROLLER_SELECT="select=1:system=polaris,place=scatter,walltime=1:00:00,filesystems=home:eagle"
-if [ "$HPTUNE_QUEUE" = "prod" ] && [ "$HPTUNE_PARALLELISM" -gt 1 ]; then
-    if [ -z "$HPTUNE_CONTROLLER_NODES" ]; then
-        # Default prod runs to medium unless the caller explicitly asks for a
-        # larger outer allocation that routes to large.
-        if [ "$HPTUNE_PARALLELISM" -ge 100 ]; then
-            HPTUNE_CONTROLLER_NODES="$HPTUNE_PARALLELISM"
-        else
-            HPTUNE_CONTROLLER_NODES=25
-        fi
+require_file() {
+    local path="$1"
+    local description="$2"
+    if [ -f "$path" ]; then
+        return 0
     fi
-    if [ "$HPTUNE_CONTROLLER_NODES" -lt "$HPTUNE_PARALLELISM" ]; then
-        echo "ERROR: HPTUNE_CONTROLLER_NODES ($HPTUNE_CONTROLLER_NODES) must be >= HPTUNE_PARALLELISM ($HPTUNE_PARALLELISM)"
-        exit 1
-    fi
-    # Match the default walltime to the routed execution queue limits.
-    if [ "$HPTUNE_CONTROLLER_NODES" -ge 100 ]; then
-        CONTROLLER_WALLTIME="${HPTUNE_CONTROLLER_WALLTIME:-24:00:00}"
-    else
-        CONTROLLER_WALLTIME="${HPTUNE_CONTROLLER_WALLTIME:-6:00:00}"
-    fi
-    CONTROLLER_SELECT="select=${HPTUNE_CONTROLLER_NODES}:system=polaris,place=scatter,walltime=${CONTROLLER_WALLTIME},filesystems=home:eagle"
-fi
+    echo "ERROR: $description not found: $path"
+    exit 1
+}
 
-# Clean old HPTune files, but keep per-trial .env and best-checkpoint artifacts.
-mkdir -p "$HPTUNE_DATA_DIR/trials" "$LOG_DIR"
-find "$HPTUNE_DATA_DIR" -type f ! -name ".env" ! -name "*_best_params.pt" -delete
+prepare_hptune_workspace() {
+    mkdir -p "$HPTUNE_DIR/trials" "$LOG_DIR"
+    find "$HPTUNE_DIR" -type f ! -name ".env" ! -name "*_best_params.pt" -delete
+}
 
+submit_controller() {
+    qsub \
+        -k doe \
+        -o "$LOG_DIR/" \
+        -e "$LOG_DIR/" \
+        -q "$HPTUNE_QUEUE" \
+        -l "select=1:system=polaris,place=scatter,walltime=${HPTUNE_CONTROLLER_WALLTIME},filesystems=home:eagle" \
+        -v "PROJECT_ROOT=$PROJECT_ROOT,HPTUNE_QUEUE=$HPTUNE_QUEUE,DLDL_HPTUNE_DIR=$HPTUNE_DIR" \
+        "$CONTROLLER_SCRIPT"
+}
+
+print_submission_summary() {
+    local job_id="$1"
+    local job_id_base="${job_id%%.*}"
+
+    echo "Success: Serial controller job ID is $job_id"
+    echo "Logs: $LOG_DIR/"
+    echo ""
+    echo "Watch the queue:"
+    echo "  watch \"qstat -u \$USER\""
+    echo "Watch the logs:"
+    echo "  watch \"ls -lt $LOG_DIR | head -8\""
+    echo ""
+    echo "Follow stdout once it appears:"
+    echo "  ls $LOG_DIR/${job_id_base}*.OU"
+    echo "  tail -f $LOG_DIR/${job_id_base}*.OU"
+}
+
+require_file "$CONTROLLER_SCRIPT" "serial controller script"
+prepare_hptune_workspace
 cd "$PROJECT_ROOT"
 
-echo "Submitting Controller..."
-FIRST_JOB_ID=$(qsub \
-    -k doe \
-    -o "$LOG_DIR/" \
-    -e "$LOG_DIR/" \
-    -q "$HPTUNE_QUEUE" \
-    -l "$CONTROLLER_SELECT" \
-    -v "PROJECT_ROOT=$PROJECT_ROOT,HPTUNE_QUEUE=$HPTUNE_QUEUE,HPTUNE_PARALLELISM=$HPTUNE_PARALLELISM,HPTUNE_DISPATCH_SLEEP_SECONDS=$HPTUNE_DISPATCH_SLEEP_SECONDS,HPTUNE_CONTROLLER_NODES=$HPTUNE_CONTROLLER_NODES" \
-    "$HPTUNE_SCRIPT_DIR/controller.sh")
-
-echo "Success: Controller Job ID is $FIRST_JOB_ID"
-echo "Logs: $LOG_DIR/"
-echo ""
-echo "Watch the queue:"
-echo "  watch \"qstat -u \$USER\""
-echo "Watch the logs:"
-echo "  watch \"ls -lt $LOG_DIR | head -8\""
-
-echo "Use this to follow stdout once the file appears:"
-echo "tail -f \"$LOG_DIR/${FIRST_JOB_ID}.OU\""
+echo "Submitting serial controller..."
+FIRST_JOB_ID="$(submit_controller)"
+print_submission_summary "$FIRST_JOB_ID"

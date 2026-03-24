@@ -61,9 +61,12 @@ if __name__ == "__main__":
         classification=False,
         normalization_type=d.normalization_type,
     )
-    pmr, pms = os.environ.get("PMI_RANK"), os.environ.get("PMI_SIZE")
+    rank = int(os.environ.get("RANK", "0"))
+    world_size = int(os.environ.get("WORLD_SIZE", "1"))
+    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
     model.train_model(
-        rank=int(pmr) if pmr is not None else 0,
-        world_size=int(pms) if pms is not None else 1,
+        rank=rank,
+        world_size=world_size,
+        local_rank=local_rank,
         job_id=job_id,
     )

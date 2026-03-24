@@ -20,6 +20,8 @@ A 1D CNN that uses plasma current to predict disruption time. For labeling D-III
 
 `.env` is loaded when you call ``load_settings()`` from ``config.settings`` (typically at script startup).
 
+**Hyperparameter tuning:** Trial state (serial and parallel controllers) is stored in **SQLite** at `data/hptune/trials/trials_log.db` using **SQLAlchemy** 2.0 ORM (`database.connection` + `database.trial_model`, same layout as [this FastAPI SQLAlchemy template](https://github.com/mdhishaamakhtar/fastapi-sqlalchemy-postgres-template/tree/master/database)) with **Pydantic** DTOs (`schemas.trial_schema`).
+
 ## Testing
 
 Install the test tools:
@@ -47,7 +49,32 @@ python3.11 -m pytest --cov=src --cov-report=html
 ```
 
 The HTML report is written to `htmlcov/index.html`.
-If `pytest-cov` fails with an `sqlite3` import error, use a Python build that includes `sqlite3`.
+
+#### Python `sqlite3` (required for DB / HP-tune tests)
+
+Some HPC or minimal Python installs ship **without** the `sqlite3` stdlib extension (`_sqlite3`). Tests that touch the trial database need it.
+
+**Check:**
+
+```bash
+python3.11 -c "import sqlite3; print('sqlite3 OK', sqlite3.sqlite_version)"
+```
+
+**SUSE / zypper** (error may suggest `sudo zypper install python311`):
+
+```bash
+sudo zypper install python311-sqlite
+# or, if that package name is unavailable:
+sudo zypper install python311
+```
+
+**Debian / Ubuntu** — stock `python3` packages usually include SQLite; if you build Python from source, install `libsqlite3-dev` first.
+
+Then from the repo root (with `src` on `PYTHONPATH`, e.g. `pip install -e .`):
+
+```bash
+PYTHONPATH=src python3.11 -m pytest tests/ -q
+```
 
 ### Environment Variables
 
@@ -187,22 +214,117 @@ Output logs: `preprocess_<jobid>.out`, `train_<jobid>.out` (and `.err`).
 
 ### Bayesian Hyperparameter Tuning
 
-Same pattern as FusionTransformer `job_setup/controller.sh`: Bayes step → worker → next controller (PBS `depend=afterany`).
-
 HPTune reads the same project-root `.env` as the rest of the workflow. On Polaris, that is typically a symlink to `.env.polaris`.
+
+There are now two HPTune execution modes:
+- Serial chain: one trial job at a time, with each completed trial requeueing the next controller.
+- MPI controller: one controller allocation launches multiple distributed trials and keeps dispatching until the search budget is exhausted.
+
+#### Serial HPTune
+
+Launch:
 
 ```bash
 ./scripts/start_hptune.sh
 ```
 
-**Loguru** writes **`data/hptune/controller_logs/hptune_<PBS_JOBID>.txt`** when `PBS_JOBID` is set. Shell scripts do not configure logging.
+**Debug queue (smoke-test SQLite / 10-trial chain)** — uses queue `debug-scaling` by default (override with `HPTUNE_QUEUE=debug`), isolated dir `data/hptune_debug`, and `HPTUNE_MAX_TRIALS=10` (override with `HPTUNE_MAX_TRIALS=...`):
 
-**Training:** `data/hptune/trials/trial_N/train_<jobid>.log`. **Env:** `HPTUNE_TRAIN_WALLTIME`, `HPTUNE_MAX_TRIALS` (default `20`), `DLDL_HPTUNE_CHAIN_ID`, `DLDL_HPTUNE_DIR`.
+```bash
+chmod +x scripts/start_hptune_debug.sh
+./scripts/start_hptune_debug.sh
+```
 
-**Local parse check:** `bash scripts/validate_hptune_chain.sh`
+Check the DB on the login node after jobs start:
+
+```bash
+sqlite3 data/hptune_debug/trials/trials_log.db 'SELECT trial_id, status FROM trials;'
+```
+
+If your site uses a different debug queue name, set `HPTUNE_QUEUE` before running the script.
+
+Layout:
+- `scripts/start_hptune.sh`: submits the serial controller job.
+- `scripts/controller.sh`: runs one Bayesian optimizer pass, submits at most one queued trial, then exits.
+- `src/model/hptune_trial.py`: generates each trial directory and a per-trial `run.sh`.
+- Trial `run.sh`: runs `python src/train.py` and, on success, submits the next `scripts/controller.sh`.
+
+Important serial env:
+- `HPTUNE_QUEUE`
+- `HPTUNE_CONTROLLER_WALLTIME`
+- `HPTUNE_TRAIN_WALLTIME`
+- `HPTUNE_MAX_TRIALS`
+- `OPENBLAS_NUM_THREADS` / `OMP_NUM_THREADS` (defaults: `1` in `controller.sh` and `run_train.sh`) — PBS often allocates many CPUs to one process; uncapped BLAS can try to spawn that many threads and fail (`pthread_create` / `Exit_status=1` with little log output).
+
+#### MPI HPTune
+
+Launch:
+
+```bash
+HPTUNE_CONTROLLER_NODES=4 HPTUNE_TRIAL_NODES=1 ./scripts/start_hptune_parallel.sh
+```
+
+The MPI path is designed for multi-GPU and multi-node trial execution. The controller allocation includes one controller node plus worker nodes. In the example above, one node runs the HPTune controller and the remaining three nodes are available for trial execution.
+
+Top-level layout:
+- `scripts/start_hptune_parallel.sh`: submits the outer PBS controller allocation.
+- `scripts/controller_parallel.sh`: activates the environment, computes MPI world size, and launches `python -m hptune_mpi` under `mpiexec`.
+- `src/hptune_mpi.py`: rank `0` is the controller; worker ranks on non-controller hosts act as distributed training processes.
+- `src/model/bayesian_hptuner.py`: owns trial state, locking, trial creation, status sync, retries, and Bayesian sampling.
+- `src/model/hptune_trial.py`: materializes each trial directory, `.env`, and `run.sh`.
+- `src/train.py`: actual training entrypoint used by generated trial scripts.
+- `src/util/distributed.py`: helper functions for PyTorch distributed initialization.
+
+MPI workflow step by step:
+1. `scripts/start_hptune_parallel.sh` submits `scripts/controller_parallel.sh` as a PBS job.
+2. `scripts/controller_parallel.sh` sets `GPUS_PER_NODE=4` by default and derives `HPTUNE_MPI_SIZE = HPTUNE_CONTROLLER_NODES * GPUS_PER_NODE`.
+3. `mpiexec` starts `python -m hptune_mpi` with one MPI rank per GPU across the whole allocation.
+4. In `src/hptune_mpi.py`, rank `0` becomes the HPTune controller. All MPI ranks on the controller host are reserved from trial dispatch; full trial slots are formed only from non-controller hosts.
+5. The controller calls `BayesianHPTuner.sync_and_load()` to refresh trial state from `data/hptune/trials/trials_log.db`.
+6. The controller calls `BayesianHPTuner.plan_and_enqueue()` to create new queued trials under `data/hptune/trials/trial_*`.
+7. Each trial directory contains:
+   - a generated `.env` with trial-specific hyperparameters
+   - a generated `run.sh` derived from `scripts/run_train.sh`
+   - trial logs and checkpoints under that same directory
+8. The controller groups worker hosts into fixed-size slots using:
+   - `GPUS_PER_NODE`
+   - `HPTUNE_TRIAL_NODES`
+   - all GPUs on each worker node
+9. A trial slot therefore consumes `HPTUNE_TRIAL_NODES` worker nodes, with one MPI rank per GPU participating in training.
+10. When a slot is free, the controller assigns a queued trial to that slot and marks the trial as running in `trials_log.db`.
+11. Worker ranks create an MPI subcommunicator for their assigned slot and call `run_distributed_trial(...)`.
+12. `run_distributed_trial(...)` loads the generated trial `.env`, sets `MASTER_ADDR`, `MASTER_PORT`, `RANK`, `WORLD_SIZE`, `LOCAL_RANK`, and `NODE_RANK`, and launches `python src/train.py` directly.
+13. When the slot leader finishes, it sends either `DONE` or `FAILED` back to the controller, and failed trials are requeued or marked permanently failed according to `HPTUNE_MAX_RETRIES`.
+14. The controller frees that slot, refreshes trial state, and dispatches more queued trials until `HPTUNE_MAX_TRIALS` is reached and no trials remain active.
+
+Data and logging layout:
+- Trial state database: `data/hptune/trials/trials_log.db` (see `database.connection`, `database.trial_model.TrialTable`, `schemas.trial_schema.TrialSchema`)
+- Trial directories: `data/hptune/trials/trial_*`
+- Best-trial artifacts: `data/hptune/best_trial`
+- Controller logs: `data/hptune/controller_logs/`
+- Per-rank MPI logs: `data/hptune/trials/trial_*/dist_rank_<world_rank>.log`
+- Standard training logs: `data/hptune/trials/trial_*/train_<jobid>.log`
+- Under PBS, Loguru also writes `data/hptune/controller_logs/hptune_<PBS_JOBID>.txt`
+
+MPI-related env and sizing:
+- `HPTUNE_CONTROLLER_NODES`: nodes reserved for the outer controller allocation
+- one controller node is reserved from trial execution
+- `HPTUNE_TRIAL_NODES`: nodes consumed by each dispatched trial
+- `GPUS_PER_NODE`: defaults to `4` in `scripts/controller_parallel.sh`
+- `HPTUNE_MPI_SIZE`: derived as `HPTUNE_CONTROLLER_NODES * GPUS_PER_NODE`
+- `HPTUNE_MAX_TRIALS`
+- `HPTUNE_MAX_RETRIES`
+- `HPTUNE_EI_XI`
+- `HPTUNE_RANDOM_INSERT_EVERY`
+- `DLDL_HPTUNE_DIR`
+
+Operational note:
+- Effective parallel trial capacity is `floor((HPTUNE_CONTROLLER_NODES - 1) / HPTUNE_TRIAL_NODES)`, because one node is dedicated to the controller.
 
 ## Quick Reference
 
 * **Config:** `NORMALIZATION_TYPE` and `CPU_USE` in env (or `.env`) drive preprocessing and training.
 * **Output files:** Whatever paths you set in `DATA_PATH` and `TRAIN_LABELS_PATH` (often filenames include the normalization mode, e.g. `processed_dataset_meanvar-whole.pt`).
 * **Multiple configs:** Change `NORMALIZATION_TYPE` and update `DATA_PATH` / `TRAIN_LABELS_PATH` to the matching `.pt` files.
+
+See https://docs.pytorch.org/tutorials/intermediate/dist_tuto.html

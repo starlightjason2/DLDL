@@ -1,6 +1,6 @@
+from dataclasses import fields
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 from model import HPTuneTrial
@@ -26,6 +26,13 @@ def make_trial(**overrides) -> HPTuneTrial:
     return HPTuneTrial(**data)
 
 
+def test_validate_for_persistence_requires_trial_id() -> None:
+    """Persistence validation matches DB / ORM expectations."""
+    trial = make_trial(trial_id=None)
+    with pytest.raises(ValueError, match="trial_id must be set before persisting"):
+        trial.validate_for_persistence()
+
+
 def test_dir_name_requires_trial_id() -> None:
     """Raise when a trial directory name is requested before assigning an ID."""
     trial = make_trial(trial_id=None)
@@ -34,14 +41,13 @@ def test_dir_name_requires_trial_id() -> None:
         _ = trial.dir_name
 
 
-def test_from_series_round_trip_preserves_values() -> None:
-    """Round-trip a trial through CSV-style series serialization without data loss."""
+def test_keyword_constructed_trials_compare_equal() -> None:
+    """Two trials built with the same field values compare equal."""
     trial = make_trial()
-
-    row = pd.Series(trial.to_csv_row())
-    restored = HPTuneTrial.from_series(row)
-
-    assert restored == trial
+    copy = HPTuneTrial(
+        **{f.name: getattr(trial, f.name) for f in fields(HPTuneTrial)}
+    )
+    assert copy == trial
 
 
 def test_bayesian_params_uses_nearest_batch_index() -> None:

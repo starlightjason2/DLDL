@@ -3,7 +3,7 @@
 import os
 from collections.abc import Sized
 from typing import Tuple, cast
-
+from datetime import timedelta
 from loguru import logger
 
 import pandas as pd
@@ -22,6 +22,7 @@ from torch import Tensor
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
+
 
 from config.settings import load_settings
 from util.distributed import cleanup, setup
@@ -255,6 +256,7 @@ class IpCNN(nn.Module):
         self,
         rank: int,
         world_size: int,
+        local_rank: int,
         job_id: str,
         lr: float | None = None,
         num_epochs: int | None = None,
@@ -272,11 +274,20 @@ class IpCNN(nn.Module):
         use_distributed = world_size > 1
         if use_distributed:
             self.logger.info(
-                f"Distributed training - Rank: {rank}, World Size: {world_size}"
+                f"Distributed training - Rank: {rank}, Local Rank: {local_rank}, World Size: {world_size}"
             )
-            setup(rank, world_size)
+            dist.init_process_group(
+                backend="nccl",
+                init_method="env://",
+                world_size=world_size,
+                rank=rank,
+                timeout=timedelta(minutes=10),
+            )
+            torch.cuda.set_device(local_rank)
         else:
             self.logger.info("Single-process training (world_size=1)")
+            local_rank = 0
+            torch.cuda.set_device(local_rank)
         torch.manual_seed(42 + rank)
 
         t = _s.training_config
@@ -344,7 +355,7 @@ class IpCNN(nn.Module):
 
         model = self.cuda()
         if use_distributed:
-            model = DDP(model, device_ids=[0])
+            model = DDP(model, device_ids=[local_rank], output_device=local_rank)
 
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         if lr_scheduler_enabled:
@@ -413,7 +424,9 @@ class IpCNN(nn.Module):
                         )
                         writer.add_scalar("Training Time Loss", loss_time.item(), step)
 
-            val_loss_t = torch.zeros(1, device="cuda", dtype=torch.float64)
+            val_loss_t = torch.zeros(
+                1, device=f"cuda:{local_rank}", dtype=torch.float64
+            )
             if rank == 0:
                 self._validate_epoch(
                     model=model,
@@ -475,4 +488,4 @@ class IpCNN(nn.Module):
             )
 
         if use_distributed:
-            cleanup()
+            dist.destroy_process_group()

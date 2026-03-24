@@ -8,7 +8,7 @@ from .data_loading import (
     load_and_pad_norm,
     load_and_pad_scale,
 )
-from .distributed import setup, setup_file, cleanup
+from .distributed import cleanup, setup
 from .processing import (
     get_use_cores,
     create_binary_labels,
@@ -28,6 +28,5 @@ __all__ = [
     "convert_tensors_to_float",
     "split",
     "setup",
-    "setup_file",
     "cleanup",
 ]

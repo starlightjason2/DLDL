@@ -1,12 +1,13 @@
 import os
+from dataclasses import asdict
 from types import SimpleNamespace
 import types
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 from helpers import load_module_from_path
+from service.trial_service import TrialService
 
 
 _HPTUNE_TRIAL_MODULE = load_module_from_path(
@@ -30,7 +31,8 @@ _MODULE = load_module_from_path(
 )
 BayesianHPTuner = _MODULE.BayesianHPTuner
 HPTuneTrial = _HPTUNE_TRIAL_MODULE.HPTuneTrial
-TRIAL_LOG_COLUMNS = _UTIL_HPTUNE_MODULE.TRIAL_LOG_COLUMNS
+SerialTrial = _HPTUNE_TRIAL_MODULE.SerialTrial
+ParallelTrial = _HPTUNE_TRIAL_MODULE.ParallelTrial
 
 
 def fake_settings(project_root: Path) -> SimpleNamespace:
@@ -75,15 +77,27 @@ def make_trial(**overrides) -> HPTuneTrial:
         "trial_id": "trial_1",
         "val_loss": 0.25,
         "status": 0,
+        "retries": 0,
     }
     data.update(overrides)
     return HPTuneTrial(**data)
 
 
+def make_serial_trial(**overrides) -> SerialTrial:
+    """Same as :func:`make_trial` but as :class:`SerialTrial` for materialization tests."""
+    return SerialTrial(**asdict(make_trial(**overrides)))
+
+
+def make_parallel_trial(**overrides) -> ParallelTrial:
+    """Same as :func:`make_trial` but as :class:`ParallelTrial` for materialization tests."""
+    return ParallelTrial(**asdict(make_trial(**overrides)))
+
+
 def make_tuner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> BayesianHPTuner:
     """Construct a tuner rooted at a temporary project directory."""
     monkeypatch.delenv("DLDL_HPTUNE_DIR", raising=False)
-    monkeypatch.delenv("HPTUNE_PARALLELISM", raising=False)
+    monkeypatch.delenv("HPTUNE_CONTROLLER_NODES", raising=False)
+    monkeypatch.delenv("HPTUNE_TRIAL_NODES", raising=False)
     monkeypatch.delenv("HPTUNE_RANDOM_INSERT_EVERY", raising=False)
     monkeypatch.delenv("HPTUNE_EI_XI", raising=False)
     monkeypatch.setattr(_MODULE, "load_settings", lambda: fake_settings(tmp_path))
@@ -115,6 +129,36 @@ def test_suggestion_to_trial_clamps_values(monkeypatch: pytest.MonkeyPatch) -> N
     assert trial.lr_scheduler_factor == pytest.approx(0.9)
     assert trial.lr_scheduler_patience == 6
     assert trial.early_stopping_patience == 2
+    assert isinstance(trial, SerialTrial)
+
+
+def test_suggestion_to_trial_uses_parallel_class_when_parallelism_gt_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Multi-slot parallelism builds :class:`ParallelTrial` proposals."""
+    monkeypatch.setenv("HPTUNE_CONTROLLER_NODES", "5")
+    monkeypatch.setenv("HPTUNE_TRIAL_NODES", "2")
+    monkeypatch.delenv("DLDL_HPTUNE_DIR", raising=False)
+    monkeypatch.delenv("HPTUNE_RANDOM_INSERT_EVERY", raising=False)
+    monkeypatch.delenv("HPTUNE_EI_XI", raising=False)
+    monkeypatch.setattr(_MODULE, "load_settings", lambda: fake_settings(tmp_path))
+
+    tuner = BayesianHPTuner()
+    trial = tuner._suggestion_to_trial(
+        {
+            "lr": 2e-3,
+            "epochs": 24.9,
+            "dropout": 0.3,
+            "log_wd": -5.0,
+            "batch_idx": 1.6,
+            "gradient_clip": 1.2,
+            "lr_scheduler_u": 0.8,
+            "lr_scheduler_factor": 1.5,
+            "lr_sched_patience": 8.9,
+            "early_stop_patience": 1.2,
+        }
+    )
+    assert isinstance(trial, ParallelTrial)
 
 
 def test_tuner_reads_expected_improvement_xi_from_environment(
@@ -134,8 +178,9 @@ def test_tuner_reads_expected_improvement_xi_from_environment(
 def test_tuner_reads_parallelism_from_environment(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Use the environment override for dispatcher parallelism."""
-    monkeypatch.setenv("HPTUNE_PARALLELISM", "4")
+    """Derive dispatcher parallelism from worker-node slots per trial."""
+    monkeypatch.setenv("HPTUNE_CONTROLLER_NODES", "5")
+    monkeypatch.setenv("HPTUNE_TRIAL_NODES", "2")
     monkeypatch.delenv("DLDL_HPTUNE_DIR", raising=False)
     monkeypatch.delenv("HPTUNE_RANDOM_INSERT_EVERY", raising=False)
     monkeypatch.delenv("HPTUNE_EI_XI", raising=False)
@@ -143,49 +188,18 @@ def test_tuner_reads_parallelism_from_environment(
 
     tuner = BayesianHPTuner()
 
-    assert tuner.parallelism == 4
-
-
-def test_find_pending_trial_returns_first_pending(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Return the first running or queued trial row from the trials log."""
-    tuner = make_tuner(tmp_path, monkeypatch)
-    base_row = {
-        "lr": 1e-3,
-        "epochs": 10,
-        "dropout": 0.1,
-        "weight_decay": 1e-4,
-        "batch_size": 16,
-        "gradient_clip": 1.0,
-        "lr_scheduler": 1,
-        "lr_scheduler_factor": 0.5,
-        "lr_scheduler_patience": 2,
-        "early_stopping_patience": 4,
-    }
-    df = pd.DataFrame(
-        [
-            {**base_row, "trial_id": "trial_1", "val_loss": 0.5, "status": 0},
-            {**base_row, "trial_id": "trial_2", "val_loss": -1.0, "status": -1},
-            {**base_row, "trial_id": "trial_3", "val_loss": -1.0, "status": -2},
-        ]
-    )
-
-    pending = tuner.find_pending_trial(df)
-
-    assert pending is not None
-    assert pending.trial_id == "trial_2"
+    assert tuner.parallelism == 2
+    assert tuner._trial_cls is ParallelTrial
 
 
 def test_post_run_checkpoint_cleanup_block_mentions_best_checkpoint(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Emit shell cleanup that preserves only the best checkpoint artifact."""
-    tuner = make_tuner(Path("/tmp"), monkeypatch)
+    _ = make_tuner(Path("/tmp"), monkeypatch)
+    block = HPTuneTrial._post_run_checkpoint_cleanup_block()
 
-    block = tuner._post_run_checkpoint_cleanup_block()
-
-    assert '${JOB_ID}_best_params.pt' in block
+    assert "${JOB_ID}_best_params.pt" in block
     assert 'rm -f "$checkpoint"' in block
 
 
@@ -203,11 +217,11 @@ def test_sample_hyperparameters_uses_random_before_warmup_is_complete(
     monkeypatch.setattr(
         tuner,
         "sample_bayesian",
-        lambda _df: pytest.fail("Bayesian sampling should not run during warmup"),
+        lambda _trials: pytest.fail("Bayesian sampling should not run during warmup"),
     )
 
     chosen = tuner.sample_hyperparameters(
-        pd.DataFrame([make_trial(status=0).to_csv_row()])
+        [make_trial(status=0)],
     )
 
     assert chosen is random_trial
@@ -234,16 +248,18 @@ def test_sample_hyperparameters_inserts_random_trial_periodically(
     monkeypatch.setattr(
         tuner,
         "sample_bayesian",
-        lambda _df: pytest.fail("Bayesian sampling should be skipped for periodic exploration"),
+        lambda _trials: pytest.fail(
+            "Bayesian sampling should be skipped for periodic exploration"
+        ),
     )
-    df = pd.DataFrame(
-        [
-            make_trial(trial_id=f"trial_{index}", status=0, epochs=10 + 10 * (index % 3)).to_csv_row()
-            for index in range(1, 6)
-        ]
-    )
+    trials = [
+        make_trial(
+            trial_id=f"trial_{index}", status=0, epochs=10 + 10 * (index % 3)
+        )
+        for index in range(1, 6)
+    ]
 
-    chosen = tuner.sample_hyperparameters(df)
+    chosen = tuner.sample_hyperparameters(trials)
 
     assert chosen is random_trial
 
@@ -262,7 +278,7 @@ def test_sample_bayesian_falls_back_to_random_for_duplicate_suggestion(
         epochs=30,
         batch_size=64,
     )
-    df = pd.DataFrame([existing.to_csv_row()])
+    trials = [existing]
 
     class FakeOptimizer:
         """Return a duplicate suggestion while accepting duplicate registration."""
@@ -283,7 +299,7 @@ def test_sample_bayesian_falls_back_to_random_for_duplicate_suggestion(
         lambda seen_signatures, context: fallback_trial,
     )
 
-    chosen = tuner.sample_bayesian(df)
+    chosen = tuner.sample_bayesian(trials)
 
     assert chosen is fallback_trial
 
@@ -302,25 +318,26 @@ def test_update_trials_marks_completed_rows_and_syncs_best_snapshot(
     monkeypatch.setattr(
         _MODULE,
         "sync_best_trial_artifacts",
-        lambda df, trials_dir, best_trial_dir: sync_calls.append(
+        lambda trials, trials_dir, best_trial_dir: sync_calls.append(
             (trials_dir, best_trial_dir)
         ),
     )
     Path(tuner.trials_dir).mkdir(parents=True, exist_ok=True)
-    df = pd.DataFrame([make_trial(status=-1, val_loss=-1.0).to_csv_row()])
+    trial = make_trial(trial_id="trial_1", status=-1, val_loss=-1.0)
+    os.makedirs(trial.path_under(tuner.trials_dir), exist_ok=True)
 
-    updated = tuner.update_trials(df.copy())
+    updated = tuner.update_trials([trial])
 
-    assert updated.loc[0, "status"] == 0
-    assert updated.loc[0, "val_loss"] == pytest.approx(0.125)
+    assert updated[0].status == 0
+    assert updated[0].val_loss == pytest.approx(0.125)
     assert sync_calls == [(tuner.trials_dir, tuner.best_trial_dir)]
-    assert Path(tuner.csv_path).exists()
+    assert TrialService(tuner.trials_db_path).get_trials()[0].status == 0
 
 
-def test_create_trial_writes_env_and_run_script(
+def test_serial_trial_materialize_writes_env_and_run_script(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Materialize a trial directory with both a rendered env file and chained run script."""
+    """Materialize a serial trial with both a rendered env file and chained run script."""
     tuner = make_tuner(tmp_path, monkeypatch)
     scripts_dir = tmp_path / "scripts"
     scripts_dir.mkdir(parents=True, exist_ok=True)
@@ -339,9 +356,13 @@ def test_create_trial_writes_env_and_run_script(
         ),
         encoding="utf-8",
     )
-    trial = make_trial(trial_id="trial_4", status=-1, val_loss=-1.0)
+    trial = make_serial_trial(trial_id="trial_4", status=-1, val_loss=-1.0)
 
-    created = tuner.create_trial(trial, ["BASE_VAR=1"])
+    created = trial.materialize_trial_files(
+        project_root=tuner.project_root,
+        trials_dir=tuner.trials_dir,
+        env_lines=["BASE_VAR=1"],
+    )
 
     env_path = Path(tuner.trials_dir) / "trial_4" / ".env"
     run_path = Path(tuner.trials_dir) / "trial_4" / "run.sh"
@@ -351,35 +372,47 @@ def test_create_trial_writes_env_and_run_script(
     run_text = run_path.read_text(encoding="utf-8")
     assert "source " in run_text
     assert 'BEST_PARAMS_PATH="$PROG_DIR/${JOB_ID}_best_params.pt"' in run_text
-    assert "Submitting next controller" in run_text
+    assert '"$PROJECT_ROOT/scripts/controller.sh"' in run_text
+    assert "HPTUNE_SERIAL_CONTROLLER_PATH" not in run_text
     assert os.access(run_path, os.X_OK)
 
 
-def test_run_reuses_pending_trial_without_creating_new_one(
+def test_parallel_trial_materialize_skips_serial_chain_block(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Avoid scheduling new work while active trial count already fills capacity."""
+    """Materialize a parallel trial without appending the serial controller handoff block."""
     tuner = make_tuner(tmp_path, monkeypatch)
-    pending_trial = make_trial(trial_id="trial_2", status=-1, val_loss=-1.0)
-    df = pd.DataFrame([pending_trial.to_csv_row()])
-    marker_calls: list[str] = []
-
-    monkeypatch.setattr(_MODULE, "load_trials", lambda *_args: df)
-    monkeypatch.setattr(tuner, "update_trials", lambda in_df: in_df)
-    monkeypatch.setattr(
-        tuner,
-        "_log_next_trial_marker",
-        lambda dir_name: marker_calls.append(dir_name),
+    tuner.parallelism = 4
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+    (scripts_dir / "run_train.sh").write_text(
+        "\n".join(
+            [
+                "#!/bin/bash",
+                "#PBS -N dldl_train",
+                "#PBS -o old.out",
+                "#PBS -e old.err",
+                "set -e",
+                "# __HPTUNE_ENV_INJECT__",
+                "# __HPTUNE_CD_OVERRIDE__",
+                'cd "${PBS_O_WORKDIR:-$(pwd)}"',
+            ]
+        ),
+        encoding="utf-8",
     )
-    monkeypatch.setattr(
-        tuner,
-        "create_trial",
-        lambda *_args, **_kwargs: pytest.fail("create_trial should not run"),
+    trial = make_parallel_trial(trial_id="trial_5", status=-1, val_loss=-1.0)
+
+    created = trial.materialize_trial_files(
+        project_root=tuner.project_root,
+        trials_dir=tuner.trials_dir,
+        env_lines=["BASE_VAR=1"],
     )
 
-    tuner.run()
-
-    assert marker_calls == []
+    run_path = Path(tuner.trials_dir) / "trial_5" / "run.sh"
+    run_text = run_path.read_text(encoding="utf-8")
+    assert created == "trial_5"
+    assert "Submitting next controller" not in run_text
+    assert "HPTUNE_SERIAL_CONTROLLER_PATH" not in run_text
 
 
 def test_mark_trials_running_updates_queued_rows(
@@ -388,18 +421,65 @@ def test_mark_trials_running_updates_queued_rows(
     """Promote queued trials to running after worker submission succeeds."""
     tuner = make_tuner(tmp_path, monkeypatch)
     Path(tuner.trials_dir).mkdir(parents=True, exist_ok=True)
-    df = pd.DataFrame(
+    svc = TrialService(tuner.trials_db_path)
+    svc.persist_snapshot(
         [
-            make_trial(trial_id="trial_1", status=-2, val_loss=-1.0).to_csv_row(),
-            make_trial(trial_id="trial_2", status=0).to_csv_row(),
+            make_trial(trial_id="trial_1", status=-2, val_loss=-1.0),
+            make_trial(trial_id="trial_2", status=0),
         ]
     )
-    df.to_csv(tuner.csv_path, index=False)
 
     tuner.mark_trials_running(["trial_1"])
 
-    written = pd.read_csv(tuner.csv_path)
-    assert int(written.loc[written["trial_id"] == "trial_1", "status"].iloc[0]) == -1
+    trials = TrialService(tuner.trials_db_path).get_trials()
+    t1 = next(t for t in trials if t.trial_id == "trial_1")
+    assert t1.status == -1
+
+
+def test_mark_trial_failed_requeues_when_retries_remain(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Requeue failed trials immediately until the retry budget is exhausted."""
+    monkeypatch.setenv("HPTUNE_MAX_RETRIES", "2")
+    tuner = make_tuner(tmp_path, monkeypatch)
+    Path(tuner.trials_dir).mkdir(parents=True, exist_ok=True)
+    TrialService(tuner.trials_db_path).persist_snapshot(
+        [
+            make_trial(
+                trial_id="trial_1", status=-1, val_loss=-1.0, retries=0
+            ),
+        ]
+    )
+
+    tuner.mark_trial_failed("trial_1", return_code=3)
+
+    trials = TrialService(tuner.trials_db_path).get_trials()
+    row = next(t for t in trials if t.trial_id == "trial_1")
+    assert row.status == -2
+    assert row.retries == 1
+
+
+def test_mark_trial_failed_marks_permanent_failure_after_retry_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Mark a trial permanently failed once it has exhausted retry attempts."""
+    monkeypatch.setenv("HPTUNE_MAX_RETRIES", "1")
+    tuner = make_tuner(tmp_path, monkeypatch)
+    Path(tuner.trials_dir).mkdir(parents=True, exist_ok=True)
+    TrialService(tuner.trials_db_path).persist_snapshot(
+        [
+            make_trial(
+                trial_id="trial_1", status=-1, val_loss=-1.0, retries=1
+            ),
+        ]
+    )
+
+    tuner.mark_trial_failed("trial_1", return_code=7)
+
+    trials = TrialService(tuner.trials_db_path).get_trials()
+    row = next(t for t in trials if t.trial_id == "trial_1")
+    assert row.status == -3
+    assert row.retries == 1
 
 
 def test_run_stops_when_max_trials_are_already_present(
@@ -408,50 +488,52 @@ def test_run_stops_when_max_trials_are_already_present(
     """Avoid scheduling a new trial once the maximum row count has been reached."""
     monkeypatch.setenv("HPTUNE_MAX_TRIALS", "1")
     tuner = make_tuner(tmp_path, monkeypatch)
-    df = pd.DataFrame([make_trial().to_csv_row()])
-
-    monkeypatch.setattr(_MODULE, "load_trials", lambda *_args: df)
-    monkeypatch.setattr(tuner, "update_trials", lambda in_df: in_df)
-    monkeypatch.setattr(tuner, "find_pending_trial", lambda _df: None)
+    monkeypatch.setattr(
+        tuner._trial_service,
+        "get_trials",
+        lambda: [make_trial()],
+    )
+    monkeypatch.setattr(tuner, "update_trials", lambda trials: trials)
     monkeypatch.setattr(
         tuner,
         "sample_hyperparameters",
-        lambda _df: pytest.fail("No new sampling should occur at max trials"),
+        lambda _trials: pytest.fail("No new sampling should occur at max trials"),
     )
 
     tuner.run()
 
 
-def test_run_appends_a_new_trial_row_to_csv(
+def test_run_appends_a_new_trial_to_db(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Append a newly proposed trial row after successfully materializing trial files."""
+    """Persist a newly proposed trial after successfully materializing trial files."""
     tuner = make_tuner(tmp_path, monkeypatch)
     Path(tuner.trials_dir).mkdir(parents=True, exist_ok=True)
-    empty_df = pd.DataFrame(columns=TRIAL_LOG_COLUMNS)
-    created: list[tuple[str, list[str]]] = []
+    created = []
 
-    monkeypatch.setattr(_MODULE, "load_trials", lambda *_args: empty_df)
-    monkeypatch.setattr(tuner, "update_trials", lambda in_df: in_df)
-    monkeypatch.setattr(tuner, "find_pending_trial", lambda _df: None)
     monkeypatch.setattr(
-        _MODULE, "next_trial_numbered_id", lambda *_args: "trial_9"
+        tuner._trial_service,
+        "get_trials",
+        lambda: [],
     )
+    monkeypatch.setattr(tuner, "update_trials", lambda trials: trials)
+    monkeypatch.setattr(_MODULE, "next_trial_numbered_id", lambda *_args: "trial_9")
     monkeypatch.setattr(
         tuner,
         "sample_hyperparameters",
-        lambda _df: make_trial(trial_id=None, status=-1, val_loss=-1.0),
+        lambda _trials: make_trial(trial_id=None, status=-1, val_loss=-1.0),
     )
     monkeypatch.setattr(_MODULE, "load_env_template", lambda _root: ["BASE=1"])
-    monkeypatch.setattr(
-        tuner,
-        "create_trial",
-        lambda trial, env_lines: created.append((trial.trial_id, env_lines)) or trial.trial_id,
-    )
+
+    def fake_serial(self, *, project_root, trials_dir, env_lines, log_dir=None):
+        created.append((self.trial_id, env_lines))
+        return self.trial_id
+
+    monkeypatch.setattr(SerialTrial, "materialize_trial_files", fake_serial)
 
     tuner.run()
 
-    written = pd.read_csv(tuner.csv_path)
-    assert written["trial_id"].tolist() == ["trial_9"]
-    assert int(written.loc[0, "status"]) == -2
+    written = TrialService(tuner.trials_db_path).get_trials()
+    assert [t.trial_id for t in written] == ["trial_9"]
+    assert written[0].status == -2
     assert created == [("trial_9", ["BASE=1"])]

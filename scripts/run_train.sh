@@ -23,9 +23,12 @@ cd "${PBS_O_WORKDIR:-$(pwd)}"
 source /soft/applications/conda/2025-09-25/mconda3/etc/profile.d/conda.sh
 conda activate base
 
-# HPC-friendly settings
-export OPENBLAS_NUM_THREADS=1
-export OMP_NUM_THREADS=1
+# HPC-friendly settings (PBS may allocate many CPUs; cap BLAS threads)
+export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
+export MKL_NUM_THREADS="${MKL_NUM_THREADS:-1}"
+export NUMEXPR_NUM_THREADS="${NUMEXPR_NUM_THREADS:-1}"
+export TORCH_NUM_THREADS="${TORCH_NUM_THREADS:-1}"
 
 # Run training
 BEST_PARAMS_PATH="$PROG_DIR/${JOB_ID}_best_params.pt"

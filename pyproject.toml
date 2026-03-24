@@ -37,6 +37,8 @@ dependencies = [
     "PyQt6>=6.0.0",
     "bayesian-optimization>=1.4.0",
     "pydantic>=2.5.0",
+    "mpi4py>=4.1.1",
+    "sqlalchemy>=2.0.0,<3",
 ]
 
 [project.optional-dependencies]
