@@ -8,6 +8,7 @@ from typing import Union
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy.pool import NullPool
 
@@ -72,6 +73,17 @@ def connect(p: PathLike):
     return trial_db_engine(path).connect()
 
 
+def _trials_table_exists(conn) -> bool:
+    return bool(
+        conn.execute(
+            text(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=:n LIMIT 1",
+            ),
+            {"n": TRIALS_TABLE},
+        ).fetchone()
+    )
+
+
 def initialize(p: PathLike) -> None:
     from . import trial_model  # noqa: F401 — register ORM mappers on ``Base.metadata``
 
@@ -83,11 +95,15 @@ def initialize(p: PathLike) -> None:
         if v > SCHEMA_USER_VERSION:
             raise SchemaError(f"{path}: user_version={v} > {SCHEMA_USER_VERSION}")
         if v < SCHEMA_USER_VERSION:
-            Base.metadata.create_all(eng)
+            if not _trials_table_exists(conn):
+                try:
+                    Base.metadata.create_all(eng)
+                except OperationalError as err:
+                    # Another MPI rank may have created the table first.
+                    msg = str(err.orig or err).lower()
+                    if "already exists" not in msg:
+                        raise
             conn.execute(text(f"PRAGMA user_version = {SCHEMA_USER_VERSION}"))
             conn.commit()
-        elif not conn.execute(
-            text("SELECT 1 FROM sqlite_master WHERE type='table' AND name=:n LIMIT 1"),
-            {"n": TRIALS_TABLE},
-        ).fetchone():
+        elif not _trials_table_exists(conn):
             raise SchemaError(f"missing {TRIALS_TABLE!r}")
