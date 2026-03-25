@@ -29,7 +29,7 @@ from util.processing import (
 )
 
 _ROOT = Path(__file__).resolve().parents[2]
-load_dotenv(_ROOT / ".env")
+load_dotenv(dotenv_path=_ROOT / ".env", encoding="utf-8")
 
 
 def _abs(p: str) -> str:

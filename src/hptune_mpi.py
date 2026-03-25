@@ -1,11 +1,16 @@
+"""MPI-based distributed HPTune dispatcher."""
+
+from __future__ import annotations
+
 import hashlib
 import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 
-from loguru import logger
 from dotenv import dotenv_values
+from loguru import logger
 from mpi4py import MPI
 
 from model.bayesian_hptuner import BayesianHPTuner
@@ -14,126 +19,171 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 hostname = MPI.Get_processor_name()
-hosts_by_rank = comm.allgather(hostname)
-
+hosts_by_rank: list[str] = comm.allgather(hostname)
 
 GPUS_PER_NODE = int(os.environ.get("GPUS_PER_NODE", "4"))
 TRIAL_NODES = int(os.environ.get("HPTUNE_TRIAL_NODES", "1"))
 
-
-def _unique_preserving_order(items):
-    unique_items = []
-    seen = set()
-    for item in items:
-        if item in seen:
-            continue
-        seen.add(item)
-        unique_items.append(item)
-    return unique_items
+_controller_host = hosts_by_rank[0]
 
 
-def _get_controller_host():
-    return hosts_by_rank[0]
+# ------------------------------------------------------------------
+# Topology helpers
+# ------------------------------------------------------------------
 
 
-def _worker_ranks_by_host():
-    worker_hosts = {}
+def _unique_ordered(items: list) -> list:
+    """Deduplicate while preserving insertion order."""
+    seen: set = set()
+    return [x for x in items if not (x in seen or seen.add(x))]
+
+
+def _worker_ranks_by_host() -> dict[str, list[int]]:
+    """Map each non-controller host to its MPI ranks, validating GPU count."""
+    workers: dict[str, list[int]] = {}
     for worker_rank, worker_host in enumerate(hosts_by_rank):
-        if worker_host == _get_controller_host():
-            continue
-        worker_hosts.setdefault(worker_host, []).append(worker_rank)
+        if worker_host != _controller_host:
+            workers.setdefault(worker_host, []).append(worker_rank)
 
-    if not worker_hosts:
+    if not workers:
         raise RuntimeError(
-            "No worker hosts are available. Reserve at least one controller node "
+            "No worker hosts available. Reserve at least one controller node "
             "plus one worker node for MPI HPTune."
         )
-
-    for worker_host, worker_ranks in worker_hosts.items():
-        if len(worker_ranks) != GPUS_PER_NODE:
+    for host, ranks in workers.items():
+        if len(ranks) != GPUS_PER_NODE:
             raise RuntimeError(
-                f"Worker host {worker_host} has {len(worker_ranks)} MPI ranks; "
+                f"Worker host {host} has {len(ranks)} MPI ranks; "
                 f"expected exactly GPUS_PER_NODE={GPUS_PER_NODE}"
             )
+    return workers
 
-    return worker_hosts
 
-
-def get_slots():
-    worker_ranks_by_host = _worker_ranks_by_host()
-    worker_hosts = list(worker_ranks_by_host.keys())
-    slots = []
-
-    for i in range(0, len(worker_hosts), TRIAL_NODES):
-        slot_hosts = worker_hosts[i : i + TRIAL_NODES]
-        if len(slot_hosts) != TRIAL_NODES:
-            continue
-        slot_ranks = []
-        for slot_host in slot_hosts:
-            slot_ranks.extend(worker_ranks_by_host[slot_host])
-        slots.append(slot_ranks)
-
+def get_slots() -> list[list[int]]:
+    """Group worker hosts into fixed-size trial slots of ``TRIAL_NODES`` nodes each."""
+    ranks_by_host = _worker_ranks_by_host()
+    hosts = list(ranks_by_host)
+    slots = [
+        [r for host in hosts[i : i + TRIAL_NODES] for r in ranks_by_host[host]]
+        for i in range(0, len(hosts), TRIAL_NODES)
+        if len(hosts[i : i + TRIAL_NODES]) == TRIAL_NODES
+    ]
+    if not slots:
+        raise RuntimeError(
+            "No full MPI trial slots available. Increase HPTUNE_CONTROLLER_NODES "
+            "or decrease HPTUNE_TRIAL_NODES."
+        )
     return slots
 
 
-def _master_port(slot_id, trial_id):
-    pbs_job_id = os.environ.get("PBS_JOBID", "local")
-    seed = f"{pbs_job_id}:{slot_id}:{trial_id}"
-    offset = int(hashlib.sha1(seed.encode("utf-8")).hexdigest()[:4], 16) % 20000
+def _master_port(slot_id: int, trial_id: str) -> str:
+    """Deterministic, collision-avoiding port derived from job/slot/trial identity."""
+    seed = f"{os.environ.get('PBS_JOBID', 'local')}:{slot_id}:{trial_id}"
+    offset = int(hashlib.sha1(seed.encode()).hexdigest()[:4], 16) % 20000
     return str(20000 + offset)
 
 
-def controller():
+# ------------------------------------------------------------------
+# Trial runner
+# ------------------------------------------------------------------
+
+
+def run_distributed_trial(
+    tuner: BayesianHPTuner,
+    *,
+    trial_id: str,
+    slot_id: int,
+    group: list[int],
+    group_comm: MPI.Comm,
+) -> int:
+    trial_dir = Path(tuner.trials_dir) / trial_id
+    trial_env_path = trial_dir / ".env"
+
+    if not trial_env_path.exists():
+        raise FileNotFoundError(f"Missing trial env file: {trial_env_path}")
+
+    group_hosts = [hosts_by_rank[r] for r in group]
+    node_hosts = _unique_ordered(group_hosts)
+    group_rank = group_comm.Get_rank()
+    local_rank = sum(1 for r in group[:group_rank] if hosts_by_rank[r] == hostname)
+
+    env = {
+        **os.environ,
+        **{
+            k: v
+            for k, v in dotenv_values(trial_env_path, encoding="utf-8").items()
+            if v is not None
+        },
+        "OMP_NUM_THREADS": "1",
+        "PYTHONPATH": f"{tuner.project_root}/src{os.pathsep}{os.environ.get('PYTHONPATH', '')}".rstrip(
+            os.pathsep
+        ),
+        "MASTER_ADDR": node_hosts[0],
+        "MASTER_PORT": _master_port(slot_id, trial_id),
+        "RANK": str(group_rank),
+        "WORLD_SIZE": str(group_comm.Get_size()),
+        "LOCAL_RANK": str(local_rank),
+        "LOCAL_WORLD_SIZE": str(GPUS_PER_NODE),
+        "NODE_RANK": str(node_hosts.index(hostname)),
+    }
+    for key in ("PMI_RANK", "PMI_SIZE", "PMI_LOCAL_RANK"):
+        env.pop(key, None)
+
+    log_path = trial_dir / f"dist_rank_{rank}.log"
+    result = subprocess.run(
+        [sys.executable, Path(tuner.project_root) / "src" / "train.py"],
+        cwd=tuner.project_root,
+        stdout=log_path.open("w", encoding="utf-8"),
+        stderr=subprocess.STDOUT,
+        env=env,
+        check=False,
+    )
+    return result.returncode
+
+
+# ------------------------------------------------------------------
+# Controller
+# ------------------------------------------------------------------
+
+
+def controller() -> None:
     tuner = BayesianHPTuner.create()
     slots = get_slots()
-    active_slots = (
-        {}
-    )  # dict used as bookkeeping for which MPI slots are busy: slot_id -> trial_id
 
-    if not slots:
-        raise RuntimeError(
-            "No full MPI trial slots are available. Increase HPTUNE_CONTROLLER_NODES "
-            "or decrease HPTUNE_TRIAL_NODES."
-        )
-
+    active_slots: dict[int, str] = {}  # slot_id -> trial_id
     logger.debug(
-        f"[controller] controller_host={_get_controller_host()} slots={len(slots)} "
-        f"trial_nodes={TRIAL_NODES} gpus_per_node={GPUS_PER_NODE}",
-        flush=True,
+        "[controller] host={} slots={} trial_nodes={} gpus_per_node={}",
+        _controller_host,
+        len(slots),
+        TRIAL_NODES,
+        GPUS_PER_NODE,
     )
 
     while True:
         while comm.Iprobe(source=MPI.ANY_SOURCE):
             msg = comm.recv(source=MPI.ANY_SOURCE)
-            slot_id = msg["slot"]
-            trial_id = msg["trial"]
+            slot_id, trial_id = msg["slot"], msg["trial"]
 
             if msg["type"] == "DONE":
-                logger.success(
-                    f"[controller] DONE trial={trial_id} slot={slot_id}", flush=True
-                )
+                logger.success("[controller] DONE  trial={} slot={}", trial_id, slot_id)
                 active_slots.pop(slot_id, None)
             elif msg["type"] == "FAILED":
                 logger.error(
-                    f"[controller] FAILED trial={trial_id} slot={slot_id} rc={msg['return_code']}",
-                    flush=True,
+                    "[controller] FAILED trial={} slot={} rc={}",
+                    trial_id,
+                    slot_id,
+                    msg["return_code"],
                 )
                 tuner.mark_trial_failed(trial_id, return_code=int(msg["return_code"]))
                 active_slots.pop(slot_id, None)
 
-        trials = tuner.sync_and_load()
-        trials, trial_idsss = tuner.plan_and_enqueue()
+        trials = tuner.plan_and_enqueue()
         queued = tuner.get_dispatchable_trials(trials)
-
-        free_slots = [
-            slot_id for slot_id in range(len(slots)) if slot_id not in active_slots
-        ]
-        assignments = list(zip[tuple[int, str]](free_slots, queued[: len(free_slots)]))
+        free_slots = [sid for sid in range(len(slots)) if sid not in active_slots]
+        assignments = list(zip(free_slots, queued[: len(free_slots)]))
 
         if assignments:
-            trial_ids = [trial_id for _, trial_id in assignments]
-            tuner.mark_trials_running(trial_ids)
-
+            tuner.mark_trials_running([tid for _, tid in assignments])
             for slot_id, trial_id in assignments:
                 slot_group = slots[slot_id]
                 for worker_rank in slot_group:
@@ -148,8 +198,10 @@ def controller():
                     )
                 active_slots[slot_id] = trial_id
                 logger.info(
-                    f"[controller] DISPATCH trial={trial_id} slot={slot_id} ranks={slot_group}",
-                    flush=True,
+                    "[controller] DISPATCH trial={} slot={} ranks={}",
+                    trial_id,
+                    slot_id,
+                    slot_group,
                 )
 
         if tuner.is_complete(trials) and not active_slots:
@@ -160,7 +212,12 @@ def controller():
         time.sleep(1)
 
 
-def worker():
+# ------------------------------------------------------------------
+# Worker
+# ------------------------------------------------------------------
+
+
+def worker() -> None:
     tuner = BayesianHPTuner.create()
 
     while True:
@@ -168,36 +225,32 @@ def worker():
 
         if msg["type"] == "STOP":
             break
-
         if msg["type"] != "TASK":
             raise RuntimeError(f"Unknown MPI task message: {msg}")
 
-        trial_id = msg["trial"]
-        slot_id = msg["slot"]
-        group = msg["group"]
+        trial_id, slot_id, group = msg["trial"], msg["slot"], msg["group"]
         group_comm = comm.Create_group(comm.group.Incl(group))
 
         try:
             if group_comm == MPI.COMM_NULL:
                 continue
 
-            return_code = run_distributed_trial(
-                tuner=tuner,
+            rc = run_distributed_trial(
+                tuner,
                 trial_id=trial_id,
                 slot_id=slot_id,
                 group=group,
                 group_comm=group_comm,
             )
-            group_return_code = group_comm.allreduce(return_code, op=MPI.MAX)
+            group_rc = group_comm.allreduce(rc, op=MPI.MAX)
 
             if group_comm.rank == 0:
-                msg_type = "DONE" if group_return_code == 0 else "FAILED"
                 comm.send(
                     {
-                        "type": msg_type,
+                        "type": "DONE" if group_rc == 0 else "FAILED",
                         "trial": trial_id,
                         "slot": slot_id,
-                        "return_code": int(group_return_code),
+                        "return_code": int(group_rc),
                     },
                     dest=0,
                 )
@@ -206,69 +259,16 @@ def worker():
                 group_comm.Free()
 
 
-def run_distributed_trial(tuner, trial_id, slot_id, group, group_comm):
-    trial_dir = os.path.join(tuner.trials_dir, trial_id)
-    trial_env_path = os.path.join(trial_dir, ".env")
-
-    if not os.path.exists(trial_env_path):
-        raise FileNotFoundError(f"Missing trial env file: {trial_env_path}")
-
-    group_hosts = [hosts_by_rank[group_rank] for group_rank in group]
-    node_hosts = _unique_preserving_order(group_hosts)
-    group_rank = group_comm.Get_rank()
-    world_size = group_comm.Get_size()
-    local_rank = sum(
-        1
-        for group_rank_id in group[:group_rank]
-        if hosts_by_rank[group_rank_id] == hostname
-    )
-    node_rank = node_hosts.index(hostname)
-
-    env = os.environ.copy()
-    env.update(
-        {
-            key: value
-            for key, value in dotenv_values(trial_env_path).items()
-            if value is not None
-        }
-    )
-    env["OMP_NUM_THREADS"] = "1"
-    env["PYTHONPATH"] = (
-        f"{tuner.project_root}/src{os.pathsep}{env.get('PYTHONPATH', '')}".rstrip(
-            os.pathsep
-        )
-    )
-    env["MASTER_ADDR"] = node_hosts[0]
-    env["MASTER_PORT"] = _master_port(slot_id, trial_id)
-    env["RANK"] = str(group_rank)
-    env["WORLD_SIZE"] = str(world_size)
-    env["LOCAL_RANK"] = str(local_rank)
-    env["LOCAL_WORLD_SIZE"] = str(GPUS_PER_NODE)
-    env["NODE_RANK"] = str(node_rank)
-    env.pop("PMI_RANK", None)
-    env.pop("PMI_SIZE", None)
-    env.pop("PMI_LOCAL_RANK", None)
-
-    command = [sys.executable, os.path.join(tuner.project_root, "src", "train.py")]
-    log_path = os.path.join(trial_dir, f"dist_rank_{rank}.log")
-
-    with open(log_path, "w", encoding="utf-8") as log_file:
-        result = subprocess.run(
-            command,
-            cwd=tuner.project_root,
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            env=env,
-            check=False,
-        )
-
-    return int(result.returncode)
-
+# ------------------------------------------------------------------
+# Entrypoint
+# ------------------------------------------------------------------
 
 if __name__ == "__main__":
-    if rank == 0:
-        logger.info(f"Running controller on {hostname}, rank {rank} with size {size}")
-        controller()
-    else:
-        logger.info(f"Running worker on {hostname}, rank {rank} with size {size}")
-        worker()
+    logger.info(
+        "Rank {} on {} (size={}) — starting as {}",
+        rank,
+        hostname,
+        size,
+        "controller" if rank == 0 else "worker",
+    )
+    controller() if rank == 0 else worker()

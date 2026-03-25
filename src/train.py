@@ -8,9 +8,10 @@ from dotenv import load_dotenv
 from loguru import logger
 
 from config.settings import Settings
+from schemas.trial_schema import cleanup_epoch_checkpoints, submit_next_serial_controller
 
 _REPO = Path(__file__).resolve().parents[1]  # project root (src/..)
-load_dotenv(_REPO / ".env")
+load_dotenv(dotenv_path=_REPO / ".env", encoding="utf-8")
 
 
 def _abs(p: str) -> str:
@@ -68,3 +69,6 @@ if __name__ == "__main__":
         local_rank=local_rank,
         job_id=job_id,
     )
+    if rank == 0:
+        cleanup_epoch_checkpoints(prog_dir, job_id)
+        submit_next_serial_controller()

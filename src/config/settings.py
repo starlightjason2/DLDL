@@ -17,7 +17,7 @@ from config.schema import ArchitectureConfig, DldlConfigFile, TrainingConfig
 @functools.lru_cache(maxsize=1)
 def _dotenv() -> None:
     p = Path(__file__).resolve().parents[2] / ".env"
-    load_dotenv(p)
+    load_dotenv(dotenv_path=p, encoding="utf-8")
 
 
 class Settings(BaseModel):

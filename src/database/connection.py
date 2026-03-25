@@ -13,7 +13,10 @@ from sqlalchemy.engine import Engine
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(
+    dotenv_path=Path(__file__).resolve().parents[2] / ".env",
+    encoding="utf-8",
+)
 
 _TO, _BT = 30.0, 30_000
 

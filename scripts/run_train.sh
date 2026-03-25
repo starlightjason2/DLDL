@@ -20,9 +20,11 @@ set -a
 source "$PROJECT_ROOT/.env"
 set +a
 
-cd "$PROJECT_ROOT"
+# __HPTUNE_CD_OVERRIDE__
 # shellcheck source=/dev/null
 source "$DLDL_CONDASH" && conda activate "$CONDA_ENV"
+
+# __HPTUNE_ENV_INJECT__
 
 BEST_PARAMS_PATH="$PROG_DIR/${JOB_ID}_best_params.pt"
 if [ -f "$BEST_PARAMS_PATH" ]; then
@@ -30,8 +32,3 @@ if [ -f "$BEST_PARAMS_PATH" ]; then
 else
   python src/train.py
 fi
-
-_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-_LOG="$PROG_DIR/train_${PBS_JOBID}.log"
-echo "---- tail: $_LOG ----" && tail -n 100 "$_LOG" 2>/dev/null || true
-echo "---- LIVE: tail -F $_LOG ----"

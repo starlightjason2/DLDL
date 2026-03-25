@@ -10,7 +10,7 @@ from loguru import logger
 from config.settings import Settings
 
 _REPO = Path(__file__).resolve().parents[1]
-load_dotenv(_REPO / ".env")
+load_dotenv(dotenv_path=_REPO / ".env", encoding="utf-8")
 
 
 def _abs(p: str) -> str:
