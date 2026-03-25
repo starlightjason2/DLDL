@@ -1,5 +1,5 @@
 """Pydantic API schemas (separate from SQLAlchemy ORM tables)."""
 
-from schemas.trial_schema import HPTuneTrial, TrialStatus
+from model.hp_trial import HPTuneTrial, TrialStatus
 
 __all__ = ["HPTuneTrial", "TrialStatus"]

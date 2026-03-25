@@ -42,11 +42,6 @@ def _load_and_pad_base(filename: str, data_dir: str, max_length: int, data: NDAr
     return shot_no, padded
 
 
-def load_and_pad(filename: str, data_dir: str, max_length: int) -> Tuple[int, NDArray[np.float32]]:
-    data = _read_signal_file(os.path.join(data_dir, filename), col=1)
-    return _load_and_pad_base(filename, data_dir, max_length, data)
-
-
 def load_and_pad_norm(
     filename: str, data_dir: str, max_length: int, mean: Optional[float] = None, std: Optional[float] = None
 ) -> Tuple[int, NDArray[np.float32]]:

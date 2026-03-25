@@ -4,12 +4,10 @@ from __future__ import annotations
 import os
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Union, cast
 
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.engine import Engine
-
+from sqlalchemy.engine import make_url
 
 from dotenv import load_dotenv
 
@@ -18,11 +16,18 @@ load_dotenv(
     encoding="utf-8",
 )
 
-_TO, _BT = 30.0, 30_000
+_BT = 30_000
 
-os.makedirs(Path(os.environ.get("DB_CONNECTION")).parent, exist_ok=True)
+db_connection = os.environ["DB_CONNECTION"]
+url = make_url(db_connection)
+if url.drivername == "sqlite" and url.database and url.database != ":memory:":
+    db_path = Path(url.database)
+    if not db_path.is_absolute():
+        db_path = Path.cwd() / db_path
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
 engine = create_engine(
-    os.environ.get("DB_CONNECTION"), connect_args={"check_same_thread": False}
+    db_connection, connect_args={"check_same_thread": False}
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

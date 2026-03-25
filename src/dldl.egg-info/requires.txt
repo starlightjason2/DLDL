@@ -13,6 +13,6 @@ mpi4py>=4.1.1
 sqlalchemy<3,>=2.0.0
 
 [dev]
-pytest>=7.0.0
 black>=22.0.0
 flake8>=4.0.0
+pytest>=7.0.0

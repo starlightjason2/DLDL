@@ -8,12 +8,13 @@ import shutil
 import warnings
 from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 from loguru import logger
 
-from schemas.trial_schema import HPTuneTrial, TrialStatus
+if TYPE_CHECKING:
+    from model.hp_trial import HPTuneTrial
 
 # Enumerated trial folders: trial_1, trial_2, ...
 _TRIAL_NUM_DIR_RE = re.compile(r"^trial_(\d+)$")
@@ -91,6 +92,8 @@ def sync_best_trial_artifacts(
     best_trial_dir: str | Path,
 ) -> None:
     """Copy the current overall best trial's ``.env`` and checkpoint into ``best_trial/``."""
+    from model.hp_trial import TrialStatus
+
     dest = Path(best_trial_dir)
     dest.mkdir(parents=True, exist_ok=True)
 

@@ -36,8 +36,8 @@ def _abs(p: str) -> str:
     return p if os.path.isabs(p) else str(_ROOT / p)
 
 
-_CPU_USE = float(os.environ.get("CPU_USE", "0.2"))
-_PREPROCESSOR_MAX_WORKERS = int(os.environ.get("PREPROCESSOR_MAX_WORKERS", "4"))
+_CPU_USE = float(os.environ["CPU_USE"])
+_PREPROCESSOR_MAX_WORKERS = int(os.environ["PREPROCESSOR_MAX_WORKERS"])
 _DATA_DIR = _abs(os.environ["DATA_DIR"])
 _LABELS_PATH = _abs(os.environ["LABELS_PATH"])
 _DATA_PATH = _abs(os.environ["DATA_PATH"])

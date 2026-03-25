@@ -13,7 +13,7 @@ from pydantic import TypeAdapter
 from sqlalchemy import select, update
 
 from database import Trial, get_db_session, engine
-from schemas.trial_schema import HPTuneTrial, TrialStatus
+from model.hp_trial import HPTuneTrial, TrialStatus
 
 
 class TrialService:
@@ -44,25 +44,11 @@ class TrialService:
 
     @staticmethod
     @logger.catch
-    def delete_trial(trial_id: str) -> bool:
-        """Delete a trial by id. Returns ``True`` if a row was removed."""
-        with get_db_session() as session:
-            row = session.get(Trial, trial_id)
-            if row is None:
-                return False
-            session.delete(row)
-            session.commit()
-        return True
-
-    @staticmethod
-    @logger.catch
     def update_trial(trial_id: str, payload: dict[str, Any]) -> None:
         """Partial update by primary key; ``status`` values persist as integers."""
         with get_db_session() as session:
             TypeAdapter(Mapping[str, Any]).validate_python(payload)
-            values = {
-                k: int(v) if k == "status" else v for k, v in payload.items()
-            }
+            values = {k: int(v) if k == "status" else v for k, v in payload.items()}
             session.execute(
                 update(Trial).where(Trial.trial_id == trial_id).values(**values)
             )
@@ -101,18 +87,25 @@ class TrialService:
         table_name = Trial.__table__.name
         df = pd.read_sql(f"SELECT * FROM {table_name}", engine)
         output_path = os.path.join(
-            os.environ.get("TRIALS_DIR"), f"{table_name.lower()}.csv"
+            os.environ["TRIALS_DIR"], f"{table_name.lower()}.csv"
         )
         df.to_csv(output_path, index=False, encoding="utf-8")
 
     @staticmethod
     def get_status_counts(trials: list[HPTuneTrial]) -> dict[str, int]:
-        """Aggregate counts by :class:`TrialStatus`."""
+        """Aggregate counts by :class:`TrialStatus`.
+
+        ``active`` is running plus queued (work still in the pipeline); used by
+        :meth:`model.bayesian_hptuner.BayesianHPTuner.run` dispatch logging.
+        """
         by_status = Counter(t.status for t in trials)
+        running = by_status.get(TrialStatus.RUNNING, 0)
+        queued = by_status.get(TrialStatus.QUEUED, 0)
         return {
             "done": by_status.get(TrialStatus.COMPLETED, 0),
-            "running": by_status.get(TrialStatus.RUNNING, 0),
-            "queued": by_status.get(TrialStatus.QUEUED, 0),
+            "running": running,
+            "queued": queued,
             "failed": by_status.get(TrialStatus.FAILED, 0),
             "total": len(trials),
+            "active": running + queued,
         }

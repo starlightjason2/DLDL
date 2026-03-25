@@ -24,12 +24,8 @@ from torch.utils.data import DataLoader, DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 
 
-from config.settings import Settings
-from util.distributed import cleanup, setup
 from util.processing import split
 from model.dataset import IpDataset
-
-_s = Settings.load()
 
 
 class IpCNN(nn.Module):
@@ -139,29 +135,6 @@ class IpCNN(nn.Module):
         x = self.dropout1(F.relu(self.bn4(self.fc1(x))))
         x = self.dropout2(F.relu(self.bn5(self.fc2(x))))
         return self.fc3(x)
-
-    def validate_preprocessed_files(self, normalization_type: str) -> None:
-        """Validate that preprocessed files exist."""
-        if not os.path.exists(self.data_path) or not os.path.exists(self.labels_path):
-            missing = [
-                (
-                    f"Dataset: {self.data_path}"
-                    if not os.path.exists(self.data_path)
-                    else None
-                ),
-                (
-                    f"Labels: {self.labels_path}"
-                    if not os.path.exists(self.labels_path)
-                    else None
-                ),
-            ]
-            missing = [m for m in missing if m]
-            self.logger.error(
-                f"Preprocessed files not found for NORMALIZATION_TYPE='{normalization_type}'. Missing: {', '.join(missing)}"
-            )
-            raise FileNotFoundError(
-                "Preprocessed files not found. Run preprocess_data.py first."
-            )
 
     def _loss(self, outputs: Tensor, labels: Tensor) -> Tensor:
         """Combined loss for classification and time prediction."""
@@ -290,32 +263,41 @@ class IpCNN(nn.Module):
             torch.cuda.set_device(local_rank)
         torch.manual_seed(42 + rank)
 
-        t = _s.training_config
-        lr = lr if lr is not None else t.learning_rate
-        num_epochs = num_epochs if num_epochs is not None else t.num_epochs
-        log_interval = log_interval if log_interval is not None else t.log_interval
-        weight_decay = weight_decay if weight_decay is not None else t.weight_decay
+        e = os.environ
+        lr = lr if lr is not None else float(e["LEARNING_RATE"])
+        num_epochs = num_epochs if num_epochs is not None else int(e["NUM_EPOCHS"])
+        log_interval = (
+            log_interval if log_interval is not None else int(e["LOG_INTERVAL"])
+        )
+        weight_decay = (
+            weight_decay if weight_decay is not None else float(e["WEIGHT_DECAY"])
+        )
+        lr_scheduler_on = e["LR_SCHEDULER"].lower() in ("true", "1", "yes", "on")
         lr_scheduler_enabled = (
-            lr_scheduler if lr_scheduler is not None else t.lr_scheduler
+            lr_scheduler if lr_scheduler is not None else lr_scheduler_on
         )
         lr_scheduler_factor = (
             lr_scheduler_factor
             if lr_scheduler_factor is not None
-            else t.lr_scheduler_factor
+            else float(e["LR_SCHEDULER_FACTOR"])
         )
         lr_scheduler_patience = (
             lr_scheduler_patience
             if lr_scheduler_patience is not None
-            else t.lr_scheduler_patience
+            else int(e["LR_SCHEDULER_PATIENCE"])
         )
         early_stopping_patience = (
             early_stopping_patience
             if early_stopping_patience is not None
-            else t.early_stopping_patience
+            else int(e["EARLY_STOPPING_PATIENCE"])
         )
-        gradient_clip = gradient_clip if gradient_clip is not None else t.gradient_clip
-        batch_size = batch_size if batch_size is not None else t.batch_size
-        dl_workers = int(os.environ.get("DATALOADER_NUM_WORKERS", "4"))
+        gradient_clip = (
+            gradient_clip if gradient_clip is not None else float(e["GRADIENT_CLIP"])
+        )
+        batch_size = (
+            batch_size if batch_size is not None else int(e["BATCH_SIZE"])
+        )
+        dl_workers = int(os.environ["DATALOADER_NUM_WORKERS"])
 
         # Log training hyperparameters
         self.logger.info("=" * 60)

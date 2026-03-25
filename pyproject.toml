@@ -45,6 +45,7 @@ dependencies = [
 dev = [
     "black>=22.0.0",
     "flake8>=4.0.0",
+    "pytest>=7.0.0",
 ]
 
 [project.urls]
@@ -60,4 +61,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "*" = ["*.txt", "*.md", "LICENSE"]
-config = ["dldl.json"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

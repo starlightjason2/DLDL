@@ -1,10 +1,8 @@
-"""Hyperparameter trial model (Pydantic) and ORM bridge."""
+"""Hyperparameter trial model (Pydantic), ORM bridge, and ``run.sh`` fragments."""
 
 from __future__ import annotations
 
 import os
-import re
-import subprocess
 from datetime import datetime
 from enum import IntEnum
 from pathlib import Path
@@ -14,8 +12,29 @@ import numpy as np
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
-from service.trial_service import TrialService
 from util.hptune import write_env
+
+_POST_TRAIN_FUNCS = r"""hptune_cleanup_epoch_checkpoints() {
+  [[ -f "$PROG_DIR/${JOB_ID}_best_params.pt" ]] || return 0
+  shopt -s nullglob
+  rm -f "$PROG_DIR/${JOB_ID}_params_epoch"*.pt
+  shopt -u nullglob
+}
+
+hptune_submit_next_serial_controller() {
+  local c
+  c=$(printf %s "$HPTUNE_CHAIN_ID" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  [[ -n "$c" ]] || return 0
+  mkdir -p "${HPTUNE_DIR}/controller_logs"
+  qsub -A "$HPTUNE_QSUB_ACCOUNT" -q "$HPTUNE_QUEUE" \
+    -l "select=1:system=polaris,place=scatter,walltime=${HPTUNE_CONTROLLER_WALLTIME},filesystems=home:eagle" \
+    -k doe -o "${HPTUNE_DIR}/controller_logs/" -e "${HPTUNE_DIR}/controller_logs/" \
+    -v "HPTUNE_CHAIN_ID=$c" \
+    "${PROJECT_ROOT}/scripts/controller.sh"
+}
+"""
+
+_POST_TRAIN_RUN = '  [ "$RANK" = "0" ] && hptune_cleanup_epoch_checkpoints && hptune_submit_next_serial_controller'
 
 
 class TrialStatus(IntEnum):
@@ -27,80 +46,6 @@ class TrialStatus(IntEnum):
     FAILED = -3
 
 
-@logger.catch(OSError, message="Could not remove checkpoint", reraise=False)
-def _unlink_checkpoint(path: Path) -> None:
-    path.unlink()
-
-
-def cleanup_epoch_checkpoints(prog_dir: str | Path, job_id: str) -> None:
-    """Delete ``*_params_epoch*.pt`` files once ``{job_id}_best_params.pt`` exists."""
-    root = Path(prog_dir)
-    if not (root / f"{job_id}_best_params.pt").is_file():
-        return
-    for path in root.glob(f"{job_id}_params_epoch*.pt"):
-        _unlink_checkpoint(path)
-
-
-@logger.catch(
-    subprocess.CalledProcessError, message="Next controller qsub failed", reraise=True
-)
-def submit_next_serial_controller() -> None:
-    """Queue the next serial HPTune controller via ``qsub`` when chain env vars are set."""
-    required = {
-        "chain": os.environ.get("HPTUNE_CHAIN_ID"),
-        "project_root": os.environ.get("PROJECT_ROOT"),
-        "queue": os.environ.get("HPTUNE_QUEUE"),
-    }
-    if missing := [k for k, v in required.items() if not v]:
-        logger.debug("Serial chain skipped: missing env vars {}", missing)
-        return
-
-    chain, project_root, queue = (
-        required["chain"],
-        required["project_root"],
-        required["queue"],
-    )
-
-    log_dir = os.environ.get("HPTUNE_CONTROLLER_LOG_DIR") or (
-        Path(os.environ["TRIALS_DIR"]).parent / "controller_logs"
-        if os.environ.get("TRIALS_DIR")
-        else None
-    )
-    if not log_dir:
-        logger.debug("Serial chain skipped: could not determine log_dir")
-        return
-
-    script = Path(project_root) / "scripts" / "controller.sh"
-    if not script.is_file():
-        logger.warning("Serial chain skipped: missing {}", script)
-        return
-
-    account = os.environ.get("HPTUNE_QSUB_ACCOUNT", "fusiondl_aesp")
-    cmd = [
-        "qsub",
-        "-A",
-        account,
-        "-q",
-        queue,
-        "-l",
-        "select=1:system=polaris,place=scatter,walltime=1:00:00,filesystems=home:eagle",
-        "-k",
-        "doe",
-        "-o",
-        f"{log_dir}/",
-        "-e",
-        f"{log_dir}/",
-        "-v",
-        f"HPTUNE_CHAIN_ID={chain}",
-        str(script),
-    ]
-
-    result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-    if out := result.stdout.strip():
-        logger.info("Next controller queued: {}", out)
-
-
-# Signature tuple over the 10 tunable hyperparameters (excludes trial_id, status, etc.)
 TrialSignature = tuple[str, int, str, str, int, str, int, str, int, int]
 
 
@@ -132,9 +77,7 @@ class HPTuneTrial(BaseModel):
     @property
     def dir_path(self) -> Path:
         """Absolute path to this trial's directory under ``TRIALS_DIR``."""
-        if not (trials_dir := os.environ.get("TRIALS_DIR")):
-            raise RuntimeError("TRIALS_DIR must be set")
-        return Path(trials_dir) / self.trial_id
+        return Path(os.environ["TRIALS_DIR"]) / self.trial_id
 
     def trial_signature(self) -> TrialSignature:
         """Normalize this trial into a hashable signature for duplicate detection."""
@@ -205,20 +148,37 @@ class HPTuneTrial(BaseModel):
             f'exec > >(tee "$PROG_DIR/train_${{PBS_JOBID}}.log") 2>&1'
         )
 
+        hptune_dir = Path(os.environ["HPTUNE_DIR"])
+        log_dir = hptune_dir / "controller_logs"
+        walltime = os.environ["HPTUNE_TRAIN_WALLTIME"]
+        pbs_queue = os.environ["HPTUNE_QUEUE"]
+
         script = (
             template.replace("#PBS -N dldl_train", "#PBS -N dldl_hptune")
+            .replace("__DLDL_PROJECT_ROOT__", project_root)
+            .replace("__HPTUNE_TRAIN_WALLTIME__", walltime)
+            .replace("__HPTUNE_PBS_QUEUE__", pbs_queue)
+            .replace("__HPTUNE_LOG_DIR__", str(log_dir))
             .replace("# __HPTUNE_CD_OVERRIDE__", f"cd {project_root}")
             .replace("# __HPTUNE_ENV_INJECT__", inject_block)
-        )
-        script = re.sub(
-            r"#PBS -[oe] .*", lambda m: m.group().split()[0] + " /dev/null", script
+            .replace("# __HPTUNE_POST_TRAIN_FUNCS__\n", _POST_TRAIN_FUNCS + "\n")
+            .replace("  # __HPTUNE_POST_TRAIN_RUN__", _POST_TRAIN_RUN)
         )
 
-        sentinels = ("# __HPTUNE_CD_OVERRIDE__", "# __HPTUNE_ENV_INJECT__")
+        sentinels = (
+            "# __HPTUNE_CD_OVERRIDE__",
+            "# __HPTUNE_ENV_INJECT__",
+            "# __HPTUNE_POST_TRAIN_FUNCS__",
+            "__HPTUNE_POST_TRAIN_RUN__",
+            "__DLDL_PROJECT_ROOT__",
+            "__HPTUNE_TRAIN_WALLTIME__",
+            "__HPTUNE_PBS_QUEUE__",
+            "__HPTUNE_LOG_DIR__",
+        )
         for sentinel in sentinels:
             if sentinel in script:
                 raise AssertionError(
-                    f"Sentinel not replaced in {template_path}: {sentinel!r}"
+                    f"Sentinel or placeholder not replaced in {template_path}: {sentinel!r}"
                 )
 
         return script
@@ -247,6 +207,7 @@ class HPTuneTrial(BaseModel):
                 "LR_SCHEDULER_FACTOR": str(self.lr_scheduler_factor),
                 "LR_SCHEDULER_PATIENCE": str(self.lr_scheduler_patience),
                 "EARLY_STOPPING_PATIENCE": str(self.early_stopping_patience),
+                "PROG_DIR": self.dir_path,
             },
             env_lines,
         )

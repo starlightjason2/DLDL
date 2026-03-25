@@ -20,7 +20,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.mark_running:
         tuner.mark_trials_running(args.mark_running)
         return
-    tuner.run()
+    tuner.run_serial()
 
 
 if __name__ == "__main__":

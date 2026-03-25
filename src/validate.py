@@ -8,7 +8,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 from loguru import logger
 
-from config.settings import Settings
 
 _REPO = Path(__file__).resolve().parents[1]
 load_dotenv(dotenv_path=_REPO / ".env", encoding="utf-8")
@@ -43,7 +42,7 @@ from model.dataset import IpDataset
 
 
 def validate_preprocessed_files() -> None:
-    """Validate that preprocessed files exist (IpCNN.validate_preprocessed_files)."""
+    """Validate that preprocessed tensor files exist on disk."""
     if not os.path.exists(data_path) or not os.path.exists(labels_pt_path):
         missing = [
             f"Dataset: {data_path}" if not os.path.exists(data_path) else None,
@@ -65,7 +64,7 @@ def check_dataset(
 ) -> None:
     """Run dataset integrity check (IpDataset.check_dataset)."""
     dataset = IpDataset(
-        normalization_type=Settings.load().training_config.normalization_type
+        normalization_type=os.environ["NORMALIZATION_TYPE"]
     )
     dataset.check_dataset(
         scale_labels=scale_labels, num_checks=num_checks, verbose=verbose

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash -l
 # Submit the HPTune MPI controller job to Polaris via qsub.
 set -euo pipefail
 

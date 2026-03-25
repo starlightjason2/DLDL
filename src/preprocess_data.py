@@ -7,7 +7,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 from loguru import logger
 
-from config.settings import Settings
 
 _REPO = Path(__file__).resolve().parents[1]
 load_dotenv(dotenv_path=_REPO / ".env", encoding="utf-8")
@@ -40,7 +39,7 @@ logger.add(
 from model.dataset import IpDataset
 
 if __name__ == "__main__":
-    n = Settings.load().training_config.normalization_type
+    n = os.environ["NORMALIZATION_TYPE"]
     logger.info("Cleaning up cached preprocessed files...")
     for path in (data_path, labels_pt_path):
         if os.path.exists(path):
