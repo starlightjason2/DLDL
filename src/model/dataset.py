@@ -15,7 +15,6 @@ from numpy.typing import NDArray
 from torch import Tensor
 from torch.utils.data import Dataset
 
-from config.schema import DatasetEnv
 from util.data_loading import (
     get_length,
     get_means,
@@ -37,7 +36,8 @@ def _abs(p: str) -> str:
     return p if os.path.isabs(p) else str(_ROOT / p)
 
 
-_d = DatasetEnv.from_os()
+_CPU_USE = float(os.environ.get("CPU_USE", "0.2"))
+_PREPROCESSOR_MAX_WORKERS = int(os.environ.get("PREPROCESSOR_MAX_WORKERS", "4"))
 _DATA_DIR = _abs(os.environ["DATA_DIR"])
 _LABELS_PATH = _abs(os.environ["LABELS_PATH"])
 _DATA_PATH = _abs(os.environ["DATA_PATH"])
@@ -133,7 +133,7 @@ class IpDataset(Dataset):
         self, func: Callable[..., Any], *args: Any, desc: str = "Processing"
     ) -> NDArray:
         """Process files in parallel."""
-        workers = min(get_use_cores(_d.cpu_use), _d.preprocessor_max_workers)
+        workers = min(get_use_cores(_CPU_USE), _PREPROCESSOR_MAX_WORKERS)
         chunksize = max(1, self.num_shots // (workers * 4))  # Reduce IPC overhead
         self.logger.info(f"{desc}: {self.num_shots} files, {workers} workers")
         with ProcessPoolExecutor(max_workers=workers) as executor:
@@ -224,7 +224,7 @@ class IpDataset(Dataset):
             [_DATA_DIR] * self.num_shots, [self.max_length] * self.num_shots
         )
 
-        workers = min(get_use_cores(_d.cpu_use), _d.preprocessor_max_workers)
+        workers = min(get_use_cores(_CPU_USE), _PREPROCESSOR_MAX_WORKERS)
         chunksize = max(1, self.num_shots // (workers * 4))  # Reduce IPC overhead
         self.logger.info(
             f"Loading and normalizing: {self.num_shots} files, {workers} workers"

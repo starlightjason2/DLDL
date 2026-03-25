@@ -4,6 +4,7 @@ import subprocess
 import sys
 import time
 
+from loguru import logger
 from dotenv import dotenv_values
 from mpi4py import MPI
 
@@ -14,6 +15,7 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 hostname = MPI.Get_processor_name()
 hosts_by_rank = comm.allgather(hostname)
+
 
 GPUS_PER_NODE = int(os.environ.get("GPUS_PER_NODE", "4"))
 TRIAL_NODES = int(os.environ.get("HPTUNE_TRIAL_NODES", "1"))
@@ -30,14 +32,14 @@ def _unique_preserving_order(items):
     return unique_items
 
 
-def _controller_host():
+def _get_controller_host():
     return hosts_by_rank[0]
 
 
 def _worker_ranks_by_host():
     worker_hosts = {}
     for worker_rank, worker_host in enumerate(hosts_by_rank):
-        if worker_host == _controller_host():
+        if worker_host == _get_controller_host():
             continue
         worker_hosts.setdefault(worker_host, []).append(worker_rank)
 
@@ -82,9 +84,11 @@ def _master_port(slot_id, trial_id):
 
 
 def controller():
-    tuner = BayesianHPTuner()
+    tuner = BayesianHPTuner.create()
     slots = get_slots()
-    active = {}  # slot_id -> trial_id
+    active_slots = (
+        {}
+    )  # dict used as bookkeeping for which MPI slots are busy: slot_id -> trial_id
 
     if not slots:
         raise RuntimeError(
@@ -92,8 +96,8 @@ def controller():
             "or decrease HPTUNE_TRIAL_NODES."
         )
 
-    print(
-        f"[controller] controller_host={_controller_host()} slots={len(slots)} "
+    logger.debug(
+        f"[controller] controller_host={_get_controller_host()} slots={len(slots)} "
         f"trial_nodes={TRIAL_NODES} gpus_per_node={GPUS_PER_NODE}",
         flush=True,
     )
@@ -105,22 +109,26 @@ def controller():
             trial_id = msg["trial"]
 
             if msg["type"] == "DONE":
-                print(f"[controller] DONE trial={trial_id} slot={slot_id}", flush=True)
-                active.pop(slot_id, None)
+                logger.success(
+                    f"[controller] DONE trial={trial_id} slot={slot_id}", flush=True
+                )
+                active_slots.pop(slot_id, None)
             elif msg["type"] == "FAILED":
-                print(
+                logger.error(
                     f"[controller] FAILED trial={trial_id} slot={slot_id} rc={msg['return_code']}",
                     flush=True,
                 )
                 tuner.mark_trial_failed(trial_id, return_code=int(msg["return_code"]))
-                active.pop(slot_id, None)
+                active_slots.pop(slot_id, None)
 
         trials = tuner.sync_and_load()
-        trials, _ = tuner.plan_and_enqueue()
+        trials, trial_idsss = tuner.plan_and_enqueue()
         queued = tuner.get_dispatchable_trials(trials)
 
-        free_slots = [slot_id for slot_id in range(len(slots)) if slot_id not in active]
-        assignments = list(zip(free_slots, queued[: len(free_slots)]))
+        free_slots = [
+            slot_id for slot_id in range(len(slots)) if slot_id not in active_slots
+        ]
+        assignments = list(zip[tuple[int, str]](free_slots, queued[: len(free_slots)]))
 
         if assignments:
             trial_ids = [trial_id for _, trial_id in assignments]
@@ -138,13 +146,13 @@ def controller():
                         },
                         dest=worker_rank,
                     )
-                active[slot_id] = trial_id
-                print(
+                active_slots[slot_id] = trial_id
+                logger.info(
                     f"[controller] DISPATCH trial={trial_id} slot={slot_id} ranks={slot_group}",
                     flush=True,
                 )
 
-        if tuner.is_complete(trials) and not active:
+        if tuner.is_complete(trials) and not active_slots:
             for worker_rank in range(1, size):
                 comm.send({"type": "STOP"}, dest=worker_rank)
             break
@@ -153,7 +161,7 @@ def controller():
 
 
 def worker():
-    tuner = BayesianHPTuner()
+    tuner = BayesianHPTuner.create()
 
     while True:
         msg = comm.recv(source=0)
@@ -259,6 +267,8 @@ def run_distributed_trial(tuner, trial_id, slot_id, group, group_comm):
 
 if __name__ == "__main__":
     if rank == 0:
+        logger.info(f"Running controller on {hostname}, rank {rank} with size {size}")
         controller()
     else:
+        logger.info(f"Running worker on {hostname}, rank {rank} with size {size}")
         worker()

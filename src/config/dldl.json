@@ -1,15 +1,27 @@
 {
   "hptune": {
-    "dir": null,
     "lr_min": 5e-6,
     "lr_max": 0.03,
     "dropout_min": 0.0,
     "dropout_max": 0.7,
-    "allowed_epochs": [25, 50, 100, 150, 200, 300],
+    "allowed_epochs": [
+      25,
+      50,
+      100,
+      150,
+      200,
+      300
+    ],
     "num_initial_trials": 15,
     "weight_decay_log_min": -8.0,
     "weight_decay_log_max": -1.0,
-    "allowed_batch_sizes": [16, 32, 64, 128, 256],
+    "allowed_batch_sizes": [
+      16,
+      32,
+      64,
+      128,
+      256
+    ],
     "gradient_clip_min": 0.0,
     "gradient_clip_max": 10.0,
     "lr_scheduler_factor_min": 0.05,
@@ -30,7 +42,8 @@
     "lr_scheduler": true,
     "lr_scheduler_factor": 0.5,
     "lr_scheduler_patience": 5,
-    "gradient_clip": 1.0
+    "gradient_clip": 1.0,
+    "normalization_type": "meanvar-whole"
   },
   "architecture": {
     "conv1_filters": 16,

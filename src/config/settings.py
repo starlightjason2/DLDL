@@ -1,15 +1,16 @@
-"""Cached ``load_settings()`` → JSON config + merged training/architecture (file + env overrides)."""
+"""``Settings.load()`` → JSON config + merged training/architecture (file + env overrides)."""
 
 from __future__ import annotations
 
 import functools
 import json
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
 
 from dotenv import load_dotenv
+from pydantic import BaseModel, ConfigDict
+
 from config.schema import ArchitectureConfig, DldlConfigFile, TrainingConfig
 
 
@@ -19,15 +20,50 @@ def _dotenv() -> None:
     load_dotenv(p)
 
 
-@dataclass(frozen=True)
-class Settings:
+class Settings(BaseModel):
     """File-backed config + env-overridden training/architecture; paths use ``os.environ`` directly elsewhere."""
+
+    model_config = ConfigDict(frozen=True)
 
     project_root: str
     cfg: DldlConfigFile
     dldl_config_path: str
     training_config: TrainingConfig
     architecture_config: ArchitectureConfig
+
+    @classmethod
+    @functools.lru_cache(maxsize=1)
+    def load(cls) -> "Settings":
+        _dotenv()
+
+        root = Path(__file__).resolve().parents[2]
+        raw = os.environ.get("DLDL_CONFIG")
+        cfg_path = (
+            Path(raw).resolve()
+            if raw and os.path.isabs(raw)
+            else (
+                (root / raw).resolve()
+                if raw
+                else Path(__file__).resolve().parent / "dldl.json"
+            )
+        )
+        if not cfg_path.is_file():
+            raise FileNotFoundError(f"DLDL config missing: {cfg_path}")
+
+        cfg = DldlConfigFile.model_validate(
+            json.loads(cfg_path.read_text(encoding="utf-8"))
+        )
+        r = str(root)
+        tr, ar = TrainingConfig.merge_env(
+            cfg.default_training
+        ), ArchitectureConfig.merge_env(cfg.architecture)
+        return cls(
+            project_root=r,
+            cfg=cfg,
+            dldl_config_path=str(cfg_path),
+            training_config=tr,
+            architecture_config=ar,
+        )
 
     def default_hptune_param_bounds(
         self,
@@ -59,37 +95,3 @@ class Settings:
             ),
             "batch_idx": (0.0, float(n)),
         }
-
-
-@functools.lru_cache(maxsize=1)
-def load_settings() -> Settings:
-    _dotenv()
-
-    root = Path(__file__).resolve().parents[2]
-    raw = os.environ.get("DLDL_CONFIG")
-    cfg_path = (
-        Path(raw).resolve()
-        if raw and os.path.isabs(raw)
-        else (
-            (root / raw).resolve()
-            if raw
-            else Path(__file__).resolve().parent / "dldl.json"
-        )
-    )
-    if not cfg_path.is_file():
-        raise FileNotFoundError(f"DLDL config missing: {cfg_path}")
-
-    cfg = DldlConfigFile.model_validate(
-        json.loads(cfg_path.read_text(encoding="utf-8"))
-    )
-    r = str(root)
-    tr, ar = TrainingConfig.merge_env(
-        cfg.default_training
-    ), ArchitectureConfig.merge_env(cfg.architecture)
-    return Settings(
-        project_root=r,
-        cfg=cfg,
-        dldl_config_path=str(cfg_path),
-        training_config=tr,
-        architecture_config=ar,
-    )

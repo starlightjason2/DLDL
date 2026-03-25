@@ -7,8 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from loguru import logger
 
-from config.schema import DatasetEnv
-from config.settings import load_settings
+from config.settings import Settings
 
 _REPO = Path(__file__).resolve().parents[1]  # project root (src/..)
 load_dotenv(_REPO / ".env")
@@ -25,7 +24,7 @@ for _parent in {
 }:
     os.makedirs(_parent, exist_ok=True)
 
-s = load_settings()
+s = Settings.load()
 prog_dir = _abs(os.environ["PROG_DIR"])
 job_id = os.environ["JOB_ID"]
 data_path = _abs(os.environ["DATA_PATH"])
@@ -46,7 +45,6 @@ from model.cnn import IpCNN
 
 if __name__ == "__main__":
     a, t = s.architecture_config, s.training_config
-    d = DatasetEnv.from_os()
     model = IpCNN(
         data_path=data_path,
         labels_path=labels_pt_path,
@@ -59,7 +57,7 @@ if __name__ == "__main__":
         fc2_size=a.fc2_size,
         dropout_rate=t.dropout_rate,
         classification=False,
-        normalization_type=d.normalization_type,
+        normalization_type=t.normalization_type,
     )
     rank = int(os.environ.get("RANK", "0"))
     world_size = int(os.environ.get("WORLD_SIZE", "1"))

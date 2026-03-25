@@ -1,5 +1,5 @@
-"""Configuration: ``from config.settings import load_settings`` (and optional ``Settings``)."""
+"""Configuration: ``from config.settings import Settings``."""
 
-from config.settings import Settings, load_settings
+from config.settings import Settings
 
-__all__ = ["Settings", "load_settings"]
+__all__ = ["Settings"]

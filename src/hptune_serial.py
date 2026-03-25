@@ -16,7 +16,7 @@ def main(argv: list[str] | None = None) -> None:
         help="Mark queued trial ids as submitted/running after qsub succeeds.",
     )
     args = parser.parse_args([] if argv is None else argv)
-    tuner = BayesianHPTuner()
+    tuner = BayesianHPTuner.create()
     if args.mark_running:
         tuner.mark_trials_running(args.mark_running)
         return

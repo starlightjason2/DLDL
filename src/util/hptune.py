@@ -6,48 +6,15 @@ import re
 import shutil
 from collections.abc import Iterable
 from typing import Sequence
+from textwrap import dedent
 
 import pandas as pd
 from loguru import logger
 
-from model.hptune_trial import HPTuneTrial
+from schemas.trial_schema import HPTuneTrial
 
 # Enumerated trial folders: trial_1, trial_2, ...
 _TRIAL_NUM_DIR_RE = re.compile(r"^trial_(\d+)$")
-
-# Vars set per trial in .env; must match HPTuneTrial.write_env_file.
-ENV_SKIP_VARS = (
-    "LEARNING_RATE",
-    "NUM_EPOCHS",
-    "DROPOUT_RATE",
-    "WEIGHT_DECAY",
-    "BATCH_SIZE",
-    "GRADIENT_CLIP",
-    "LR_SCHEDULER",
-    "LR_SCHEDULER_FACTOR",
-    "LR_SCHEDULER_PATIENCE",
-    "EARLY_STOPPING_PATIENCE",
-    "PROG_DIR",
-    "JOB_ID",
-)
-
-# Trial log column order (matches the SQLite ``trials`` table; trial_id = trial_N folder name).
-TRIAL_LOG_COLUMNS = [
-    "trial_id",
-    "lr",
-    "epochs",
-    "dropout",
-    "weight_decay",
-    "batch_size",
-    "gradient_clip",
-    "lr_scheduler",
-    "lr_scheduler_factor",
-    "lr_scheduler_patience",
-    "early_stopping_patience",
-    "val_loss",
-    "status",
-    "retries",
-]
 
 
 def next_trial_numbered_id(
@@ -113,54 +80,24 @@ def parse_val_loss(trial_dir: str) -> tuple[bool, float]:
     return False, float("nan")
 
 
-def load_env_template(
-    project_root: str, skip_vars: tuple[str, ...] = ENV_SKIP_VARS
-) -> list[str]:
-    """Load base `.env` lines, excluding per-trial override vars.
-
-    HPTune uses the same `.env` entrypoint as the rest of the project. Per-trial vars in
-    skip_vars are excluded since they are written directly into the trial's `.env` by
-    :meth:`~model.hptune_trial.SerialTrial.materialize_trial_files` /
-    :meth:`~model.hptune_trial.ParallelTrial.materialize_trial_files`.
-    """
-    lines: list[str] = []
-    path = os.path.join(project_root, ".env")
-    with open(path) as f:
-        for line in f:
-            stripped = line.strip()
-            if (
-                not stripped
-                or stripped.startswith("#")
-                or any(stripped.startswith(f"{v}=") for v in skip_vars)
-            ):
-                continue
-            lines.append(line.rstrip())
-
-    return lines
-
-
-def best_checkpoint_path(trials_dir: str, trial: HPTuneTrial) -> str | None:
-    """Return the best-checkpoint path for a completed trial if it exists."""
-    path = os.path.join(
-        trial.path_under(trials_dir), f"{trial.trial_id}_best_params.pt"
-    )
-    return path if os.path.exists(path) else None
-
-
 def sync_best_trial_artifacts(
     trials: Sequence[HPTuneTrial],
-    trials_dir: str,
     best_trial_dir: str,
 ) -> None:
     """Copy the current overall best trial's .env and checkpoint into best_trial/."""
+    os.makedirs(best_trial_dir, exist_ok=True)
+
     completed = [t for t in trials if t.status == 0]
     if not completed:
         return
 
     best_trial = min(completed, key=lambda t: t.val_loss)
-    best_trial_path = best_trial.path_under(trials_dir)
+    best_trial_path = best_trial.dir_path
     env_source = os.path.join(best_trial_path, ".env")
-    checkpoint_source = best_checkpoint_path(trials_dir, best_trial)
+
+    checkpoint_source = os.path.join(
+        best_trial.dir_path, f"{best_trial.trial_id}_best_params.pt"
+    )
 
     if not os.path.exists(env_source):
         logger.warning(
@@ -169,15 +106,6 @@ def sync_best_trial_artifacts(
             env_source,
         )
         return
-    if checkpoint_source is None:
-        logger.warning(
-            "Best-trial sync skipped: missing best checkpoint for {} under {}",
-            best_trial.trial_id,
-            best_trial_path,
-        )
-        return
-
-    os.makedirs(best_trial_dir, exist_ok=True)
 
     # Keep best_trial/ as a single-current-best snapshot instead of an archive.
     for existing_name in os.listdir(best_trial_dir):

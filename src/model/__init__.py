@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from .bayesian_hptuner import BayesianHPTuner
     from .cnn import IpCNN
     from .dataset import IpDataset
-    from .hptune_trial import HPTuneTrial
+    from schemas.trial_schema import HPTuneTrial
 
 __all__ = [
     "BayesianHPTuner",
@@ -22,7 +22,7 @@ def __getattr__(name: str):
 
         return BayesianHPTuner
     if name == "HPTuneTrial":
-        from .hptune_trial import HPTuneTrial
+        from schemas.trial_schema import HPTuneTrial
 
         return HPTuneTrial
     if name == "IpCNN":

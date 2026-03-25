@@ -8,7 +8,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from loguru import logger
 
-from config.schema import DatasetEnv
+from config.settings import Settings
 
 _REPO = Path(__file__).resolve().parents[1]
 load_dotenv(_REPO / ".env")
@@ -64,7 +64,9 @@ def check_dataset(
     num_checks: int = 100, scale_labels: bool = True, verbose: bool = False
 ) -> None:
     """Run dataset integrity check (IpDataset.check_dataset)."""
-    dataset = IpDataset(normalization_type=DatasetEnv.from_os().normalization_type)
+    dataset = IpDataset(
+        normalization_type=Settings.load().training_config.normalization_type
+    )
     dataset.check_dataset(
         scale_labels=scale_labels, num_checks=num_checks, verbose=verbose
     )

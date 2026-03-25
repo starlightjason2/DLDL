@@ -1,7 +1,7 @@
 """Pydantic: ``dldl.json`` + env merge for training/architecture."""
 
 import os
-from typing import ClassVar, List, Literal, Optional, Tuple
+from typing import ClassVar, List, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -42,11 +42,26 @@ class HptuneConfig(BaseModel):
         checks = (
             (self.lr_min >= self.lr_max, "lr_min must be < lr_max"),
             (self.dropout_min >= self.dropout_max, "dropout_min must be < dropout_max"),
-            (self.weight_decay_log_min >= self.weight_decay_log_max, "weight_decay_log_min must be < weight_decay_log_max"),
-            (self.gradient_clip_min > self.gradient_clip_max, "gradient_clip_min must be <= gradient_clip_max"),
-            (self.lr_scheduler_factor_min >= self.lr_scheduler_factor_max, "lr_scheduler_factor_min must be < lr_scheduler_factor_max"),
-            (self.lr_scheduler_patience_min > self.lr_scheduler_patience_max, "lr_scheduler_patience_min must be <= lr_scheduler_patience_max"),
-            (self.early_stopping_patience_min > self.early_stopping_patience_max, "early_stopping_patience_min must be <= early_stopping_patience_max"),
+            (
+                self.weight_decay_log_min >= self.weight_decay_log_max,
+                "weight_decay_log_min must be < weight_decay_log_max",
+            ),
+            (
+                self.gradient_clip_min > self.gradient_clip_max,
+                "gradient_clip_min must be <= gradient_clip_max",
+            ),
+            (
+                self.lr_scheduler_factor_min >= self.lr_scheduler_factor_max,
+                "lr_scheduler_factor_min must be < lr_scheduler_factor_max",
+            ),
+            (
+                self.lr_scheduler_patience_min > self.lr_scheduler_patience_max,
+                "lr_scheduler_patience_min must be <= lr_scheduler_patience_max",
+            ),
+            (
+                self.early_stopping_patience_min > self.early_stopping_patience_max,
+                "early_stopping_patience_min must be <= early_stopping_patience_max",
+            ),
         )
         for bad, msg in checks:
             if bad:
@@ -67,6 +82,7 @@ class TrainingConfig(BaseModel):
     lr_scheduler_factor: float = Field(gt=0, lt=1)
     lr_scheduler_patience: int = Field(ge=1)
     gradient_clip: float = Field(ge=0)
+    normalization_type: str = "meanvar-whole"
 
     ENV_FIELDS: ClassVar[Tuple[Tuple[str, str], ...]] = (
         ("early_stopping_patience", "EARLY_STOPPING_PATIENCE"),
@@ -79,13 +95,19 @@ class TrainingConfig(BaseModel):
         ("lr_scheduler_factor", "LR_SCHEDULER_FACTOR"),
         ("lr_scheduler_patience", "LR_SCHEDULER_PATIENCE"),
         ("gradient_clip", "GRADIENT_CLIP"),
+        ("normalization_type", "NORMALIZATION_TYPE"),
     )
 
     @classmethod
     def merge_env(cls, defaults: "TrainingConfig") -> "TrainingConfig":
         d = defaults.model_dump()
         if "LR_SCHEDULER" in os.environ:
-            d["lr_scheduler"] = os.environ["LR_SCHEDULER"].lower() in ("true", "1", "yes", "on")
+            d["lr_scheduler"] = os.environ["LR_SCHEDULER"].lower() in (
+                "true",
+                "1",
+                "yes",
+                "on",
+            )
         for field, env in cls.ENV_FIELDS:
             if env in os.environ:
                 d[field] = os.environ[env]
@@ -136,20 +158,3 @@ class DldlConfigFile(BaseModel):
     hptune: HptuneConfig
     default_training: TrainingConfig = Field(alias="defaultTraining")
     architecture: ArchitectureConfig
-
-
-class DatasetEnv(BaseModel):
-    model_config = _M
-    normalization_type: Literal["scale", "meanvar-whole", "meanvar-single"]
-    cpu_use: float = Field(gt=0, le=1)
-    preprocessor_max_workers: int = Field(ge=1)
-
-    @classmethod
-    def from_os(cls) -> "DatasetEnv":
-        return cls.model_validate(
-            {
-                "normalization_type": os.environ.get("NORMALIZATION_TYPE", "meanvar-whole"),
-                "cpu_use": os.environ.get("CPU_USE", "0.2"),
-                "preprocessor_max_workers": os.environ.get("PREPROCESSOR_MAX_WORKERS", "4"),
-            },
-        )

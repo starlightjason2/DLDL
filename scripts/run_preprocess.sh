@@ -9,26 +9,23 @@
 #PBS -o /lus/eagle/projects/fusiondl_aesp/starlightjason2/DLDL/data/processed_data
 #PBS -e /lus/eagle/projects/fusiondl_aesp/starlightjason2/DLDL/data/processed_data
 
-# DLDL preprocessing - runs on compute node (CPU-only)
-
 set -e
 
-cd "${PBS_O_WORKDIR:-$(pwd)}"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+PROJECT_ROOT="$(readlink -f "$SCRIPT_DIR/..")"
 
-# Activate conda
-source /soft/applications/conda/2025-09-25/mconda3/etc/profile.d/conda.sh
-conda activate base
+set -a
+# shellcheck source=/dev/null
+source "$PROJECT_ROOT/.env"
+set +a
 
-# .env is loaded by Python (config.settings.load_settings) when the script runs
+cd "$PROJECT_ROOT"
+# shellcheck source=/dev/null
+source "$DLDL_CONDASH" && conda activate "$CONDA_ENV"
 
-# HPC-friendly settings (avoids thread exhaustion)
-export OPENBLAS_NUM_THREADS=1
-export OMP_NUM_THREADS=1
-
-# Run preprocessing
 python src/preprocess_data.py
 
 _REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-echo "---- tail PBS stdout (last 100 lines): ${_REPO}/preprocess_${PBS_JOBID%%.*}.out ----"
-tail -n 100 "${_REPO}/preprocess_${PBS_JOBID%%.*}.out" 2>/dev/null || tail -n 100 "${_REPO}/preprocess_${PBS_JOBID}.out" 2>/dev/null || true
-echo "---- LIVE follow (run on login node): tail -F ${_REPO}/preprocess_${PBS_JOBID%%.*}.out ----"
+echo "---- tail PBS stdout (last 100 lines): ${_REPO}/preprocess_${PBS_JOBID}.out ----"
+tail -n 100 "${_REPO}/preprocess_${PBS_JOBID}.out" 2>/dev/null || true
+echo "---- LIVE follow: tail -F ${_REPO}/preprocess_${PBS_JOBID}.out ----"

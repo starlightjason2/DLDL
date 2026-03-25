@@ -18,63 +18,11 @@ A 1D CNN that uses plasma current to predict disruption time. For labeling D-III
    pip install -e .
    ```
 
-`.env` is loaded when you call ``load_settings()`` from ``config.settings`` (typically at script startup).
+`.env` is loaded when you call ``Settings.load()`` from ``config.settings`` (typically at script startup).
 
-**Hyperparameter tuning:** Trial state (serial and parallel controllers) is stored in **SQLite** at `data/hptune/trials/trials_log.db` using **SQLAlchemy** 2.0 ORM (`database.connection` + `database.trial_model`, same layout as [this FastAPI SQLAlchemy template](https://github.com/mdhishaamakhtar/fastapi-sqlalchemy-postgres-template/tree/master/database)) with **Pydantic** DTOs (`schemas.trial_schema`).
+**Hyperparameter tuning:** Trial state (serial and parallel controllers) is stored in **SQLite** (URL from `DB_CONNECTION`, typically under `data/hptune/trials/trials_log.db`) using **SQLAlchemy** 2.0 ORM (`database.connection` + `database.tables.Trial`, same layout as [this FastAPI SQLAlchemy template](https://github.com/mdhishaamakhtar/fastapi-sqlalchemy-postgres-template/tree/master/database)) with **Pydantic** models (`schemas.trial_schema.HPTuneTrial`) and persistence helpers (`service.trial_service`: `get_trials`, `save_trials`).
 
-## Testing
-
-Install the test tools:
-
-```bash
-python3.11 -m pip install pytest pytest-cov
-```
-
-Run the test suite:
-
-```bash
-python3.11 -m pytest
-```
-
-Run the test suite with coverage and a terminal summary:
-
-```bash
-python3.11 -m pytest --cov=src --cov-report=term-missing
-```
-
-Generate an HTML coverage report:
-
-```bash
-python3.11 -m pytest --cov=src --cov-report=html
-```
-
-The HTML report is written to `htmlcov/index.html`.
-
-#### Python `sqlite3` (required for DB / HP-tune tests)
-
-Some HPC or minimal Python installs ship **without** the `sqlite3` stdlib extension (`_sqlite3`). Tests that touch the trial database need it.
-
-**Check:**
-
-```bash
-python3.11 -c "import sqlite3; print('sqlite3 OK', sqlite3.sqlite_version)"
-```
-
-**SUSE / zypper** (error may suggest `sudo zypper install python311`):
-
-```bash
-sudo zypper install python311-sqlite
-# or, if that package name is unavailable:
-sudo zypper install python311
-```
-
-**Debian / Ubuntu** — stock `python3` packages usually include SQLite; if you build Python from source, install `libsqlite3-dev` first.
-
-Then from the repo root (with `src` on `PYTHONPATH`, e.g. `pip install -e .`):
-
-```bash
-PYTHONPATH=src python3.11 -m pytest tests/ -q
-```
+HP-tune requires the stdlib **sqlite3** module. On some minimal or HPC Python builds it may be missing—check with `python -c "import sqlite3; print(sqlite3.sqlite_version)"` and install your OS package for `python-sqlite` / full Python if needed.
 
 ### Environment Variables
 
@@ -94,13 +42,20 @@ PYTHONPATH=src python3.11 -m pytest tests/ -q
 | `PMI_RANK` | | Process rank (default 0) |
 | `PMI_SIZE` | | World size (default 1) |
 
+**Hyperparameter tuning (controllers):** `BayesianHPTuner` and the trial ORM expect these to be set in the environment (no silent defaults—misconfiguration fails at validation). Paths must match: `TRIALS_DIR` is the parent of `trial_*` folders; `DB_CONNECTION` is the SQLAlchemy URL for the same run (e.g. `sqlite:////.../trials_log.db`).
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TRIALS_DIR` | ✓ | Root directory for per-trial folders `trial_*` (also used when resolving trial paths in `HPTuneTrial`) |
+| `DB_CONNECTION` | ✓ | SQLAlchemy database URL for the trial log (SQLite file path in URL form) |
+
 ## Workflow
 
 ```
 Raw .txt → preprocess_data.py → .pt files → train.py → Model + logs → graph.py → Visualizations
 ```
 
-**Config:** Set `NORMALIZATION_TYPE` and `CPU_USE` in `.env` (or env). Point `DATA_PATH` / `TRAIN_LABELS_PATH` at the `.pt` files that match that normalization (e.g. filenames containing `meanvar-whole`). Scripts call `load_settings()` for hyperparameters from `dldl.json` (defaults under `defaultTraining`, architecture under `architecture`, plus env overrides).
+**Config:** Set `NORMALIZATION_TYPE` and `CPU_USE` in `.env` (or env). Point `DATA_PATH` / `TRAIN_LABELS_PATH` at the `.pt` files that match that normalization (e.g. filenames containing `meanvar-whole`). Scripts call `Settings.load()` for hyperparameters from `dldl.json` (defaults under `defaultTraining`, architecture under `architecture`, plus env overrides).
 
 ### 1. Preprocessing
 
@@ -228,25 +183,27 @@ Launch:
 ./scripts/start_hptune.sh
 ```
 
-**Debug queue (smoke-test SQLite / 10-trial chain)** — uses queue `debug-scaling` by default (override with `HPTUNE_QUEUE=debug`), isolated dir `data/hptune_debug`, and `HPTUNE_MAX_TRIALS=10` (override with `HPTUNE_MAX_TRIALS=...`):
+**Debug queue (smoke-test SQLite / short chain)** — point `TRIALS_DIR` / `DB_CONNECTION` at an isolated tree, cap trials, and use your site’s debug queue (example: `debug-scaling`):
 
 ```bash
-chmod +x scripts/start_hptune_debug.sh
-./scripts/start_hptune_debug.sh
+export TRIALS_DIR=/path/to/data/hptune_debug/trials
+export DB_CONNECTION=sqlite:////path/to/data/hptune_debug/trials/trials_log.db
+export HPTUNE_MAX_TRIALS=10
+export HPTUNE_QUEUE=debug-scaling   # or your site's debug queue name
+./scripts/start_hptune.sh
 ```
 
-Check the DB on the login node after jobs start:
+Check the DB on the login node after jobs start (adjust the path to match `DB_CONNECTION`):
 
 ```bash
-sqlite3 data/hptune_debug/trials/trials_log.db 'SELECT trial_id, status FROM trials;'
+sqlite3 /path/to/data/hptune_debug/trials/trials_log.db 'SELECT trial_id, status FROM trials;'
 ```
-
-If your site uses a different debug queue name, set `HPTUNE_QUEUE` before running the script.
 
 Layout:
 - `scripts/start_hptune.sh`: submits the serial controller job.
 - `scripts/controller.sh`: runs one Bayesian optimizer pass, submits at most one queued trial, then exits.
-- `src/model/hptune_trial.py`: generates each trial directory and a per-trial `run.sh`.
+- `src/schemas/trial_schema.py` (`HPTuneTrial`): generates each trial directory, per-trial `.env`, and `run.sh`.
+- `src/service/trial_service.py`: loads and persists trial rows (`get_trials`, `save_trials`).
 - Trial `run.sh`: runs `python src/train.py` and, on success, submits the next `scripts/controller.sh`.
 
 Important serial env:
@@ -270,8 +227,9 @@ Top-level layout:
 - `scripts/start_hptune_parallel.sh`: submits the outer PBS controller allocation.
 - `scripts/controller_parallel.sh`: activates the environment, computes MPI world size, and launches `python -m hptune_mpi` under `mpiexec`.
 - `src/hptune_mpi.py`: rank `0` is the controller; worker ranks on non-controller hosts act as distributed training processes.
-- `src/model/bayesian_hptuner.py`: owns trial state, locking, trial creation, status sync, retries, and Bayesian sampling.
-- `src/model/hptune_trial.py`: materializes each trial directory, `.env`, and `run.sh`.
+- `src/model/bayesian_hptuner.py`: owns trial state, trial creation, status sync, retries, and Bayesian sampling.
+- `src/schemas/trial_schema.py` (`HPTuneTrial`): materializes each trial directory, `.env`, and `run.sh`.
+- `src/service/trial_service.py`: SQLite trial log access and snapshot writes.
 - `src/train.py`: actual training entrypoint used by generated trial scripts.
 - `src/util/distributed.py`: helper functions for PyTorch distributed initialization.
 
@@ -280,8 +238,8 @@ MPI workflow step by step:
 2. `scripts/controller_parallel.sh` sets `GPUS_PER_NODE=4` by default and derives `HPTUNE_MPI_SIZE = HPTUNE_CONTROLLER_NODES * GPUS_PER_NODE`.
 3. `mpiexec` starts `python -m hptune_mpi` with one MPI rank per GPU across the whole allocation.
 4. In `src/hptune_mpi.py`, rank `0` becomes the HPTune controller. All MPI ranks on the controller host are reserved from trial dispatch; full trial slots are formed only from non-controller hosts.
-5. The controller calls `BayesianHPTuner.sync_and_load()` to refresh trial state from `data/hptune/trials/trials_log.db`.
-6. The controller calls `BayesianHPTuner.plan_and_enqueue()` to create new queued trials under `data/hptune/trials/trial_*`.
+5. The controller calls `BayesianHPTuner.sync_and_load()` to refresh trial state from the SQLite DB at `DB_CONNECTION` (default layout `data/hptune/trials/trials_log.db`).
+6. The controller calls `BayesianHPTuner.plan_and_enqueue()` to create new queued trials under `TRIALS_DIR` (default layout `data/hptune/trials/trial_*`).
 7. Each trial directory contains:
    - a generated `.env` with trial-specific hyperparameters
    - a generated `run.sh` derived from `scripts/run_train.sh`
@@ -298,7 +256,7 @@ MPI workflow step by step:
 14. The controller frees that slot, refreshes trial state, and dispatches more queued trials until `HPTUNE_MAX_TRIALS` is reached and no trials remain active.
 
 Data and logging layout:
-- Trial state database: `data/hptune/trials/trials_log.db` (see `database.connection`, `database.trial_model.TrialTable`, `schemas.trial_schema.TrialSchema`)
+- Trial state database: `data/hptune/trials/trials_log.db` (see `database.connection`, `database.tables.Trial`, `schemas.trial_schema.HPTuneTrial`, `service.trial_service`)
 - Trial directories: `data/hptune/trials/trial_*`
 - Best-trial artifacts: `data/hptune/best_trial`
 - Controller logs: `data/hptune/controller_logs/`
@@ -307,6 +265,7 @@ Data and logging layout:
 - Under PBS, Loguru also writes `data/hptune/controller_logs/hptune_<PBS_JOBID>.txt`
 
 MPI-related env and sizing:
+- `TRIALS_DIR`, `DB_CONNECTION`, 
 - `HPTUNE_CONTROLLER_NODES`: nodes reserved for the outer controller allocation
 - one controller node is reserved from trial execution
 - `HPTUNE_TRIAL_NODES`: nodes consumed by each dispatched trial
@@ -316,10 +275,8 @@ MPI-related env and sizing:
 - `HPTUNE_MAX_RETRIES`
 - `HPTUNE_EI_XI`
 - `HPTUNE_RANDOM_INSERT_EVERY`
-- `DLDL_HPTUNE_DIR`
 
-Operational note:
-- Effective parallel trial capacity is `floor((HPTUNE_CONTROLLER_NODES - 1) / HPTUNE_TRIAL_NODES)`, because one node is dedicated to the controller.
+Run directory (trials DB, `best_trial/`, `controller_logs/`): set `hptune.dir` in `dldl.json` (relative to project root or absolute). Default when unset or `null` is `data/hptune`.
 
 ## Quick Reference
 

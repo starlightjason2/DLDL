@@ -24,12 +24,12 @@ from torch.utils.data import DataLoader, DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 
 
-from config.settings import load_settings
+from config.settings import Settings
 from util.distributed import cleanup, setup
 from util.processing import split
 from model.dataset import IpDataset
 
-_s = load_settings()
+_s = Settings.load()
 
 
 class IpCNN(nn.Module):
