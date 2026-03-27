@@ -14,28 +14,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from util.hptune import write_env
 
-_POST_TRAIN_FUNCS = r"""hptune_cleanup_epoch_checkpoints() {
-  [[ -f "$PROG_DIR/${JOB_ID}_best_params.pt" ]] || return 0
-  shopt -s nullglob
-  rm -f "$PROG_DIR/${JOB_ID}_params_epoch"*.pt
-  shopt -u nullglob
-}
-
-hptune_submit_next_serial_controller() {
-  local c
-  c=$(printf %s "$HPTUNE_CHAIN_ID" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-  [[ -n "$c" ]] || return 0
-  mkdir -p "${HPTUNE_DIR}/controller_logs"
-  qsub -A "$HPTUNE_QSUB_ACCOUNT" -q "$HPTUNE_QUEUE" \
-    -l "select=1:system=polaris,place=scatter,walltime=${HPTUNE_CONTROLLER_WALLTIME},filesystems=home:eagle" \
-    -k doe -o "${HPTUNE_DIR}/controller_logs/" -e "${HPTUNE_DIR}/controller_logs/" \
-    -v "HPTUNE_CHAIN_ID=$c" \
-    "${PROJECT_ROOT}/scripts/controller.sh"
-}
-"""
-
-_POST_TRAIN_RUN = '  [ "$RANK" = "0" ] && hptune_cleanup_epoch_checkpoints && hptune_submit_next_serial_controller'
-
 
 class TrialStatus(IntEnum):
     """Persisted as integers in SQLite."""
@@ -76,16 +54,16 @@ class HPTuneTrial(BaseModel):
 
     @property
     def dir_path(self) -> Path:
-        """Absolute path to this trial's directory under ``TRIALS_DIR``."""
-        return Path(os.environ["TRIALS_DIR"]) / self.trial_id
+        """Absolute path to this trial's directory"""
+        return Path(os.environ["HPTUNE_DIR"]) / "trials" / self.trial_id
 
-    def trial_signature(self) -> TrialSignature:
+    def signature(self) -> TrialSignature:
         """Normalize this trial into a hashable signature for duplicate detection."""
-        return self.signature_from_proposal(self.model_dump())
+        return self.signature(self.model_dump())
 
     @classmethod
-    def signature_from_proposal(cls, d: Mapping[str, Any]) -> TrialSignature:
-        """Same tuple as :meth:`trial_signature` for raw hyperparameter dicts."""
+    def proposed_signature(cls, d: Mapping[str, Any]) -> TrialSignature:
+        """Same tuple as :meth:`signature` for raw hyperparameter dicts."""
         return (
             f"{float(d['lr']):.12g}",
             int(d["epochs"]),
@@ -138,50 +116,52 @@ class HPTuneTrial(BaseModel):
             "batch_idx": float(batch_index),
         }
 
+    def trial_env_keys(self) -> dict[str, Any]:
+        """Env vars written to ``<trial_dir>/.env`` — same mapping :meth:`create_scripts` persists."""
+        return {
+            "JOB_ID": self.trial_id,
+            "LEARNING_RATE": str(self.lr),
+            "NUM_EPOCHS": str(self.epochs),
+            "BATCH_SIZE": str(self.batch_size),
+            "DROPOUT_RATE": str(self.dropout),
+            "WEIGHT_DECAY": str(self.weight_decay),
+            "GRADIENT_CLIP": str(self.gradient_clip),
+            "LR_SCHEDULER": str(self.lr_scheduler).lower(),
+            "LR_SCHEDULER_FACTOR": str(self.lr_scheduler_factor),
+            "LR_SCHEDULER_PATIENCE": str(self.lr_scheduler_patience),
+            "EARLY_STOPPING_PATIENCE": str(self.early_stopping_patience),
+            "PROG_DIR": self.dir_path,
+        }
+
     @staticmethod
-    def _build_run_script(project_root: str, env_path: str, template_path: str) -> str:
-        """Build ``run.sh`` content from the shared training template."""
-        template = Path(template_path).read_text()
-
-        inject_block = (
-            f"set -a\nsource {env_path}\nset +a\n"
-            f'exec > >(tee "$PROG_DIR/train_${{PBS_JOBID}}.log") 2>&1'
+    def _build_run_script(
+        project_root: str, env_path: Path, template_path: Path
+    ) -> str:
+        """Build ``run.sh`` from ``scripts/run_train.sh`` (``@...@`` placeholders)."""
+        text = template_path.read_text()
+        log_dir = Path(os.environ["HPTUNE_DIR"]) / "controller_logs"
+        trial_boot = (
+            f"cd {project_root}\n\n"
+            "set -a\n"
+            f"source {env_path}\n"
+            "set +a\n"
+            'export PROG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
         )
-
-        hptune_dir = Path(os.environ["HPTUNE_DIR"])
-        log_dir = hptune_dir / "controller_logs"
-        walltime = os.environ["HPTUNE_TRAIN_WALLTIME"]
-        pbs_queue = os.environ["HPTUNE_QUEUE"]
-
-        script = (
-            template.replace("#PBS -N dldl_train", "#PBS -N dldl_hptune")
-            .replace("__DLDL_PROJECT_ROOT__", project_root)
-            .replace("__HPTUNE_TRAIN_WALLTIME__", walltime)
-            .replace("__HPTUNE_PBS_QUEUE__", pbs_queue)
-            .replace("__HPTUNE_LOG_DIR__", str(log_dir))
-            .replace("# __HPTUNE_CD_OVERRIDE__", f"cd {project_root}")
-            .replace("# __HPTUNE_ENV_INJECT__", inject_block)
-            .replace("# __HPTUNE_POST_TRAIN_FUNCS__\n", _POST_TRAIN_FUNCS + "\n")
-            .replace("  # __HPTUNE_POST_TRAIN_RUN__", _POST_TRAIN_RUN)
-        )
-
-        sentinels = (
-            "# __HPTUNE_CD_OVERRIDE__",
-            "# __HPTUNE_ENV_INJECT__",
-            "# __HPTUNE_POST_TRAIN_FUNCS__",
-            "__HPTUNE_POST_TRAIN_RUN__",
-            "__DLDL_PROJECT_ROOT__",
-            "__HPTUNE_TRAIN_WALLTIME__",
-            "__HPTUNE_PBS_QUEUE__",
-            "__HPTUNE_LOG_DIR__",
-        )
-        for sentinel in sentinels:
-            if sentinel in script:
-                raise AssertionError(
-                    f"Sentinel or placeholder not replaced in {template_path}: {sentinel!r}"
-                )
-
-        return script
+        placeholders = {
+            "@DLDL_ROOT@": project_root,
+            "@HPTUNE_WALLTIME@": os.environ["HPTUNE_TRAIN_WALLTIME"],
+            "@HPTUNE_QUEUE@": os.environ["HPTUNE_QUEUE"],
+            "@HPTUNE_LOGDIR@": log_dir,
+            "@DLDL_CD_AND_TRIAL_ENV@": trial_boot,
+        }
+        for key, val in placeholders.items():
+            text = text.replace(key, str(val))
+        leftover = [k for k in placeholders if k in text]
+        if leftover:
+            raise AssertionError(
+                f"Unreplaced placeholders in {template_path}: {leftover}"
+            )
+        return text
 
     def create_scripts(
         self,
@@ -193,27 +173,10 @@ class HPTuneTrial(BaseModel):
         self.dir_path.mkdir(parents=True, exist_ok=True)
         env_path = self.dir_path / ".env"
 
-        write_env(
-            str(env_path),
-            {
-                "JOB_ID": self.trial_id,
-                "LEARNING_RATE": str(self.lr),
-                "NUM_EPOCHS": str(self.epochs),
-                "BATCH_SIZE": str(self.batch_size),
-                "DROPOUT_RATE": str(self.dropout),
-                "WEIGHT_DECAY": str(self.weight_decay),
-                "GRADIENT_CLIP": str(self.gradient_clip),
-                "LR_SCHEDULER": str(self.lr_scheduler).lower(),
-                "LR_SCHEDULER_FACTOR": str(self.lr_scheduler_factor),
-                "LR_SCHEDULER_PATIENCE": str(self.lr_scheduler_patience),
-                "EARLY_STOPPING_PATIENCE": str(self.early_stopping_patience),
-                "PROG_DIR": self.dir_path,
-            },
-            env_lines,
-        )
+        write_env(str(env_path), self.trial_env_keys(), env_lines)
 
         template_path = Path(project_root) / "scripts" / "run_train.sh"
-        script = self._build_run_script(project_root, str(env_path), str(template_path))
+        script = self._build_run_script(project_root, env_path, template_path)
 
         run_path = self.dir_path / "run.sh"
         run_path.write_text(script)

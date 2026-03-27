@@ -1,16 +1,70 @@
 """Bayesian hyperparameter tuning orchestration (trial log, acquisition, trial dirs)."""
 
 from __future__ import annotations
+
+import os
 from typing import Any
 import numpy as np
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from util.data_loading import env_tuple, env_float, env_int
 
 
 class HyperparameterSpace(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     allowed_epochs: tuple[int, ...]
     batch_sizes: tuple[int, ...]
+    num_initial_trials: int = Field(ge=1)
+    random_insert_every: int = Field(ge=0)
+    expected_improvement_xi: float = Field(ge=0)
     bounds: dict[str, tuple[float, float]]
+
+    @staticmethod
+    def from_env() -> HyperparameterSpace:
+        allowed_epochs = env_tuple("HPTUNE_ALLOWED_EPOCHS")
+        batch_sizes = env_tuple("HPTUNE_ALLOWED_BATCH_SIZES")
+        num_initial_trials = env_int("HPTUNE_NUM_INITIAL_TRIALS")
+        random_insert_every = env_int("HPTUNE_RANDOM_INSERT_EVERY")
+        expected_improvement_xi = float(os.environ["HPTUNE_EI_XI"])
+        bounds = {
+            "lr": (env_float("HPTUNE_LR_MIN"), env_float("HPTUNE_LR_MAX")),
+            "dropout": (
+                env_float("HPTUNE_DROPOUT_MIN"),
+                env_float("HPTUNE_DROPOUT_MAX"),
+            ),
+            "log_wd": (
+                env_float("HPTUNE_WEIGHT_DECAY_LOG_MIN"),
+                env_float("HPTUNE_WEIGHT_DECAY_LOG_MAX"),
+            ),
+            "gradient_clip": (
+                env_float("HPTUNE_GRADIENT_CLIP_MIN"),
+                env_float("HPTUNE_GRADIENT_CLIP_MAX"),
+            ),
+            "lr_scheduler_factor": (
+                env_float("HPTUNE_LR_SCHEDULER_FACTOR_MIN"),
+                env_float("HPTUNE_LR_SCHEDULER_FACTOR_MAX"),
+            ),
+            "lr_sched_patience": (
+                env_float("HPTUNE_LR_SCHEDULER_PATIENCE_MIN"),
+                env_float("HPTUNE_LR_SCHEDULER_PATIENCE_MAX"),
+            ),
+            "early_stop_patience": (
+                env_float("HPTUNE_EARLY_STOPPING_PATIENCE_MIN"),
+                env_float("HPTUNE_EARLY_STOPPING_PATIENCE_MAX"),
+            ),
+            "epochs": (float(min(allowed_epochs)), float(max(allowed_epochs))),
+            "batch_idx": (0.0, float(len(batch_sizes) - 1)),
+            "lr_scheduler_u": (0.0, 1.0),
+        }
+
+        return HyperparameterSpace(
+            allowed_epochs=allowed_epochs,
+            batch_sizes=batch_sizes,
+            num_initial_trials=num_initial_trials,
+            random_insert_every=random_insert_every,
+            expected_improvement_xi=expected_improvement_xi,
+            bounds=bounds,
+        )
 
     # -----------------------------
     # Sampling

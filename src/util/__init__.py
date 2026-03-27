@@ -6,6 +6,9 @@ from .data_loading import (
     get_means,
     load_and_pad_norm,
     load_and_pad_scale,
+    env_float,
+    env_int,
+    env_tuple
 )
 from .processing import (
     get_use_cores,
@@ -15,6 +18,9 @@ from .processing import (
 )
 
 __all__ = [
+    "env_float",
+    "env_int",
+    "env_tuple",
     "get_length",
     "get_scaled_t_disrupt",
     "get_means",

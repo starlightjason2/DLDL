@@ -56,11 +56,12 @@ qsub -I -A fusiondl_aesp -q debug-scaling \
 
 ## Environment Setup
 
-1. **Create `.env`** from a template:
+1. **Create `.env`** from a template (every key is listed in [Environment Variables](#environment-variables); full examples in `.env.example` and `.env.polaris.example`):
    ```bash
-   cp .env.local.example .env.local && ln -s .env.local .env   # local
+   cp .env.example .env   # then edit paths
    # or
-   cp .env.polaris.example .env.polaris && ln -s .env.polaris .env   # Polaris
+   cp .env.local.example .env.local && ln -sf .env.local .env
+   cp .env.polaris.example .env.polaris && ln -sf .env.polaris .env   # Polaris
    ```
 
 2. **Install:**
@@ -68,36 +69,115 @@ qsub -I -A fusiondl_aesp -q debug-scaling \
    pip install -e .
    ```
 
-`.env` is loaded when you call ``Settings.load()`` from ``config.settings`` (typically at script startup).
+`.env` is loaded by entry scripts (``load_dotenv``) before training or controllers read ``os.environ``.
 
-**Hyperparameter tuning:** Trial state (serial and parallel controllers) is stored in **SQLite** (URL from `DB_CONNECTION`, typically under `data/hptune/trials/trials_log.db`) using **SQLAlchemy** 2.0 ORM (`database.connection` + `database.tables.Trial`, same layout as [this FastAPI SQLAlchemy template](https://github.com/mdhishaamakhtar/fastapi-sqlalchemy-postgres-template/tree/master/database)) with **Pydantic** models (`schemas.trial_schema.HPTuneTrial`) and persistence helpers (`service.trial_service`: `get_trials`, `save_trials`).
+**Hyperparameter tuning:** Trial state (serial and parallel controllers) is stored in **SQLite** (URL from `DB_CONNECTION`, typically under `data/hptune/trials/trials_log.db`) using **SQLAlchemy** 2.0 ORM (`database.connection` + `database.tables.Trial`, same layout as [this FastAPI SQLAlchemy template](https://github.com/mdhishaamakhtar/fastapi-sqlalchemy-postgres-template/tree/master/database)) with **Pydantic** models (`model.hp_trial.HPTuneTrial`) and persistence helpers (`service.trial_service`: `get_trials`, `save_trials`).
 
 HP-tune requires the stdlib **sqlite3** module. On some minimal or HPC Python builds it may be missing—check with `python -c "import sqlite3; print(sqlite3.sqlite_version)"` and install your OS package for `python-sqlite` / full Python if needed.
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATA_DIR` | ✓ | Raw signal .txt files |
-| `LABELS_PATH` | ✓ | Shot list with disruption times |
-| `DATA_PATH` | ✓ | Full path to preprocessed dataset tensor (`.pt`) |
-| `TRAIN_LABELS_PATH` | ✓ | Full path to preprocessed labels tensor (`.pt`) |
-| `PROG_DIR` | ✓ | Logs, checkpoints, and `graph.py` plot output |
-| `JOB_ID` | ✓ | Run identifier |
-| `NORMALIZATION_TYPE` | | `scale`, `meanvar-whole`, or `meanvar-single` (default `meanvar-whole`). |
-| `CPU_USE` | | Fraction of CPU cores for preprocessing, 0-1 (default `0.2`; use `0.5-1.0` on HPC with more RAM) |
-| `PREPROCESSOR_MAX_WORKERS` | | Hard cap on preprocessing workers (default `4`; avoids fork/resource issues on HPC) |
-| `DATALOADER_NUM_WORKERS` | | DataLoader workers for training (default `4`; forced to `0` when no GPU) |
-| `PMI_LOCAL_RANK` | | Distributed training (scheduler) |
-| `PMI_RANK` | | Process rank (default 0) |
-| `PMI_SIZE` | | World size (default 1) |
+Everything is read from the process environment (typically via a project-root `.env` loaded by `load_dotenv` in entry scripts and `database/connection.py`). There is no JSON config file. **Required** means the key must be set for that workflow; keys with a **default** are optional.
 
-**Hyperparameter tuning (controllers):** `BayesianHPTuner` and the trial ORM expect these to be set in the environment (no silent defaults—misconfiguration fails at validation). Paths must match: `TRIALS_DIR` is the parent of `trial_*` folders; `DB_CONNECTION` is the SQLAlchemy URL for the same run (e.g. `sqlite:////.../trials_log.db`).
+#### Paths and run identity
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `TRIALS_DIR` | ✓ | Root directory for per-trial folders `trial_*` (also used when resolving trial paths in `HPTuneTrial`) |
-| `DB_CONNECTION` | ✓ | SQLAlchemy database URL for the trial log (SQLite file path in URL form) |
+| `PROJECT_ROOT` | ✓* | Absolute path to the repository root. Often set by PBS/launchers; needed for HPTune and MPI trial `PYTHONPATH`. |
+| `DATA_DIR` | ✓ | Directory of raw signal `.txt` files (one per shot). |
+| `LABELS_PATH` | ✓ | Shot list with disruption times. |
+| `DATA_PATH` | ✓ | Full path to preprocessed dataset tensor (`.pt`). |
+| `TRAIN_LABELS_PATH` | ✓ | Full path to preprocessed labels tensor (`.pt`). |
+| `PROG_DIR` | ✓ | Training logs, checkpoints, and `graph.py` outputs. |
+| `JOB_ID` | ✓ | Run identifier (filenames / logs). |
+
+\*Set `PROJECT_ROOT` in `.env` for local runs; on some HPC jobs it is injected before your app starts.
+
+#### Preprocessing and dataset
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NORMALIZATION_TYPE` | ✓ | `scale`, `meanvar-whole`, or `meanvar-single`; must match how tensors were built and filename conventions. |
+| `CPU_USE` | | Fraction of CPU cores for preprocessing workers (default `0.2`). |
+| `PREPROCESSOR_MAX_WORKERS` | | Max parallel preprocessing processes (default `4`). |
+
+#### Training hyperparameters (`train.py` / `model/cnn.py`)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `EARLY_STOPPING_PATIENCE` | ✓ | Integer ≥ 1. |
+| `LEARNING_RATE` | ✓ | Positive float. |
+| `NUM_EPOCHS` | ✓ | Integer ≥ 1. |
+| `LOG_INTERVAL` | ✓ | Integer ≥ 1. |
+| `WEIGHT_DECAY` | ✓ | Float ≥ 0. |
+| `DROPOUT_RATE` | ✓ | Float in [0, 1]. |
+| `BATCH_SIZE` | ✓ | Integer ≥ 1. |
+| `LR_SCHEDULER` | ✓ | `true` / `false` (or `1` / `0`, `yes` / `no`, `on` / `off`). |
+| `LR_SCHEDULER_FACTOR` | ✓ | Float in (0, 1). |
+| `LR_SCHEDULER_PATIENCE` | ✓ | Integer ≥ 1. |
+| `GRADIENT_CLIP` | ✓ | Float ≥ 0. |
+| `DATALOADER_NUM_WORKERS` | | DataLoader workers (default `4`; forced to `0` when no GPU). |
+
+#### Architecture (`train.py` → `IpCNN`)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CONV1_FILTERS`, `CONV1_KERNEL`, `CONV1_PADDING` | ✓ | Conv1 layer (integers ≥ 0 where applicable). |
+| `CONV2_FILTERS`, `CONV2_KERNEL`, `CONV2_PADDING` | ✓ | Conv2 layer. |
+| `CONV3_FILTERS`, `CONV3_KERNEL`, `CONV3_PADDING` | ✓ | Conv3 layer. |
+| `POOL_SIZE` | ✓ | Integer ≥ 1. |
+| `FC1_SIZE`, `FC2_SIZE` | ✓ | Integer ≥ 1. |
+
+#### Bayesian HPTune search space (`BayesianHPTuner.create`)
+
+Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`).
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `HPTUNE_DIR` | ✓ | Absolute path to HPTune run root; trials use `HPTUNE_DIR/trials/`, logs `HPTUNE_DIR/controller_logs/`. |
+| `HPTUNE_LR_MIN`, `HPTUNE_LR_MAX` | ✓ | Learning-rate search bounds (float; min must be less than max). |
+| `HPTUNE_DROPOUT_MIN`, `HPTUNE_DROPOUT_MAX` | ✓ | Dropout bounds (0–1; min must be less than max). |
+| `HPTUNE_ALLOWED_EPOCHS` | ✓ | Comma-separated positive integers. |
+| `HPTUNE_NUM_INITIAL_TRIALS` | ✓ | Integer ≥ 1. |
+| `HPTUNE_WEIGHT_DECAY_LOG_MIN`, `HPTUNE_WEIGHT_DECAY_LOG_MAX` | ✓ | Log10 weight-decay bounds (min must be less than max). |
+| `HPTUNE_ALLOWED_BATCH_SIZES` | ✓ | Comma-separated positive integers. |
+| `HPTUNE_GRADIENT_CLIP_MIN`, `HPTUNE_GRADIENT_CLIP_MAX` | ✓ | `min` ≤ `max`. |
+| `HPTUNE_LR_SCHEDULER_FACTOR_MIN`, `HPTUNE_LR_SCHEDULER_FACTOR_MAX` | ✓ | In (0, 1); min must be less than max. |
+| `HPTUNE_LR_SCHEDULER_PATIENCE_MIN`, `HPTUNE_LR_SCHEDULER_PATIENCE_MAX` | ✓ | Integers ≥ 1, `min` ≤ `max`. |
+| `HPTUNE_EARLY_STOPPING_PATIENCE_MIN`, `HPTUNE_EARLY_STOPPING_PATIENCE_MAX` | ✓ | Integers ≥ 1, `min` ≤ `max`. |
+
+#### HPTune controllers, DB, and jobs
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TRIALS_DIR` | ✓† | Root for `trial_*` directories (must align with `DB_CONNECTION` and scripts). |
+| `DB_CONNECTION` | ✓ | SQLAlchemy URL (e.g. `sqlite:////.../trials_log.db`). Parent directory is created at import. |
+| `HPTUNE_QUEUE` | | PBS queue name for submitted trial/controller jobs. |
+| `HPTUNE_CONTROLLER_WALLTIME`, `HPTUNE_TRAIN_WALLTIME` | | Passed to site schedulers from shell scripts. |
+| `HPTUNE_CHAIN_ID` | | Optional chain id stored on trials (`model.hp_trial`). |
+| `HPTUNE_MAX_TRIALS` | | Default `10` in `BayesianHPTuner.create` if unset. |
+| `HPTUNE_TRIAL_NODES` | | Default `1`. |
+| `HPTUNE_CONTROLLER_NODES` | | Default `0`. |
+| `HPTUNE_MAX_RETRIES` | | Default `2`. |
+| `HPTUNE_RANDOM_INSERT_EVERY` | | Default `5`. |
+| `HPTUNE_EI_XI` | | Expected-improvement ξ (default `0.05`). |
+| `TRIAL_TIMEOUT` | | Seconds (default `1800`). |
+| `GPUS_PER_NODE` | | Default `4` in `hptune_mpi.py`. |
+| `HPTUNE_QSUB_ACCOUNT` | | Default `fusiondl_aesp` if unset (`hp_trial` embedded `run.sh` fragments). |
+
+†`HPTuneTrial` (`model.hp_trial`) requires `TRIALS_DIR` when materializing trial dirs; keep it consistent with `HPTUNE_DIR` / your layout.
+
+#### Optional training / distributed
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TRAIN_LOGURU_FILE` | `1` | Set to `0` / `false` / `no` to skip the per-run Loguru file under `PROG_DIR`. |
+| `RANK` | `0` | Process rank (`train.py`). |
+| `WORLD_SIZE` | `1` | World size. |
+| `LOCAL_RANK` | `0` | Local GPU index. |
+| `PBS_JOBID` | — | If set, extra HPTune log file under `controller_logs`. |
+
+Thread caps (`OPENBLAS_NUM_THREADS`, `OMP_NUM_THREADS`, …) are recommended at `1` on crowded PBS nodes; see the HPTune section below.
 
 ## Workflow
 
@@ -105,7 +185,7 @@ HP-tune requires the stdlib **sqlite3** module. On some minimal or HPC Python bu
 Raw .txt → preprocess_data.py → .pt files → train.py → Model + logs → graph.py → Visualizations
 ```
 
-**Config:** Set `NORMALIZATION_TYPE` and `CPU_USE` in `.env` (or env). Point `DATA_PATH` / `TRAIN_LABELS_PATH` at the `.pt` files that match that normalization (e.g. filenames containing `meanvar-whole`). Scripts call `Settings.load()` for hyperparameters from `dldl.json` (defaults under `defaultTraining`, architecture under `architecture`, plus env overrides).
+**Config:** Set paths and every variable in the [Environment Variables](#environment-variables) tables in your project-root `.env`. Point `DATA_PATH` / `TRAIN_LABELS_PATH` at the `.pt` files that match `NORMALIZATION_TYPE` (e.g. filenames containing `meanvar-whole`).
 
 ### 1. Preprocessing
 
@@ -145,10 +225,10 @@ python src/train.py
 
 * Loads preprocessed tensors at `DATA_PATH` and `TRAIN_LABELS_PATH` (must match preprocessing / `NORMALIZATION_TYPE`)
 * Validates files exist, splits 80/10/10 train/dev/test
-* Uses distributed training if `PMI_*` are set
+* Uses distributed training if `WORLD_SIZE` is greater than 1 (`RANK`, `LOCAL_RANK`, `WORLD_SIZE`; MPI trial launchers set these)
 * Saves checkpoints and logs to `PROG_DIR`
 
-Hyperparameters (lr, epochs, etc.) are in `train.py`.
+Training hyperparameters (learning rate, epochs, architecture sizes, etc.) are read from environment variables (see [Environment Variables](#environment-variables)).
 
 ### 4. Visualization
 
@@ -168,13 +248,13 @@ python -m src.graph
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--csv` | str | `PROG_DIR/{JOB_ID}_training_log.csv` | Path to the training log CSV file. If not specified, uses the default path based on `PROG_DIR` and `JOB_ID` from config. |
+| `--csv` | str | `PROG_DIR/{JOB_ID}_training_log.csv` | Path to the training log CSV file. If not specified, uses the default path based on `PROG_DIR` and `JOB_ID` from the environment. |
 | `--output` | str | `PROG_DIR/{JOB_ID}_training_log_plot.png` | Path where the plot image will be saved. If not specified and `--show` is not used, defaults to that path. If `--show` is used without `--output`, the plot is only displayed and not saved. |
 | `--show` | flag | False | Display the plot interactively using matplotlib's GUI. When used without `--output`, the plot is only displayed and not saved to disk. Can be combined with `--output` to both save and display. **Note:** Requires an interactive backend (PyQt5, PyQt6, or Tkinter). In headless environments, the plot will be saved to the default location instead. |
 
 **Examples:**
 ```bash
-# Use default paths from config
+# Use default paths from the environment
 python -m src.graph
 
 # Specify custom CSV file
@@ -252,7 +332,7 @@ sqlite3 /path/to/data/hptune_debug/trials/trials_log.db 'SELECT trial_id, status
 Layout:
 - `scripts/start_hptune.sh`: submits the serial controller job.
 - `scripts/controller.sh`: runs one Bayesian optimizer pass, submits at most one queued trial, then exits.
-- `src/schemas/trial_schema.py` (`HPTuneTrial`): generates each trial directory, per-trial `.env`, and `run.sh`.
+- `src/model/hp_trial.py` (`HPTuneTrial`): generates each trial directory, per-trial `.env`, and `run.sh`.
 - `src/service/trial_service.py`: loads and persists trial rows (`get_trials`, `save_trials`).
 - Trial `run.sh`: runs `python src/train.py` and, on success, submits the next `scripts/controller.sh`.
 
@@ -278,10 +358,10 @@ Top-level layout:
 - `scripts/controller_parallel.sh`: activates the environment, computes MPI world size, and launches `python -m hptune_mpi` under `mpiexec`.
 - `src/hptune_mpi.py`: rank `0` is the controller; worker ranks on non-controller hosts act as distributed training processes.
 - `src/model/bayesian_hptuner.py`: owns trial state, trial creation, status sync, retries, and Bayesian sampling.
-- `src/schemas/trial_schema.py` (`HPTuneTrial`): materializes each trial directory, `.env`, and `run.sh`.
+- `src/model/hp_trial.py` (`HPTuneTrial`): materializes each trial directory, `.env`, and `run.sh`.
 - `src/service/trial_service.py`: SQLite trial log access and snapshot writes.
 - `src/train.py`: actual training entrypoint used by generated trial scripts.
-- `src/util/distributed.py`: helper functions for PyTorch distributed initialization.
+- Distributed training uses `torch.distributed` in `src/model/cnn.py` (`dist.init_process_group` / `destroy_process_group`).
 
 MPI workflow step by step:
 1. `scripts/start_hptune_parallel.sh` submits `scripts/controller_parallel.sh` as a PBS job.
@@ -306,7 +386,7 @@ MPI workflow step by step:
 14. The controller frees that slot, refreshes trial state, and dispatches more queued trials until `HPTUNE_MAX_TRIALS` is reached and no trials remain active.
 
 Data and logging layout:
-- Trial state database: `data/hptune/trials/trials_log.db` (see `database.connection`, `database.tables.Trial`, `schemas.trial_schema.HPTuneTrial`, `service.trial_service`)
+- Trial state database: `data/hptune/trials/trials_log.db` (see `database.connection`, `database.tables.Trial`, `model.hp_trial.HPTuneTrial`, `service.trial_service`)
 - Trial directories: `data/hptune/trials/trial_*`
 - Best-trial artifacts: `data/hptune/best_trial`
 - Controller logs: `data/hptune/controller_logs/`
@@ -326,12 +406,12 @@ MPI-related env and sizing:
 - `HPTUNE_EI_XI`
 - `HPTUNE_RANDOM_INSERT_EVERY`
 
-Run directory (trials DB, `best_trial/`, `controller_logs/`): set `hptune.dir` in `dldl.json` (relative to project root or absolute). Default when unset or `null` is `data/hptune`.
+Run directory (trials DB, `best_trial/`, `controller_logs/`): set `HPTUNE_DIR` in the environment (absolute path to the run root; trials live under `HPTUNE_DIR/trials/`).
 
 ## Quick Reference
 
-* **Config:** `NORMALIZATION_TYPE` and `CPU_USE` in env (or `.env`) drive preprocessing and training.
+* **Config:** No JSON—all settings come from `.env` / the process environment; see [Environment Variables](#environment-variables).
 * **Output files:** Whatever paths you set in `DATA_PATH` and `TRAIN_LABELS_PATH` (often filenames include the normalization mode, e.g. `processed_dataset_meanvar-whole.pt`).
-* **Multiple configs:** Change `NORMALIZATION_TYPE` and update `DATA_PATH` / `TRAIN_LABELS_PATH` to the matching `.pt` files.
+* **Changing normalization:** Update `NORMALIZATION_TYPE` and point `DATA_PATH` / `TRAIN_LABELS_PATH` at the matching `.pt` files.
 
 See https://docs.pytorch.org/tutorials/intermediate/dist_tuto.html

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import os
 import re
+import shlex
 import shutil
 import warnings
 from collections.abc import Iterable, Sequence
@@ -89,7 +89,7 @@ def parse_val_loss(trial_dir: str | Path) -> tuple[bool, float]:
 
 def sync_best_trial_artifacts(
     trials: Sequence[HPTuneTrial],
-    best_trial_dir: str | Path,
+    best_trial_dir: Path,
 ) -> None:
     """Copy the current overall best trial's ``.env`` and checkpoint into ``best_trial/``."""
     from model.hp_trial import TrialStatus
@@ -135,21 +135,20 @@ def write_env(
     env_keys: dict[str, Any],
     env_lines: list[str] | None = None,
 ) -> None:
-    """Write a shell-sourceable ``.env`` file merging ``env_keys`` into the current environment.
+    """Write a shell-sourceable ``.env`` of explicit ``env_keys`` only (no process environ dump).
 
-    Values containing spaces are quoted. Writes atomically via ``Path.write_text``.
+    Used for per-trial overrides; ``run.sh`` must ``source`` the project ``.env`` first for base vars.
+    Values are ``shlex.quote``'d. Writes atomically via ``Path.write_text``.
     """
     path = Path(env_path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    merged = {**dict(os.environ), **env_keys}  # env_keys win over inherited env
-
-    def _format(val: str) -> str:
-        return f'"{val}"' if " " in val else val
+    def _shell_value(val: str) -> str:
+        return shlex.quote(str(val))
 
     lines = (
         list(env_lines or [])
-        + ["# Merged Environment"]
-        + [f"{k}={_format(str(v))}" for k, v in merged.items()]
+        + ["# HP-tune trial overrides (see ``HPTuneTrial.trial_env_keys``)"]
+        + [f"{k}={_shell_value(v)}" for k, v in env_keys.items()]
     )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

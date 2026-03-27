@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from collections import Counter
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any, Mapping
 
 import pandas as pd
@@ -86,10 +87,10 @@ class TrialService:
     def sql_to_csv() -> None:
         table_name = Trial.__table__.name
         df = pd.read_sql(f"SELECT * FROM {table_name}", engine)
-        output_path = os.path.join(
-            os.environ["TRIALS_DIR"], f"{table_name.lower()}.csv"
+        output_path = (
+            Path(os.environ["HPTUNE_DIR"]) / "trials" / f"{table_name.lower()}.csv"
         )
-        df.to_csv(output_path, index=False, encoding="utf-8")
+        df.to_csv(str(output_path), index=False, encoding="utf-8")
 
     @staticmethod
     def get_status_counts(trials: list[HPTuneTrial]) -> dict[str, int]:
