@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, Mapping
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -91,7 +91,7 @@ class HyperparameterSpace(BaseModel):
             ),
         }
 
-    def suggestion_to_trial(self, s: dict[str, float]) -> dict[str, Any]:
+    def suggestion_to_trial(self, s: Mapping[str, float]) -> dict[str, Any]:
         bi = int(np.clip(round(s["batch_idx"]), 0, len(self.batch_sizes) - 1))
 
         return {

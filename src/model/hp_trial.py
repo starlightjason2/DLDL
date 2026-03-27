@@ -59,7 +59,7 @@ class HPTuneTrial(BaseModel):
 
     def signature(self) -> TrialSignature:
         """Normalize this trial into a hashable signature for duplicate detection."""
-        return self.signature(self.model_dump())
+        return self.proposed_signature(self.model_dump())
 
     @classmethod
     def proposed_signature(cls, d: Mapping[str, Any]) -> TrialSignature:
@@ -135,9 +135,10 @@ class HPTuneTrial(BaseModel):
 
     @staticmethod
     def _build_run_script(
-        project_root: str, env_path: Path, template_path: Path
+        project_root: Path, env_path: Path, template_path: Path
     ) -> str:
         """Build ``run.sh`` from ``scripts/run_train.sh`` (``@...@`` placeholders)."""
+
         text = template_path.read_text()
         log_dir = Path(os.environ["HPTUNE_DIR"]) / "controller_logs"
         trial_boot = (
@@ -166,7 +167,6 @@ class HPTuneTrial(BaseModel):
     def create_scripts(
         self,
         *,
-        project_root: str,
         env_lines: list[str] | None = None,
     ) -> str:
         """Write trial directory, ``.env``, and ``run.sh``; return ``trial_id``."""
@@ -175,8 +175,10 @@ class HPTuneTrial(BaseModel):
 
         write_env(str(env_path), self.trial_env_keys(), env_lines)
 
-        template_path = Path(project_root) / "scripts" / "run_train.sh"
-        script = self._build_run_script(project_root, env_path, template_path)
+        project_root = Path(os.environ["PROJECT_ROOT"])
+        script = self._build_run_script(
+            project_root, env_path, project_root / "scripts" / "run_train.sh"
+        )
 
         run_path = self.dir_path / "run.sh"
         run_path.write_text(script)

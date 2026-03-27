@@ -69,7 +69,7 @@ class BayesianHPTuner(BaseModel):
         return cls(
             trials_dir=trials_dir,
             log_dir=log_dir,
-            project_root=os.environ["PROJECT_ROOT"],
+            project_root=Path(os.environ["PROJECT_ROOT"]),
             max_retries=env_int("HPTUNE_MAX_RETRIES"),
             trial_nodes=trial_nodes,
             controller_nodes=controller_nodes,
@@ -125,7 +125,7 @@ class BayesianHPTuner(BaseModel):
                 target=-t.val_loss,
             )
 
-        proposal = self.hp_space.suggestion_to_trial(optimizer.suggest())
+        proposal = self.hp_space.suggestion_to_trial(optimizer.suggest())  # type: ignore
 
         if HPTuneTrial.proposed_signature(proposal) in self._seen_signatures(trials):
             return self._sample_random(
