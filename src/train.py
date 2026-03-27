@@ -76,9 +76,9 @@ def main() -> None:
         normalization_type=e["NORMALIZATION_TYPE"],
     )
 
-    rank = int(os.environ["RANK"])
-    world_size = int(os.environ["WORLD_SIZE"])
-    local_rank = int(os.environ["LOCAL_RANK"])
+    rank = int(os.environ.get("PMI_RANK", 0))
+    world_size = int(os.environ.get("PMI_SIZE", 1))
+    local_rank = rank % 4  # GPUs per node
 
     model.train_model(
         rank=rank, world_size=world_size, local_rank=local_rank, job_id=job_id

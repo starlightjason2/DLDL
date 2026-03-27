@@ -85,7 +85,7 @@ class TrialService:
     @staticmethod
     @logger.catch
     def sql_to_csv() -> None:
-        table_name = Trial.__table__.name
+        table_name = Trial.__table__.name  # type: ignore
         df = pd.read_sql(f"SELECT * FROM {table_name}", engine)
         output_path = (
             Path(os.environ["HPTUNE_DIR"]) / "trials" / f"{table_name.lower()}.csv"

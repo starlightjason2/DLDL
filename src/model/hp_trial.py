@@ -133,55 +133,7 @@ class HPTuneTrial(BaseModel):
             "PROG_DIR": self.dir_path,
         }
 
-    @staticmethod
-    def _build_run_script(
-        project_root: Path, env_path: Path, template_path: Path
-    ) -> str:
-        """Build ``run.sh`` from ``scripts/run_train.sh`` (``@...@`` placeholders)."""
-
-        text = template_path.read_text()
-        log_dir = Path(os.environ["HPTUNE_DIR"]) / "controller_logs"
-        trial_boot = (
-            f"cd {project_root}\n\n"
-            "set -a\n"
-            f"source {env_path}\n"
-            "set +a\n"
-            'export PROG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
-        )
-        placeholders = {
-            "@DLDL_ROOT@": project_root,
-            "@HPTUNE_WALLTIME@": os.environ["HPTUNE_TRAIN_WALLTIME"],
-            "@HPTUNE_QUEUE@": os.environ["HPTUNE_QUEUE"],
-            "@HPTUNE_LOGDIR@": log_dir,
-            "@DLDL_CD_AND_TRIAL_ENV@": trial_boot,
-        }
-        for key, val in placeholders.items():
-            text = text.replace(key, str(val))
-        leftover = [k for k in placeholders if k in text]
-        if leftover:
-            raise AssertionError(
-                f"Unreplaced placeholders in {template_path}: {leftover}"
-            )
-        return text
-
-    def create_scripts(
-        self,
-        *,
-        env_lines: list[str] | None = None,
-    ) -> str:
-        """Write trial directory, ``.env``, and ``run.sh``; return ``trial_id``."""
+    def create_files(self, *, env_lines: list[str] | None = None) -> str:
         self.dir_path.mkdir(parents=True, exist_ok=True)
-        env_path = self.dir_path / ".env"
-
-        write_env(str(env_path), self.trial_env_keys(), env_lines)
-
-        project_root = Path(os.environ["PROJECT_ROOT"])
-        script = self._build_run_script(
-            project_root, env_path, project_root / "scripts" / "run_train.sh"
-        )
-
-        run_path = self.dir_path / "run.sh"
-        run_path.write_text(script)
-        run_path.chmod(0o755)
-
+        write_env(str(self.dir_path / ".env"), self.trial_env_keys(), env_lines)
         return self.trial_id

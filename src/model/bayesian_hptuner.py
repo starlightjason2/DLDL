@@ -30,7 +30,6 @@ class BayesianHPTuner(BaseModel):
     # Paths
     trials_dir: Path
     log_dir: Path
-    project_root: Path
 
     # Config
     max_retries: int = Field(ge=0)
@@ -69,7 +68,6 @@ class BayesianHPTuner(BaseModel):
         return cls(
             trials_dir=trials_dir,
             log_dir=log_dir,
-            project_root=Path(os.environ["PROJECT_ROOT"]),
             max_retries=env_int("HPTUNE_MAX_RETRIES"),
             trial_nodes=trial_nodes,
             controller_nodes=controller_nodes,
@@ -228,7 +226,7 @@ class BayesianHPTuner(BaseModel):
                 }
             )
 
-            trial.create_scripts(project_root=self.project_root)
+            trial.create_files()
             trials.append(trial)
 
         TrialService.save_trials(trials)
@@ -275,16 +273,13 @@ class BayesianHPTuner(BaseModel):
     # ------------------------------------------------------------------
 
     def run_serial(self) -> None:
-        """One dispatcher pass for the serial PBS controller (`scripts/controller.sh`)."""
+        """One dispatcher pass for the serial PBS controller."""
         trials = self.update_trials(TrialService.get_trials())
 
         queued_ids = [t.trial_id for t in trials if t.status == TrialStatus.QUEUED]
         if not queued_ids:
             trials = self._plan_new_trials(trials)
             queued_ids = [t.trial_id for t in trials if t.status == TrialStatus.QUEUED]
-
-        # Controller parses a single `Next trial -> id` line
-        print("Next trial -> {}", queued_ids[0])
 
         counts = TrialService.get_status_counts(trials)
         logger.info(
@@ -295,4 +290,11 @@ class BayesianHPTuner(BaseModel):
             self.num_slots,
             self.is_complete(trials),
         )
+
+        if not queued_ids:
+            logger.info("Chain complete.")
+            return
+
+        # Shell parser in controller.sh keys on this exact format
+        print(f"Next trial -> {queued_ids[0]}")
         TrialService.sql_to_csv()
