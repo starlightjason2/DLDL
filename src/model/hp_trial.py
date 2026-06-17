@@ -16,7 +16,7 @@ from util.hptune import write_env
 
 
 class TrialStatus(IntEnum):
-    """Persisted as integers in SQLite."""
+    """Persisted as integers in the trial CSV."""
 
     COMPLETED = 0
     RUNNING = -1
@@ -30,12 +30,12 @@ TrialSignature = tuple[str, int, str, str, int, str, int, str, int, int]
 class HPTuneTrial(BaseModel):
     """One hyperparameter trial: training hparams, log status, identity.
 
-    ``trial_id`` is the primary key (same as :attr:`database.tables.Trial.trial_id`).
+    ``trial_id`` is the primary key in ``trials.csv``.
     """
 
     model_config = ConfigDict(from_attributes=True, validate_assignment=True)
 
-    trial_id: str = Field(description="Primary key; ORM column ``trials.trial_id``.")
+    trial_id: str = Field(description="Primary key; column ``trial_id`` in ``trials.csv``.")
     lr: float
     epochs: int
     dropout: float

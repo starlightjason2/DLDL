@@ -64,7 +64,14 @@ def check_dataset(
 ) -> None:
     """Run dataset integrity check (IpDataset.check_dataset)."""
     dataset = IpDataset(
-        normalization_type=os.environ["NORMALIZATION_TYPE"]
+        normalization_type=os.environ["NORMALIZATION_TYPE"],
+        data_file=data_path,
+        labels_file=labels_pt_path,
+        labels_path=_abs(os.environ["LABELS_PATH"]),
+        data_dir=_abs(os.environ["DATA_DIR"]),
+        labels_type="scaled",
+        cpu_use=float(os.environ["CPU_USE"]),
+        preprocessor_max_workers=int(os.environ["PREPROCESSOR_MAX_WORKERS"]),
     )
     dataset.check_dataset(
         scale_labels=scale_labels, num_checks=num_checks, verbose=verbose

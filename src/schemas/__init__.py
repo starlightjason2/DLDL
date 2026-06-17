@@ -1,4 +1,4 @@
-"""Pydantic API schemas (separate from SQLAlchemy ORM tables)."""
+"""Pydantic API schemas for trial state."""
 
 from model.hp_trial import HPTuneTrial, TrialStatus
 

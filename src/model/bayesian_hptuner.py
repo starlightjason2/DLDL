@@ -195,7 +195,6 @@ class BayesianHPTuner(BaseModel):
             and counts["running"] == 0
             and counts["queued"] == 0
         ):
-            TrialService.sql_to_csv()
             return True
         return False
 
@@ -297,4 +296,3 @@ class BayesianHPTuner(BaseModel):
 
         # Shell parser in controller.sh keys on this exact format
         print(f"Next trial -> {queued_ids[0]}")
-        TrialService.sql_to_csv()

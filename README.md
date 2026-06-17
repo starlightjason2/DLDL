@@ -4,7 +4,7 @@
 
 A 1D CNN that uses plasma current to predict disruption time. For labeling D-IIID shots with the 'ipspr15V' plasma current PTDATA signal.
 
-Interactice polaris shell
+Interactive polaris shell
 
 ```
 qsub -I -A fusiondl_aesp -q debug-scaling \
@@ -16,13 +16,14 @@ qsub -I -A fusiondl_aesp -q debug-scaling \
 
 ## Environment Setup
 
-1. **Create `.env`** from a template (every key is listed in [Environment Variables](#environment-variables); full examples in `.env.example` and `.env.polaris.example`):
+1. **Create `.env`** from a template. Each example file lists the **full** variable set required by the code (71+ keys); do not use a paths-only snippet as your only `.env`:
    ```bash
-   cp .env.example .env   # then edit paths
-   # or
-   cp .env.local.example .env.local && ln -sf .env.local .env
-   cp .env.polaris.example .env.polaris && ln -sf .env.polaris .env   # Polaris
+   cp .env.example .env              # generic template; edit paths
+   cp .env.local.example .env        # local dev (relative paths, smaller HPTUNE_MAX_TRIALS)
+   cp .env.polaris.example .env      # Polaris / Eagle paths
+   # or symlink: ln -sf .env.polaris .env
    ```
+   See [Environment Variables](#environment-variables) for descriptions.
 
 2. **Install:**
    ```bash
@@ -31,19 +32,17 @@ qsub -I -A fusiondl_aesp -q debug-scaling \
 
 `.env` is loaded by entry scripts (``load_dotenv``) before training or controllers read ``os.environ``.
 
-**Hyperparameter tuning:** Trial state (serial and parallel controllers) is stored in **SQLite** (URL from `DB_CONNECTION`, typically under `data/hptune/trials/trials_log.db`) using **SQLAlchemy** 2.0 ORM (`database.connection` + `database.tables.Trial`, same layout as [this FastAPI SQLAlchemy template](https://github.com/mdhishaamakhtar/fastapi-sqlalchemy-postgres-template/tree/master/database)) with **Pydantic** models (`model.hp_trial.HPTuneTrial`) and persistence helpers (`service.trial_service`: `get_trials`, `save_trials`).
-
-HP-tune requires the stdlib **sqlite3** module. On some minimal or HPC Python builds it may be missing—check with `python -c "import sqlite3; print(sqlite3.sqlite_version)"` and install your OS package for `python-sqlite` / full Python if needed.
+**Hyperparameter tuning:** Trial state is stored in **`{HPTUNE_DIR}/trials/trials.csv`** (see `service.trial_service`) with **Pydantic** models (`model.hp_trial.HPTuneTrial`). Trial directories live under `{HPTUNE_DIR}/trials/trial_*`.
 
 ### Environment Variables
 
-Everything is read from the process environment (typically via a project-root `.env` loaded by `load_dotenv` in entry scripts and `database/connection.py`). There is no JSON config file. **Required** means the key must be set for that workflow; keys with a **default** are optional.
+Everything is read from the process environment (typically via a project-root `.env` loaded by `load_dotenv` in Python entry scripts, or `source`d by PBS shell scripts). There is no JSON config file. **Required** means the key must be set for that workflow.
 
 #### Paths and run identity
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `PROJECT_ROOT` | ✓* | Absolute path to the repository root. Often set by PBS/launchers; needed for HPTune and MPI trial `PYTHONPATH`. |
+| `PROJECT_ROOT` | ✓* | Absolute path to the repository root. Required by `scripts/*.sh`. |
 | `DATA_DIR` | ✓ | Directory of raw signal `.txt` files (one per shot). |
 | `LABELS_PATH` | ✓ | Shot list with disruption times. |
 | `DATA_PATH` | ✓ | Full path to preprocessed dataset tensor (`.pt`). |
@@ -51,15 +50,15 @@ Everything is read from the process environment (typically via a project-root `.
 | `PROG_DIR` | ✓ | Training logs, checkpoints, and `graph.py` outputs. |
 | `JOB_ID` | ✓ | Run identifier (filenames / logs). |
 
-\*Set `PROJECT_ROOT` in `.env` for local runs; on some HPC jobs it is injected before your app starts.
+\*Set `PROJECT_ROOT` in `.env` for local and PBS runs. PBS scripts `source` the project `.env` and `cd` to `PROJECT_ROOT`.
 
 #### Preprocessing and dataset
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `NORMALIZATION_TYPE` | ✓ | `scale`, `meanvar-whole`, or `meanvar-single`; must match how tensors were built and filename conventions. |
-| `CPU_USE` | | Fraction of CPU cores for preprocessing workers (default `0.2`). |
-| `PREPROCESSOR_MAX_WORKERS` | | Max parallel preprocessing processes (default `4`). |
+| `CPU_USE` | ✓ | Fraction of CPU cores for preprocessing workers (e.g. `0.2`). |
+| `PREPROCESSOR_MAX_WORKERS` | ✓ | Max parallel preprocessing processes (e.g. `4`). |
 
 #### Training hyperparameters (`train.py` / `model/cnn.py`)
 
@@ -76,7 +75,7 @@ Everything is read from the process environment (typically via a project-root `.
 | `LR_SCHEDULER_FACTOR` | ✓ | Float in (0, 1). |
 | `LR_SCHEDULER_PATIENCE` | ✓ | Integer ≥ 1. |
 | `GRADIENT_CLIP` | ✓ | Float ≥ 0. |
-| `DATALOADER_NUM_WORKERS` | | DataLoader workers (default `4`; forced to `0` when no GPU). |
+| `DATALOADER_NUM_WORKERS` | ✓ | DataLoader workers (forced to `0` when no GPU). |
 
 #### Architecture (`train.py` → `IpCNN`)
 
@@ -90,11 +89,11 @@ Everything is read from the process environment (typically via a project-root `.
 
 #### Bayesian HPTune search space (`BayesianHPTuner.create`)
 
-Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`).
+Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`). All keys below are required when running `hptune_serial`.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `HPTUNE_DIR` | ✓ | Absolute path to HPTune run root; trials use `HPTUNE_DIR/trials/`, logs `HPTUNE_DIR/controller_logs/`. |
+| `HPTUNE_DIR` | ✓ | Absolute path to HPTune run root. Trials: `HPTUNE_DIR/trials/trial_*`. Log CSV: `HPTUNE_DIR/trials/trials.csv`. Controller logs: `HPTUNE_DIR/controller_logs/`. |
 | `HPTUNE_LR_MIN`, `HPTUNE_LR_MAX` | ✓ | Learning-rate search bounds (float; min must be less than max). |
 | `HPTUNE_DROPOUT_MIN`, `HPTUNE_DROPOUT_MAX` | ✓ | Dropout bounds (0–1; min must be less than max). |
 | `HPTUNE_ALLOWED_EPOCHS` | ✓ | Comma-separated positive integers. |
@@ -105,39 +104,49 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | `HPTUNE_LR_SCHEDULER_FACTOR_MIN`, `HPTUNE_LR_SCHEDULER_FACTOR_MAX` | ✓ | In (0, 1); min must be less than max. |
 | `HPTUNE_LR_SCHEDULER_PATIENCE_MIN`, `HPTUNE_LR_SCHEDULER_PATIENCE_MAX` | ✓ | Integers ≥ 1, `min` ≤ `max`. |
 | `HPTUNE_EARLY_STOPPING_PATIENCE_MIN`, `HPTUNE_EARLY_STOPPING_PATIENCE_MAX` | ✓ | Integers ≥ 1, `min` ≤ `max`. |
+| `HPTUNE_RANDOM_INSERT_EVERY` | ✓ | Insert a random trial every N completed trials after warmup (integer ≥ 0). |
+| `HPTUNE_EI_XI` | ✓ | Expected-improvement ξ for Bayesian optimization (float ≥ 0). |
 
-#### HPTune controllers, DB, and jobs
+#### HPTune controllers and PBS jobs
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `TRIALS_DIR` | ✓† | Root for `trial_*` directories (must align with `DB_CONNECTION` and scripts). |
-| `DB_CONNECTION` | ✓ | SQLAlchemy URL (e.g. `sqlite:////.../trials_log.db`). Parent directory is created at import. |
-| `HPTUNE_QUEUE` | | PBS queue name for submitted trial/controller jobs. |
-| `HPTUNE_CONTROLLER_WALLTIME`, `HPTUNE_TRAIN_WALLTIME` | | Passed to site schedulers from shell scripts. |
-| `HPTUNE_CHAIN_ID` | | Optional chain id stored on trials (`model.hp_trial`). |
-| `HPTUNE_MAX_TRIALS` | | Default `10` in `BayesianHPTuner.create` if unset. |
-| `HPTUNE_TRIAL_NODES` | | Default `1`. |
-| `HPTUNE_CONTROLLER_NODES` | | Default `0`. |
-| `HPTUNE_MAX_RETRIES` | | Default `2`. |
-| `HPTUNE_RANDOM_INSERT_EVERY` | | Default `5`. |
-| `HPTUNE_EI_XI` | | Expected-improvement ξ (default `0.05`). |
-| `TRIAL_TIMEOUT` | | Seconds (default `1800`). |
-| `GPUS_PER_NODE` | | Default `4` in `hptune_mpi.py`. |
-| `HPTUNE_QSUB_ACCOUNT` | | Default `fusiondl_aesp` if unset (`hp_trial` embedded `run.sh` fragments). |
+| `HPTUNE_MAX_TRIALS` | ✓ | Stop when this many trials exist and none are running or queued. |
+| `HPTUNE_TRIAL_NODES` | ✓ | Nodes per trial (used for slot sizing in the controller). |
+| `HPTUNE_CONTROLLER_NODES` | ✓ | Nodes in the controller allocation (used for slot sizing). |
+| `HPTUNE_MAX_RETRIES` | ✓ | Requeue failed trials up to this many times. |
+| `TRIAL_TIMEOUT` | ✓ | Seconds without log activity before a running trial is requeued or failed. |
+| `HPTUNE_QUEUE` | ✓† | PBS queue name for submitted trial/controller jobs. |
+| `HPTUNE_CONTROLLER_WALLTIME` | ✓† | Controller job walltime (passed to `qsub`). |
+| `HPTUNE_TRAIN_WALLTIME` | ✓† | Trial training job walltime (passed to `qsub`). |
+| `HPTUNE_CHAIN_ID` | ✓† | Label written to `controller_logs/chain_steps.csv` and `chain_summary.log`. |
 
-†`HPTuneTrial` (`model.hp_trial`) requires `TRIALS_DIR` when materializing trial dirs; keep it consistent with `HPTUNE_DIR` / your layout.
+†Required for the serial PBS chain (`scripts/start_hptune.sh`, `scripts/controller.sh`).
 
-#### Optional training / distributed
+#### Shell, conda, and runtime
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TRAIN_LOGURU_FILE` | `1` | Set to `0` / `false` / `no` to skip the per-run Loguru file under `PROG_DIR`. |
-| `RANK` | `0` | Process rank (`train.py`). |
-| `WORLD_SIZE` | `1` | World size. |
-| `LOCAL_RANK` | `0` | Local GPU index. |
-| `PBS_JOBID` | — | If set, extra HPTune log file under `controller_logs`. |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DLDL_CONDASH` | ✓‡ | Path to `conda.sh` (sourced by PBS scripts). |
+| `CONDA_ENV` | ✓‡ | Conda environment name. |
+| `TMPDIR` | | Temp directory (recommended on HPC). |
+| `NRANKS_PER_NODE` | | MPI ranks per node in `scripts/run_train.sh` (default `4`). |
+| `RESET` | | Set to `1` when calling `scripts/start_hptune.sh` to wipe files under `HPTUNE_DIR`. |
 
-Thread caps (`OPENBLAS_NUM_THREADS`, `OMP_NUM_THREADS`, …) are recommended at `1` on crowded PBS nodes; see the HPTune section below.
+‡Required by PBS training/preprocess/HPTune scripts.
+
+#### Set by PBS or controllers (not in `.env`)
+
+| Variable | Description |
+|----------|-------------|
+| `PBS_JOBID` | PBS job id. When set, HPTune also writes `controller_logs/hptune_<PBS_JOBID>.txt`. |
+| `PBS_NODEFILE` | Node list for `mpiexec` in `scripts/run_train.sh`. |
+| `TRIAL_DIR` | Set by `scripts/controller.sh` to `HPTUNE_DIR/trials/<trial_id>` before submitting a trial. Trial `.env` overrides are sourced from here. |
+| `PMI_RANK`, `PMI_SIZE` | MPI rank/size read by `train.py` under `mpiexec` (defaults: `0`, `1`). |
+
+#### Thread caps (recommended on HPC)
+
+Set to `1` on crowded PBS nodes to avoid BLAS oversubscription (`OPENBLAS_NUM_THREADS`, `OMP_NUM_THREADS`, `MKL_NUM_THREADS`, `NUMEXPR_NUM_THREADS`, `TORCH_NUM_THREADS`). PBS scripts do not set these automatically; include them in `.env`.
 
 ## Workflow
 
@@ -159,7 +168,7 @@ python src/preprocess_data.py
 * Writes tensors to `DATA_PATH` and `TRAIN_LABELS_PATH`
 * Runs integrity check
 
-**Normalization** (env `NORMALIZATION_TYPE`; default `meanvar-whole`):
+**Normalization** (env `NORMALIZATION_TYPE`; typical value `meanvar-whole`):
 
 | Value | Formula | Use case |
 |-------|---------|----------|
@@ -185,7 +194,7 @@ python src/train.py
 
 * Loads preprocessed tensors at `DATA_PATH` and `TRAIN_LABELS_PATH` (must match preprocessing / `NORMALIZATION_TYPE`)
 * Validates files exist, splits 80/10/10 train/dev/test
-* Uses distributed training if `WORLD_SIZE` is greater than 1 (`RANK`, `LOCAL_RANK`, `WORLD_SIZE`; MPI trial launchers set these)
+* Uses distributed training when `PMI_SIZE` is greater than 1 (`PMI_RANK`, `PMI_SIZE`; set by `mpiexec` in `scripts/run_train.sh`)
 * Saves checkpoints and logs to `PROG_DIR`
 
 Training hyperparameters (learning rate, epochs, architecture sizes, etc.) are read from environment variables (see [Environment Variables](#environment-variables)).
@@ -193,7 +202,7 @@ Training hyperparameters (learning rate, epochs, architecture sizes, etc.) are r
 ### 4. Visualization
 
 ```bash
-python -m src.graph
+python src/graph.py
 ```
 
 * Loads training log CSV from `PROG_DIR/{JOB_ID}_training_log.csv`
@@ -215,22 +224,22 @@ python -m src.graph
 **Examples:**
 ```bash
 # Use default paths from the environment
-python -m src.graph
+python src/graph.py
 
 # Specify custom CSV file
-python -m src.graph --csv path/to/training_log.csv
+python src/graph.py --csv path/to/training_log.csv
 
 # Save plot to specific location
-python -m src.graph --output path/to/output.png
+python src/graph.py --output path/to/output.png
 
 # Display plot interactively (not saved)
-python -m src.graph --show
+python src/graph.py --show
 
 # Save and display plot
-python -m src.graph --output plot.png --show
+python src/graph.py --output plot.png --show
 
 # Use custom CSV and save to custom location
-python -m src.graph --csv custom_log.csv --output plot.png
+python src/graph.py --csv custom_log.csv --output plot.png
 ```
 
 ## Polaris Batch Jobs
@@ -261,9 +270,7 @@ Output logs: `preprocess_<jobid>.out`, `train_<jobid>.out` (and `.err`).
 
 HPTune reads the same project-root `.env` as the rest of the workflow. On Polaris, that is typically a symlink to `.env.polaris`.
 
-There are now two HPTune execution modes:
-- Serial chain: one trial job at a time, with each completed trial requeueing the next controller.
-- MPI controller: one controller allocation launches multiple distributed trials and keeps dispatching until the search budget is exhausted.
+The supported path is a **serial PBS chain**: one controller job plans the next trial, submits one training job, then chains another controller after the trial finishes.
 
 #### Serial HPTune
 
@@ -273,100 +280,60 @@ Launch:
 ./scripts/start_hptune.sh
 ```
 
-**Debug queue (smoke-test SQLite / short chain)** — point `TRIALS_DIR` / `DB_CONNECTION` at an isolated tree, cap trials, and use your site’s debug queue (example: `debug-scaling`):
+To wipe a previous run tree first:
 
 ```bash
-export TRIALS_DIR=/path/to/data/hptune_debug/trials
-export DB_CONNECTION=sqlite:////path/to/data/hptune_debug/trials/trials_log.db
+RESET=1 ./scripts/start_hptune.sh
+```
+
+**Debug queue (smoke-test / short chain)** — point `HPTUNE_DIR` at an isolated tree, cap trials, and use your site’s debug queue (example: `debug-scaling`):
+
+```bash
+export HPTUNE_DIR=/path/to/data/hptune_debug
 export HPTUNE_MAX_TRIALS=10
 export HPTUNE_QUEUE=debug-scaling   # or your site's debug queue name
 ./scripts/start_hptune.sh
 ```
 
-Check the DB on the login node after jobs start (adjust the path to match `DB_CONNECTION`):
+Check the trial log on the login node after jobs start:
 
 ```bash
-sqlite3 /path/to/data/hptune_debug/trials/trials_log.db 'SELECT trial_id, status FROM trials;'
+column -t -s, /path/to/data/hptune_debug/trials/trials.csv | head
 ```
 
 Layout:
-- `scripts/start_hptune.sh`: submits the serial controller job.
-- `scripts/controller.sh`: runs one Bayesian optimizer pass, submits at most one queued trial, then exits.
-- `src/model/hp_trial.py` (`HPTuneTrial`): generates each trial directory, per-trial `.env`, and `run.sh`.
-- `src/service/trial_service.py`: loads and persists trial rows (`get_trials`, `save_trials`).
-- Trial `run.sh`: runs `python src/train.py` and, on success, submits the next `scripts/controller.sh`.
+- `scripts/start_hptune.sh`: submits the first controller job.
+- `scripts/controller.sh`: runs one Bayesian optimizer pass via `python -m hptune_serial`, submits at most one queued trial, chains the next controller, then exits.
+- `src/hptune_serial.py`: CLI wrapper around `BayesianHPTuner.run_serial()` (or `--trial-id` to mark trials running).
+- `src/model/bayesian_hptuner.py`: trial state, acquisition, retries, and dispatch.
+- `src/model/hp_trial.py` (`HPTuneTrial`): creates each trial directory and per-trial `.env` overrides.
+- `src/service/trial_service.py`: reads/writes `{HPTUNE_DIR}/trials/trials.csv`.
+- `scripts/run_train.sh`: training entrypoint submitted for each trial; sources `TRIAL_DIR/.env` for hyperparameter overrides.
+
+Serial chain flow:
+1. Controller runs `hptune_serial`, which refreshes trial status from training logs and plans new trials if needed.
+2. Controller prints `Next trial -> trial_N` (parsed by `controller.sh`).
+3. Controller submits `scripts/run_train.sh` with `TRIAL_DIR=$HPTUNE_DIR/trials/trial_N`.
+4. After the trial job, controller submits another `scripts/controller.sh` with `-W depend=afterany`.
+5. Repeat until `HPTUNE_MAX_TRIALS` is reached and no trials are running or queued.
 
 Important serial env:
-- `HPTUNE_QUEUE`
-- `HPTUNE_CONTROLLER_WALLTIME`
-- `HPTUNE_TRAIN_WALLTIME`
-- `HPTUNE_MAX_TRIALS`
-- `OPENBLAS_NUM_THREADS` / `OMP_NUM_THREADS` (defaults: `1` in `controller.sh` and `run_train.sh`) — PBS often allocates many CPUs to one process; uncapped BLAS can try to spawn that many threads and fail (`pthread_create` / `Exit_status=1` with little log output).
-
-#### MPI HPTune
-
-Launch:
-
-```bash
-HPTUNE_CONTROLLER_NODES=4 HPTUNE_TRIAL_NODES=1 ./scripts/start_hptune_parallel.sh
-```
-
-The MPI path is designed for multi-GPU and multi-node trial execution. The controller allocation includes one controller node plus worker nodes. In the example above, one node runs the HPTune controller and the remaining three nodes are available for trial execution.
-
-Top-level layout:
-- `scripts/start_hptune_parallel.sh`: submits the outer PBS controller allocation.
-- `scripts/controller_parallel.sh`: activates the environment, computes MPI world size, and launches `python -m hptune_mpi` under `mpiexec`.
-- `src/hptune_mpi.py`: rank `0` is the controller; worker ranks on non-controller hosts act as distributed training processes.
-- `src/model/bayesian_hptuner.py`: owns trial state, trial creation, status sync, retries, and Bayesian sampling.
-- `src/model/hp_trial.py` (`HPTuneTrial`): materializes each trial directory, `.env`, and `run.sh`.
-- `src/service/trial_service.py`: SQLite trial log access and snapshot writes.
-- `src/train.py`: actual training entrypoint used by generated trial scripts.
-- Distributed training uses `torch.distributed` in `src/model/cnn.py` (`dist.init_process_group` / `destroy_process_group`).
-
-MPI workflow step by step:
-1. `scripts/start_hptune_parallel.sh` submits `scripts/controller_parallel.sh` as a PBS job.
-2. `scripts/controller_parallel.sh` sets `GPUS_PER_NODE=4` by default and derives `HPTUNE_MPI_SIZE = HPTUNE_CONTROLLER_NODES * GPUS_PER_NODE`.
-3. `mpiexec` starts `python -m hptune_mpi` with one MPI rank per GPU across the whole allocation.
-4. In `src/hptune_mpi.py`, rank `0` becomes the HPTune controller. All MPI ranks on the controller host are reserved from trial dispatch; full trial slots are formed only from non-controller hosts.
-5. The controller calls `BayesianHPTuner.sync_and_load()` to refresh trial state from the SQLite DB at `DB_CONNECTION` (default layout `data/hptune/trials/trials_log.db`).
-6. The controller calls `BayesianHPTuner.plan_and_enqueue()` to create new queued trials under `TRIALS_DIR` (default layout `data/hptune/trials/trial_*`).
-7. Each trial directory contains:
-   - a generated `.env` with trial-specific hyperparameters
-   - a generated `run.sh` derived from `scripts/run_train.sh`
-   - trial logs and checkpoints under that same directory
-8. The controller groups worker hosts into fixed-size slots using:
-   - `GPUS_PER_NODE`
-   - `HPTUNE_TRIAL_NODES`
-   - all GPUs on each worker node
-9. A trial slot therefore consumes `HPTUNE_TRIAL_NODES` worker nodes, with one MPI rank per GPU participating in training.
-10. When a slot is free, the controller assigns a queued trial to that slot and marks the trial as running in `trials_log.db`.
-11. Worker ranks create an MPI subcommunicator for their assigned slot and call `run_distributed_trial(...)`.
-12. `run_distributed_trial(...)` loads the generated trial `.env`, sets `MASTER_ADDR`, `MASTER_PORT`, `RANK`, `WORLD_SIZE`, `LOCAL_RANK`, and `NODE_RANK`, and launches `python src/train.py` directly.
-13. When the slot leader finishes, it sends either `DONE` or `FAILED` back to the controller, and failed trials are requeued or marked permanently failed according to `HPTUNE_MAX_RETRIES`.
-14. The controller frees that slot, refreshes trial state, and dispatches more queued trials until `HPTUNE_MAX_TRIALS` is reached and no trials remain active.
+- `PROJECT_ROOT`, `HPTUNE_DIR`, `HPTUNE_QUEUE`
+- `HPTUNE_CONTROLLER_WALLTIME`, `HPTUNE_TRAIN_WALLTIME`
+- `HPTUNE_MAX_TRIALS`, `HPTUNE_CHAIN_ID`
+- `OPENBLAS_NUM_THREADS` / `OMP_NUM_THREADS` (set to `1` in `.env`) — PBS often allocates many CPUs to one process; uncapped BLAS can try to spawn that many threads and fail (`pthread_create` / `Exit_status=1` with little log output).
 
 Data and logging layout:
-- Trial state database: `data/hptune/trials/trials_log.db` (see `database.connection`, `database.tables.Trial`, `model.hp_trial.HPTuneTrial`, `service.trial_service`)
-- Trial directories: `data/hptune/trials/trial_*`
-- Best-trial artifacts: `data/hptune/best_trial`
-- Controller logs: `data/hptune/controller_logs/`
-- Per-rank MPI logs: `data/hptune/trials/trial_*/dist_rank_<world_rank>.log`
-- Standard training logs: `data/hptune/trials/trial_*/train_<jobid>.log`
-- Under PBS, Loguru also writes `data/hptune/controller_logs/hptune_<PBS_JOBID>.txt`
+- Trial state CSV: `{HPTUNE_DIR}/trials/trials.csv`
+- Trial directories: `{HPTUNE_DIR}/trials/trial_*`
+- Best-trial artifacts: `{HPTUNE_DIR}/best_trial/`
+- Controller logs: `{HPTUNE_DIR}/controller_logs/` (`chain_steps.csv`, `chain_summary.log`, PBS stdout/stderr)
+- Per-trial training logs/checkpoints: `{HPTUNE_DIR}/trials/trial_*/`
+- Under PBS, Loguru also writes `{HPTUNE_DIR}/controller_logs/hptune_<PBS_JOBID>.txt`
 
-MPI-related env and sizing:
-- `TRIALS_DIR`, `DB_CONNECTION`, 
-- `HPTUNE_CONTROLLER_NODES`: nodes reserved for the outer controller allocation
-- one controller node is reserved from trial execution
-- `HPTUNE_TRIAL_NODES`: nodes consumed by each dispatched trial
-- `GPUS_PER_NODE`: defaults to `4` in `scripts/controller_parallel.sh`
-- `HPTUNE_MPI_SIZE`: derived as `HPTUNE_CONTROLLER_NODES * GPUS_PER_NODE`
-- `HPTUNE_MAX_TRIALS`
-- `HPTUNE_MAX_RETRIES`
-- `HPTUNE_EI_XI`
-- `HPTUNE_RANDOM_INSERT_EVERY`
+#### MPI / parallel HPTune (experimental)
 
-Run directory (trials DB, `best_trial/`, `controller_logs/`): set `HPTUNE_DIR` in the environment (absolute path to the run root; trials live under `HPTUNE_DIR/trials/`).
+`src/hptune_mpi.py` is an experimental Redis/MPI worker stub (not wired into the serial PBS chain above). There are no `start_hptune_parallel.sh` or `controller_parallel.sh` scripts in this repository yet. Multi-GPU training within a single PBS trial job is supported via `scripts/run_train.sh` + `mpiexec`.
 
 ## Quick Reference
 

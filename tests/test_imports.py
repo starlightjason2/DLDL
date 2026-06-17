@@ -8,9 +8,6 @@ import pytest
 
 # Library modules only (not train.py / graph.py / validate.py — those need full .env at import time).
 _CORE_MODULES = [
-    "database.connection",
-    "database.tables",
-    "database",
     "service.trial_service",
     "schemas",
     "util.data_loading",
@@ -27,14 +24,6 @@ _CORE_MODULES = [
 @pytest.mark.parametrize("name", _CORE_MODULES)
 def test_import_core_module(name: str) -> None:
     importlib.import_module(name)
-
-
-def test_database_exports_engine() -> None:
-    from database import Trial, engine, get_db_session
-
-    assert Trial is not None
-    assert engine is not None
-    assert get_db_session is not None
 
 
 def test_hptune_mpi_import_optional() -> None:

@@ -35,6 +35,7 @@ def _configure_logging(prog_dir: Path, job_id: str) -> None:
 
 def main() -> None:
     from model.cnn import IpCNN
+    from model.dataset import IpDataset
 
     prog_dir = _abs(os.environ["PROG_DIR"])
     job_id = os.environ["JOB_ID"]
@@ -48,32 +49,41 @@ def main() -> None:
 
     _configure_logging(prog_dir, job_id)
 
-    e = os.environ
+    lr_scheduler = os.environ["LR_SCHEDULER"].lower() in ("true", "1", "yes", "on")
+
+    dataset = IpDataset(
+        normalization_type=os.environ["NORMALIZATION_TYPE"],
+        data_file=str(data_path),
+        labels_file=str(labels_path),
+        labels_path=str(_abs(os.environ["LABELS_PATH"])),
+        data_dir=str(_abs(os.environ["DATA_DIR"])),
+        labels_type="scaled",
+        cpu_use=float(os.environ["CPU_USE"]),
+        preprocessor_max_workers=int(os.environ["PREPROCESSOR_MAX_WORKERS"]),
+    )
+
     model = IpCNN(
-        data_path=str(data_path),
-        labels_path=str(labels_path),
+        dataset,
         prog_dir=str(prog_dir),
         conv1=(
-            int(e["CONV1_FILTERS"]),
-            int(e["CONV1_KERNEL"]),
-            int(e["CONV1_PADDING"]),
+            int(os.environ["CONV1_FILTERS"]),
+            int(os.environ["CONV1_KERNEL"]),
+            int(os.environ["CONV1_PADDING"]),
         ),
         conv2=(
-            int(e["CONV2_FILTERS"]),
-            int(e["CONV2_KERNEL"]),
-            int(e["CONV2_PADDING"]),
+            int(os.environ["CONV2_FILTERS"]),
+            int(os.environ["CONV2_KERNEL"]),
+            int(os.environ["CONV2_PADDING"]),
         ),
         conv3=(
-            int(e["CONV3_FILTERS"]),
-            int(e["CONV3_KERNEL"]),
-            int(e["CONV3_PADDING"]),
+            int(os.environ["CONV3_FILTERS"]),
+            int(os.environ["CONV3_KERNEL"]),
+            int(os.environ["CONV3_PADDING"]),
         ),
-        pool_size=int(e["POOL_SIZE"]),
-        fc1_size=int(e["FC1_SIZE"]),
-        fc2_size=int(e["FC2_SIZE"]),
-        dropout_rate=float(e["DROPOUT_RATE"]),
-        classification=False,
-        normalization_type=e["NORMALIZATION_TYPE"],
+        pool_size=int(os.environ["POOL_SIZE"]),
+        fc1_size=int(os.environ["FC1_SIZE"]),
+        fc2_size=int(os.environ["FC2_SIZE"]),
+        dropout_rate=float(os.environ["DROPOUT_RATE"]),
     )
 
     rank = int(os.environ.get("PMI_RANK", 0))
@@ -81,7 +91,21 @@ def main() -> None:
     local_rank = rank % 4  # GPUs per node
 
     model.train_model(
-        rank=rank, world_size=world_size, local_rank=local_rank, job_id=job_id
+        rank=rank,
+        world_size=world_size,
+        local_rank=local_rank,
+        job_id=job_id,
+        lr=float(os.environ["LEARNING_RATE"]),
+        num_epochs=int(os.environ["NUM_EPOCHS"]),
+        log_interval=int(os.environ["LOG_INTERVAL"]),
+        weight_decay=float(os.environ["WEIGHT_DECAY"]),
+        lr_scheduler=lr_scheduler,
+        lr_scheduler_factor=float(os.environ["LR_SCHEDULER_FACTOR"]),
+        lr_scheduler_patience=int(os.environ["LR_SCHEDULER_PATIENCE"]),
+        early_stopping_patience=int(os.environ["EARLY_STOPPING_PATIENCE"]),
+        gradient_clip=float(os.environ["GRADIENT_CLIP"]),
+        batch_size=int(os.environ["BATCH_SIZE"]),
+        dataloader_num_workers=int(os.environ["DATALOADER_NUM_WORKERS"]),
     )
 
 

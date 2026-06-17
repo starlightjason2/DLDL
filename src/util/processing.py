@@ -27,15 +27,3 @@ def convert_tensors_to_float(dset_path: str, labels_path: str) -> None:
     dataset, labels = torch.load(dset_path), torch.load(labels_path)
     torch.save(dataset.float(), dset_path)
     torch.save(labels.float(), labels_path)
-
-
-def split(dataset: Dataset, train_size: float = 0.8) -> Tuple[Subset, Subset, Subset]:
-    """Split dataset into train, dev, and test sets."""
-    total_size = len(cast(Sized, dataset))
-    train_end = int(train_size * total_size)
-    dev_end = int((train_size + (1 - train_size) / 2) * total_size)
-    return (
-        Subset(dataset, range(0, train_end)),
-        Subset(dataset, range(train_end, dev_end)),
-        Subset(dataset, range(dev_end, total_size)),
-    )

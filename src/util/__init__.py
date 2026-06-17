@@ -14,7 +14,6 @@ from .processing import (
     get_use_cores,
     create_binary_labels,
     convert_tensors_to_float,
-    split,
 )
 
 __all__ = [
@@ -29,5 +28,4 @@ __all__ = [
     "get_use_cores",
     "create_binary_labels",
     "convert_tensors_to_float",
-    "split",
 ]

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from loguru import logger
-
+from model.dataset import IpDataset
 
 _REPO = Path(__file__).resolve().parents[1]
 load_dotenv(dotenv_path=_REPO / ".env", encoding="utf-8")
@@ -36,13 +36,21 @@ logger.add(
     format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
     level="INFO",
 )
-from model.dataset import IpDataset
+
 
 if __name__ == "__main__":
-    n = os.environ["NORMALIZATION_TYPE"]
     logger.info("Cleaning up cached preprocessed files...")
     for path in (data_path, labels_pt_path):
         if os.path.exists(path):
             os.remove(path)
             logger.info(f"Deleted cached file: {path}")
-    IpDataset(normalization_type=n).check_dataset(scale_labels=True)
+    IpDataset(
+        normalization_type=os.environ["NORMALIZATION_TYPE"],
+        data_file=data_path,
+        labels_file=labels_pt_path,
+        labels_path=_abs(os.environ["LABELS_PATH"]),
+        data_dir=_abs(os.environ["DATA_DIR"]),
+        labels_type="scaled",
+        cpu_use=float(os.environ["CPU_USE"]),
+        preprocessor_max_workers=int(os.environ["PREPROCESSOR_MAX_WORKERS"]),
+    ).check_dataset(scale_labels=True)

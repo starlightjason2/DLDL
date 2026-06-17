@@ -23,8 +23,6 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 
-
-from util.processing import split
 from model.dataset import IpDataset
 
 
@@ -33,8 +31,7 @@ class IpCNN(nn.Module):
 
     def __init__(
         self,
-        data_path: str,
-        labels_path: str,
+        dataset: IpDataset,
         prog_dir: str,
         conv1: Tuple[int, int, int],
         conv2: Tuple[int, int, int],
@@ -43,17 +40,11 @@ class IpCNN(nn.Module):
         fc1_size: int,
         fc2_size: int,
         dropout_rate: float,
-        classification: bool = False,
-        normalization_type: str = "",
     ) -> None:
         """Initialize CNN model."""
         super(IpCNN, self).__init__()
         self.logger = logger.bind(name=__name__)
-        self.labels_path = labels_path
-        self.data_path = data_path
         self.prog_dir = prog_dir
-        self.classification = classification
-        self.normalization_type = normalization_type
         self._cls_loss = nn.BCEWithLogitsLoss()
         self._time_loss = nn.MSELoss()
 
@@ -73,20 +64,13 @@ class IpCNN(nn.Module):
         self.logger.info(f"  FC1 size: {fc1_size}")
         self.logger.info(f"  FC2 size: {fc2_size}")
         self.logger.info(f"  Dropout rate: {dropout_rate}")
-        self.logger.info(f"  Classification mode: {classification}")
-        self.logger.info(f"  Normalization type: {normalization_type}")
+        self.logger.info(f"  Normalization type: {dataset.normalization_type}")
         self.logger.info("=" * 60)
 
-        # Load dataset
-        self.dataset = IpDataset(
-            normalization_type=normalization_type,
-            data_file=data_path,
-            labels_file=labels_path,
-            classification=classification,
-        )
+        self.dataset = dataset
         self.max_length = int(self.dataset.data.shape[1])
         self.logger.info(
-            f"Dataset loaded: {len(self.dataset)} examples, max_length={self.max_length}"
+            f"Dataset: {len(self.dataset)} examples, max_length={self.max_length}"
         )
 
         # create CNN layers
@@ -117,7 +101,7 @@ class IpCNN(nn.Module):
         self.fc2 = nn.Linear(fc1_size, fc2_size)
         self.bn5 = nn.BatchNorm1d(fc2_size)
         self.dropout2 = nn.Dropout(dropout_rate)
-        self.fc3 = nn.Linear(fc2_size, 1 if classification else 2)
+        self.fc3 = nn.Linear(fc2_size, 2)
 
     def __len__(self) -> int:
         return sum(p.numel() for p in self.parameters())
@@ -139,21 +123,14 @@ class IpCNN(nn.Module):
     def _loss(self, outputs: Tensor, labels: Tensor) -> Tensor:
         """Combined loss for classification and time prediction."""
         class_loss = self._cls_loss(outputs[:, 0], labels[:, 0])
-        disruptive_mask = labels[:, 0] == 1
-        time_loss = (
-            self._time_loss(outputs[disruptive_mask, 1], labels[disruptive_mask, 1])
-            if disruptive_mask.any()
-            else torch.tensor(0.0, device=outputs.device)
-        )
+        time_loss = self._time_loss(outputs[:, 1], labels[:, 1])
         return class_loss + time_loss
 
     def _validate_epoch(
         self,
         model: nn.Module,
         dev_loader: DataLoader,
-        classification: bool,
-        bce_loss: nn.Module,
-        mse_loss: nn.Module | None,
+        mse_loss: nn.Module,
         epoch: int,
         writer: SummaryWriter,
         total_train_loss: float,
@@ -163,21 +140,17 @@ class IpCNN(nn.Module):
         """Run validation for a single epoch and update logs."""
         model.eval()
         total_val_loss = 0.0
-        if not classification:
-            all_classification_targets, all_classification_predictions = [], []
-            all_time_targets, all_time_predictions = [], []
+        all_classification_targets, all_classification_predictions = [], []
+        all_time_targets, all_time_predictions = [], []
 
         with torch.no_grad():
             for data, targets in dev_loader:
                 data, targets = data.cuda(), targets.cuda()
                 output = model(data)
-                if not classification:
-                    classification_targets, time_targets = targets[:, 0], targets[:, 1]
-                    classification_output, time_output = output[:, 0], output[:, 1]
-                    all_time_targets.extend(time_targets.cpu().numpy())
-                    all_time_predictions.extend(time_output.cpu().numpy())
-                else:
-                    classification_output, classification_targets = output, targets
+                classification_targets, time_targets = targets[:, 0], targets[:, 1]
+                classification_output, time_output = output[:, 0], output[:, 1]
+                all_time_targets.extend(time_targets.cpu().numpy())
+                all_time_predictions.extend(time_output.cpu().numpy())
 
                 classification_predictions = torch.sigmoid(classification_output) > 0.5
                 all_classification_targets.extend(classification_targets.cpu().numpy())
@@ -215,15 +188,14 @@ class IpCNN(nn.Module):
         for name, value in metrics.items():
             writer.add_scalar(name, value, epoch)
         writer.add_scalar("Validation Loss", avg_val_loss, epoch)
-        if not classification:
-            writer.add_scalar(
-                "Validation Time MSE",
-                mse_loss(
-                    torch.tensor(all_time_predictions),
-                    torch.tensor(all_time_targets),
-                ).item(),
-                epoch,
-            )
+        writer.add_scalar(
+            "Validation Time MSE",
+            mse_loss(
+                torch.tensor(all_time_predictions),
+                torch.tensor(all_time_targets),
+            ).item(),
+            epoch,
+        )
 
     def train_model(
         self,
@@ -231,16 +203,17 @@ class IpCNN(nn.Module):
         world_size: int,
         local_rank: int,
         job_id: str,
-        lr: float | None = None,
-        num_epochs: int | None = None,
-        log_interval: int | None = None,
-        weight_decay: float | None = None,
-        lr_scheduler: bool | None = None,
-        lr_scheduler_factor: float | None = None,
-        lr_scheduler_patience: int | None = None,
-        early_stopping_patience: int | None = None,
-        gradient_clip: float | None = None,
-        batch_size: int | None = None,
+        lr: float,
+        num_epochs: int,
+        log_interval: int,
+        weight_decay: float,
+        lr_scheduler: bool,
+        lr_scheduler_factor: float,
+        lr_scheduler_patience: int,
+        early_stopping_patience: int,
+        gradient_clip: float,
+        batch_size: int,
+        dataloader_num_workers: int,
     ) -> None:
         """Train this model with distributed data parallel."""
         self.logger.info(f"GPUs Available: {torch.cuda.device_count()}")
@@ -263,41 +236,8 @@ class IpCNN(nn.Module):
             torch.cuda.set_device(local_rank)
         torch.manual_seed(42 + rank)
 
-        e = os.environ
-        lr = lr if lr is not None else float(e["LEARNING_RATE"])
-        num_epochs = num_epochs if num_epochs is not None else int(e["NUM_EPOCHS"])
-        log_interval = (
-            log_interval if log_interval is not None else int(e["LOG_INTERVAL"])
-        )
-        weight_decay = (
-            weight_decay if weight_decay is not None else float(e["WEIGHT_DECAY"])
-        )
-        lr_scheduler_on = e["LR_SCHEDULER"].lower() in ("true", "1", "yes", "on")
-        lr_scheduler_enabled = (
-            lr_scheduler if lr_scheduler is not None else lr_scheduler_on
-        )
-        lr_scheduler_factor = (
-            lr_scheduler_factor
-            if lr_scheduler_factor is not None
-            else float(e["LR_SCHEDULER_FACTOR"])
-        )
-        lr_scheduler_patience = (
-            lr_scheduler_patience
-            if lr_scheduler_patience is not None
-            else int(e["LR_SCHEDULER_PATIENCE"])
-        )
-        early_stopping_patience = (
-            early_stopping_patience
-            if early_stopping_patience is not None
-            else int(e["EARLY_STOPPING_PATIENCE"])
-        )
-        gradient_clip = (
-            gradient_clip if gradient_clip is not None else float(e["GRADIENT_CLIP"])
-        )
-        batch_size = (
-            batch_size if batch_size is not None else int(e["BATCH_SIZE"])
-        )
-        dl_workers = int(os.environ["DATALOADER_NUM_WORKERS"])
+        lr_scheduler_enabled = lr_scheduler
+        num_workers = dataloader_num_workers if torch.cuda.is_available() else 0
 
         # Log training hyperparameters
         self.logger.info("=" * 60)
@@ -314,12 +254,11 @@ class IpCNN(nn.Module):
             )
         self.logger.info(f"  Early stopping patience: {early_stopping_patience}")
         self.logger.info(f"  Gradient clip: {gradient_clip}")
-        self.logger.info(f"  DataLoader num_workers: {dl_workers} (0 when no GPU)")
+        self.logger.info(f"  DataLoader num_workers: {num_workers}")
         self.logger.info("=" * 60)
 
-        train, dev, _ = split(self.dataset)
+        train, dev, _ = self.dataset.split()
 
-        num_workers = dl_workers if torch.cuda.is_available() else 0
         loader_kw = dict(
             batch_size=batch_size,
             pin_memory=torch.cuda.is_available(),
@@ -348,9 +287,7 @@ class IpCNN(nn.Module):
                 patience=lr_scheduler_patience,
             )
         bce_loss = torch.nn.BCEWithLogitsLoss()
-        classification = self.classification
-        if not classification:
-            mse_loss = torch.nn.MSELoss()
+        mse_loss = torch.nn.MSELoss()
 
         logs = []
         if rank == 0:
@@ -368,22 +305,14 @@ class IpCNN(nn.Module):
 
             for batch_idx, (data, target) in enumerate(train_loader):
                 data, target = data.cuda(), target.cuda()
-
-                if not classification:
-                    classification_targets, time_targets = target[:, 0], target[:, 1]
+                classification_targets, time_targets = target[:, 0], target[:, 1]
 
                 optimizer.zero_grad()
                 output = model(data)
-
-                if not classification:
-                    classification_output, time_output = output[:, 0], output[:, 1]
-                    loss_classification = bce_loss(
-                        classification_output, classification_targets
-                    )
-                    loss_time = mse_loss(time_output, time_targets)
-                    loss_value = self._loss(output, target)
-                else:
-                    loss_value = bce_loss(output, target)
+                classification_output, time_output = output[:, 0], output[:, 1]
+                loss_classification = bce_loss(classification_output, classification_targets)
+                loss_time = mse_loss(time_output, time_targets)
+                loss_value = self._loss(output, target)
 
                 loss_value.backward()
                 if gradient_clip and gradient_clip > 0:
@@ -398,13 +327,12 @@ class IpCNN(nn.Module):
                         f"Epoch {epoch}/{num_epochs}, Batch {batch_idx}, [{batch_idx * len(data)}/{dataset_size}] Loss {loss_value.item():.6f}"
                     )
                     writer.add_scalar("Training Loss", loss_value.item(), step)
-                    if not classification:
-                        writer.add_scalar(
-                            "Training Classification Loss",
-                            loss_classification.item(),
-                            step,
-                        )
-                        writer.add_scalar("Training Time Loss", loss_time.item(), step)
+                    writer.add_scalar(
+                        "Training Classification Loss",
+                        loss_classification.item(),
+                        step,
+                    )
+                    writer.add_scalar("Training Time Loss", loss_time.item(), step)
 
             val_loss_t = torch.zeros(
                 1, device=f"cuda:{local_rank}", dtype=torch.float64
@@ -413,9 +341,7 @@ class IpCNN(nn.Module):
                 self._validate_epoch(
                     model=model,
                     dev_loader=dev_loader,
-                    classification=classification,
-                    bce_loss=bce_loss,
-                    mse_loss=mse_loss if not classification else None,
+                    mse_loss=mse_loss,
                     epoch=epoch,
                     writer=writer,
                     total_train_loss=total_train_loss,
