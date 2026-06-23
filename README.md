@@ -76,6 +76,8 @@ Everything is read from the process environment (typically via a project-root `.
 | `LR_SCHEDULER_PATIENCE` | ✓ | Integer ≥ 1. |
 | `GRADIENT_CLIP` | ✓ | Float ≥ 0. |
 | `DATALOADER_NUM_WORKERS` | ✓ | DataLoader workers (forced to `0` when no GPU). |
+| `CLS_POS_WEIGHT` | ✓ | Positive-class (disruptive) weight in BCE loss (float ≥ 0). `>1` favors recall over precision. Tunable via `HPTUNE_CLS_POS_WEIGHT_*`. |
+| `DECISION_THRESHOLD` | ✓ | Sigmoid probability cutoff for the disruptive class (float in [0, 1]). `<0.5` favors recall. Tunable via `HPTUNE_DECISION_THRESHOLD_*`. |
 
 #### Architecture (`train.py` → `IpCNN`)
 
@@ -105,6 +107,8 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | `HPTUNE_LR_SCHEDULER_FACTOR_MIN`, `HPTUNE_LR_SCHEDULER_FACTOR_MAX` | ✓ | In (0, 1); min must be less than max. |
 | `HPTUNE_LR_SCHEDULER_PATIENCE_MIN`, `HPTUNE_LR_SCHEDULER_PATIENCE_MAX` | ✓ | Integers ≥ 1, `min` ≤ `max`. |
 | `HPTUNE_EARLY_STOPPING_PATIENCE_MIN`, `HPTUNE_EARLY_STOPPING_PATIENCE_MAX` | ✓ | Integers ≥ 1, `min` ≤ `max`. |
+| `HPTUNE_CLS_POS_WEIGHT_MIN`, `HPTUNE_CLS_POS_WEIGHT_MAX` | ✓ | BCE positive-class weight bounds (float ≥ 0; `min` ≤ `max`). Higher values push toward recall. |
+| `HPTUNE_DECISION_THRESHOLD_MIN`, `HPTUNE_DECISION_THRESHOLD_MAX` | ✓ | Decision-threshold bounds (floats in [0, 1]; `min` ≤ `max`). Lower values push toward recall. |
 | `HPTUNE_RANDOM_INSERT_EVERY` | ✓ | Insert a random trial every N completed trials after warmup (integer ≥ 0). |
 | `HPTUNE_EI_XI` | ✓ | Expected-improvement ξ for Bayesian optimization (float ≥ 0). |
 

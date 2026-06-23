@@ -89,6 +89,8 @@ def main() -> None:
         fc1_size=int(os.environ["FC1_SIZE"]),
         fc2_size=int(os.environ["FC2_SIZE"]),
         dropout_rate=float(os.environ["DROPOUT_RATE"]),
+        cls_pos_weight=float(os.environ["CLS_POS_WEIGHT"]),
+        decision_threshold=float(os.environ["DECISION_THRESHOLD"]),
     )
 
     model.train_model(

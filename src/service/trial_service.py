@@ -29,6 +29,8 @@ _CSV_COLUMNS = [
     "lr_scheduler_factor",
     "lr_scheduler_patience",
     "early_stopping_patience",
+    "cls_pos_weight",
+    "decision_threshold",
     "val_loss",
     "status",
     "retries",
@@ -83,6 +85,10 @@ class TrialService:
         for key in ("created_at", "updated_at"):
             if pd.isna(data.get(key)):
                 data[key] = None
+        if pd.isna(data.get("cls_pos_weight")):
+            data["cls_pos_weight"] = 1.0
+        if pd.isna(data.get("decision_threshold")):
+            data["decision_threshold"] = 0.5
         data["status"] = int(data["status"])
         return HPTuneTrial.model_validate(data)
 
@@ -100,6 +106,8 @@ class TrialService:
             "lr_scheduler_factor": trial.lr_scheduler_factor,
             "lr_scheduler_patience": trial.lr_scheduler_patience,
             "early_stopping_patience": trial.early_stopping_patience,
+            "cls_pos_weight": trial.cls_pos_weight,
+            "decision_threshold": trial.decision_threshold,
             "val_loss": trial.val_loss,
             "status": int(trial.status),
             "retries": trial.retries,

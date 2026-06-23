@@ -38,12 +38,27 @@ class IpCNN(nn.Module):
         fc1_size: int,
         fc2_size: int,
         dropout_rate: float,
+        cls_pos_weight: float = 1.0,
+        decision_threshold: float = 0.5,
     ) -> None:
-        """Initialize CNN model."""
+        """Initialize CNN model.
+
+        ``cls_pos_weight`` scales the loss of the positive (disruptive) class in
+        the binary classification head. Values > 1 penalize false negatives
+        (missed disruptions) more heavily, trading precision for recall.
+
+        ``decision_threshold`` is the sigmoid probability cutoff for predicting
+        the disruptive class. Values < 0.5 classify more shots as disruptive,
+        raising recall at the cost of precision.
+        """
         super(IpCNN, self).__init__()
         self.logger = logger.bind(name=__name__)
         self.prog_dir = prog_dir
-        self._cls_loss = nn.BCEWithLogitsLoss()
+        self.cls_pos_weight = float(cls_pos_weight)
+        self.decision_threshold = float(decision_threshold)
+        self._cls_loss = nn.BCEWithLogitsLoss(
+            pos_weight=torch.tensor(self.cls_pos_weight)
+        )
         self._time_loss = nn.MSELoss()
 
         # Log hyperparameters
@@ -65,6 +80,8 @@ class IpCNN(nn.Module):
         self.logger.info(f"  FC1 size: {fc1_size}")
         self.logger.info(f"  FC2 size: {fc2_size}")
         self.logger.info(f"  Dropout rate: {dropout_rate}")
+        self.logger.info(f"  Classification pos_weight: {self.cls_pos_weight}")
+        self.logger.info(f"  Decision threshold: {self.decision_threshold}")
         self.logger.info(f"  Normalization type: {dataset.normalization_type}")
         self.logger.info("=" * 60)
 
@@ -158,7 +175,9 @@ class IpCNN(nn.Module):
                 all_time_targets.extend(time_targets.cpu().numpy())
                 all_time_predictions.extend(time_output.cpu().numpy())
 
-                classification_predictions = torch.sigmoid(classification_output) > 0.5
+                classification_predictions = (
+                    torch.sigmoid(classification_output) > self.decision_threshold
+                )
                 all_classification_targets.extend(classification_targets.cpu().numpy())
                 all_classification_predictions.extend(
                     classification_predictions.cpu().numpy()
@@ -266,8 +285,8 @@ class IpCNN(nn.Module):
                 factor=lr_scheduler_factor,
                 patience=lr_scheduler_patience,
             )
-        bce_loss = torch.nn.BCEWithLogitsLoss()
-        mse_loss = torch.nn.MSELoss()
+        bce_loss = self._cls_loss
+        mse_loss = self._time_loss
 
         logs = []
         writer = SummaryWriter(self.prog_dir, filename_suffix=f"-job_{job_id}")

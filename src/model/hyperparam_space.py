@@ -52,6 +52,14 @@ class HyperparameterSpace(BaseModel):
                 env_float("HPTUNE_EARLY_STOPPING_PATIENCE_MIN"),
                 env_float("HPTUNE_EARLY_STOPPING_PATIENCE_MAX"),
             ),
+            "cls_pos_weight": (
+                env_float("HPTUNE_CLS_POS_WEIGHT_MIN"),
+                env_float("HPTUNE_CLS_POS_WEIGHT_MAX"),
+            ),
+            "decision_threshold": (
+                env_float("HPTUNE_DECISION_THRESHOLD_MIN"),
+                env_float("HPTUNE_DECISION_THRESHOLD_MAX"),
+            ),
             "epochs": (float(min(allowed_epochs)), float(max(allowed_epochs))),
             "batch_idx": (0.0, float(len(batch_sizes) - 1)),
             "lr_scheduler_u": (0.0, 1.0),
@@ -89,6 +97,8 @@ class HyperparameterSpace(BaseModel):
             "early_stopping_patience": int(
                 np.random.randint(*map(int, b["early_stop_patience"]))
             ),
+            "cls_pos_weight": float(np.random.uniform(*b["cls_pos_weight"])),
+            "decision_threshold": float(np.random.uniform(*b["decision_threshold"])),
         }
 
     def suggestion_to_trial(self, s: Mapping[str, float]) -> dict[str, Any]:
@@ -105,4 +115,6 @@ class HyperparameterSpace(BaseModel):
             "lr_scheduler_factor": float(s["lr_scheduler_factor"]),
             "lr_scheduler_patience": int(round(s["lr_sched_patience"])),
             "early_stopping_patience": int(round(s["early_stop_patience"])),
+            "cls_pos_weight": float(s["cls_pos_weight"]),
+            "decision_threshold": float(s["decision_threshold"]),
         }
