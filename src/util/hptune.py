@@ -64,10 +64,11 @@ def next_trial_numbered_id(
     return f"trial_{max(log_max, fs_max) + 1}"
 
 
-def parse_val_loss(trial_dir: str | Path) -> tuple[bool, float]:
-    """Parse best validation loss from the most recent training log CSV.
+def parse_trial_score(trial_dir: str | Path) -> tuple[bool, float]:
+    """Parse the best validation F-beta score from the most recent training log CSV.
 
-    Returns ``(True, val_loss)`` on success, ``(False, nan)`` if no valid log is found.
+    This is the trial objective the tuner maximizes (higher is better).
+    Returns ``(True, score)`` on success, ``(False, nan)`` if no valid log is found.
     """
     candidates = sorted(
         Path(trial_dir).glob("*training_log.csv"),
@@ -79,9 +80,9 @@ def parse_val_loss(trial_dir: str | Path) -> tuple[bool, float]:
             Exception, message=f"Skipping unreadable log {path}", reraise=False
         ):
             df = pd.read_csv(path)
-            if not df.empty and "validation_loss" in df.columns:
+            if not df.empty and "Validation Fbeta" in df.columns:
                 return True, float(
-                    df.loc[df["validation_loss"].idxmin(), "validation_loss"]
+                    df.loc[df["Validation Fbeta"].idxmax(), "Validation Fbeta"]
                 )
 
     return False, float("nan")
@@ -101,7 +102,7 @@ def sync_best_trial_artifacts(
     if not completed:
         return
 
-    best = min(completed, key=lambda t: t.val_loss)
+    best = max(completed, key=lambda t: t.score)
     env_src = Path(best.dir_path) / ".env"
 
     if not env_src.exists():
@@ -123,9 +124,9 @@ def sync_best_trial_artifacts(
     shutil.copy2(checkpoint_src, dest / checkpoint_src.name)
 
     logger.info(
-        "Best-trial snapshot updated: trial_id={} val_loss={:.6f} -> {}",
+        "Best-trial snapshot updated: trial_id={} score={:.6f} -> {}",
         best.trial_id,
-        float(best.val_loss),
+        float(best.score),
         dest,
     )
 

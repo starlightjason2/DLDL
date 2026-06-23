@@ -16,7 +16,7 @@ from model.hp_trial import HPTuneTrial, TrialStatus
 from service.trial_service import TrialService
 from util.hptune import (
     next_trial_numbered_id,
-    parse_val_loss,
+    parse_trial_score,
     sync_best_trial_artifacts,
 )
 from util.data_loading import env_int
@@ -120,7 +120,7 @@ class BayesianHPTuner(BaseModel):
         for t in completed:
             optimizer.register(
                 params=t.bayesian_params(self.hp_space.batch_sizes),
-                target=-t.val_loss,
+                target=t.score,
             )
 
         proposal = self.hp_space.suggestion_to_trial(optimizer.suggest())  # type: ignore
@@ -161,11 +161,11 @@ class BayesianHPTuner(BaseModel):
                 updated.append(t)
                 continue
 
-            completed, val_loss = parse_val_loss(t.dir_path)
+            completed, score = parse_trial_score(t.dir_path)
 
             if completed:
                 t = t.model_copy(
-                    update={"val_loss": val_loss, "status": TrialStatus.COMPLETED}
+                    update={"score": score, "status": TrialStatus.COMPLETED}
                 )
 
             elif logs := sorted(
@@ -221,7 +221,7 @@ class BayesianHPTuner(BaseModel):
                     **proposal,
                     "trial_id": tid,
                     "status": TrialStatus.QUEUED,
-                    "val_loss": -1.0,
+                    "score": -1.0,
                 }
             )
 

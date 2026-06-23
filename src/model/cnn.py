@@ -13,6 +13,7 @@ import torch.optim as optim
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
+    fbeta_score,
     precision_score,
     recall_score,
 )
@@ -159,8 +160,13 @@ class IpCNN(nn.Module):
         total_train_loss: float,
         train_loader: DataLoader,
         logs: list,
+        fbeta: float,
     ) -> None:
-        """Run validation for a single epoch and update logs."""
+        """Run validation for a single epoch and update logs.
+
+        ``fbeta`` is the beta used for the F-beta score that drives model
+        selection (beta > 1 weights recall over precision).
+        """
         model.eval()
         total_val_loss = 0.0
         all_classification_targets, all_classification_predictions = [], []
@@ -193,13 +199,25 @@ class IpCNN(nn.Module):
                 all_classification_targets, all_classification_predictions
             ),
             "Validation Precision": precision_score(
-                all_classification_targets, all_classification_predictions
+                all_classification_targets,
+                all_classification_predictions,
+                zero_division=0,
             ),
             "Validation Recall": recall_score(
-                all_classification_targets, all_classification_predictions
+                all_classification_targets,
+                all_classification_predictions,
+                zero_division=0,
             ),
             "Validation F1 Score": f1_score(
-                all_classification_targets, all_classification_predictions
+                all_classification_targets,
+                all_classification_predictions,
+                zero_division=0,
+            ),
+            "Validation Fbeta": fbeta_score(
+                all_classification_targets,
+                all_classification_predictions,
+                beta=fbeta,
+                zero_division=0,
             ),
         }
         logs.append(
@@ -236,8 +254,15 @@ class IpCNN(nn.Module):
         gradient_clip: float,
         batch_size: int,
         dataloader_num_workers: int,
+        fbeta: float = 2.0,
     ) -> None:
-        """Train this model on a single device."""
+        """Train this model on a single device.
+
+        Model selection (best checkpoint + early stopping) maximizes the
+        validation F-beta score, where ``fbeta`` > 1 prioritizes recall over
+        precision. The same F-beta is the scalar objective reported to the
+        hyperparameter tuner.
+        """
         self.logger.info(f"GPUs Available: {torch.cuda.device_count()}")
         if torch.cuda.is_available():
             torch.cuda.set_device(0)
@@ -262,6 +287,7 @@ class IpCNN(nn.Module):
         self.logger.info(f"  Early stopping patience: {early_stopping_patience}")
         self.logger.info(f"  Gradient clip: {gradient_clip}")
         self.logger.info(f"  DataLoader num_workers: {num_workers}")
+        self.logger.info(f"  Selection objective: F{fbeta:g} score (maximize)")
         self.logger.info("=" * 60)
 
         train, dev, _ = self.dataset.split()
@@ -291,7 +317,7 @@ class IpCNN(nn.Module):
         logs = []
         writer = SummaryWriter(self.prog_dir, filename_suffix=f"-job_{job_id}")
 
-        best_val_loss = float("inf")
+        best_score = float("-inf")
         epochs_without_improvement = 0
 
         for epoch in range(num_epochs):
@@ -343,8 +369,10 @@ class IpCNN(nn.Module):
                 total_train_loss=total_train_loss,
                 train_loader=train_loader,
                 logs=logs,
+                fbeta=fbeta,
             )
             avg_val_loss = logs[-1]["validation_loss"] if logs else float("inf")
+            current_score = logs[-1]["Validation Fbeta"] if logs else float("-inf")
 
             if lr_scheduler_enabled:
                 scheduler.step(avg_val_loss)
@@ -352,14 +380,14 @@ class IpCNN(nn.Module):
                     "Learning Rate", optimizer.param_groups[0]["lr"], epoch
                 )
 
-            if avg_val_loss < best_val_loss:
-                best_val_loss = avg_val_loss
+            if current_score > best_score:
+                best_score = current_score
                 epochs_without_improvement = 0
                 torch.save(
                     model.state_dict(),
                     os.path.join(self.prog_dir, f"{job_id}_best_params.pt"),
                 )
-                self.logger.info(f"New best validation loss: {best_val_loss:.6f}")
+                self.logger.info(f"New best validation F{fbeta:g}: {best_score:.6f}")
             else:
                 epochs_without_improvement += 1
 

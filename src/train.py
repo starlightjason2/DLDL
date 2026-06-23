@@ -106,6 +106,7 @@ def main() -> None:
         gradient_clip=float(os.environ["GRADIENT_CLIP"]),
         batch_size=int(os.environ["BATCH_SIZE"]),
         dataloader_num_workers=int(os.environ["DATALOADER_NUM_WORKERS"]),
+        fbeta=float(os.environ.get("FBETA", "2.0")),
     )
 
 

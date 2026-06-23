@@ -78,6 +78,7 @@ Everything is read from the process environment (typically via a project-root `.
 | `DATALOADER_NUM_WORKERS` | ✓ | DataLoader workers (forced to `0` when no GPU). |
 | `CLS_POS_WEIGHT` | ✓ | Positive-class (disruptive) weight in BCE loss (float ≥ 0). `>1` favors recall over precision. Tunable via `HPTUNE_CLS_POS_WEIGHT_*`. |
 | `DECISION_THRESHOLD` | ✓ | Sigmoid probability cutoff for the disruptive class (float in [0, 1]). `<0.5` favors recall. Tunable via `HPTUNE_DECISION_THRESHOLD_*`. |
+| `FBETA` | optional (default `2.0`) | Beta for the F-beta score used for model selection (best checkpoint + early stopping) and as the HPTune objective, which is **maximized**. `beta>1` weights recall over precision (`2.0` = F2). This defines the objective and is not itself tuned. |
 
 #### Architecture (`train.py` → `IpCNN`)
 
@@ -197,6 +198,7 @@ python src/train.py
 * Loads preprocessed tensors at `DATA_PATH` and `TRAIN_LABELS_PATH` (must match preprocessing / `NORMALIZATION_TYPE`)
 * Validates files exist, splits 80/10/10 train/dev/test
 * Trains on a single process / single GPU
+* Selects the best checkpoint and applies early stopping by **maximizing the validation F-beta** (`FBETA`, default F2), favoring recall over precision
 * Saves checkpoints and logs to `PROG_DIR`
 
 Training hyperparameters (learning rate, epochs, architecture sizes, etc.) are read from environment variables (see [Environment Variables](#environment-variables)).
@@ -273,6 +275,8 @@ Output logs: `preprocess_<jobid>.out`, `train_<jobid>.out` (and `.err`).
 HPTune reads the same project-root `.env` as the rest of the workflow. On Polaris, that is typically a symlink to `.env.polaris`.
 
 The supported path is a **serial PBS chain**: one controller job plans the next trial, submits one training job, then chains another controller after the trial finishes.
+
+**Objective:** each trial's score (the `score` column in `trials.csv`) is its best validation F-beta (`FBETA`, default F2). The optimizer **maximizes** this score, and `best_trial/` tracks the highest-scoring trial. Because F-beta with `beta>1` weights recall over precision, tuning pushes `cls_pos_weight` and `decision_threshold` toward catching more disruptions.
 
 #### Serial HPTune
 
