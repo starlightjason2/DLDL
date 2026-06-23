@@ -118,8 +118,8 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `HPTUNE_MAX_TRIALS` | ✓ | Stop when this many trials exist and none are running or queued. |
-| `HPTUNE_TRIAL_NODES` | ✓ | Nodes per trial (used for slot sizing in the controller). |
-| `HPTUNE_CONTROLLER_NODES` | ✓ | Nodes in the controller allocation (used for slot sizing). |
+| `HPTUNE_TRIAL_NODES` | ✓ | Nodes per trial: sets the trial job's `qsub` `select=` and feeds slot sizing in the controller. |
+| `HPTUNE_CONTROLLER_NODES` | ✓ | Nodes in the controller allocation: sets the chained controller's `qsub` `select=` and feeds slot sizing. |
 | `HPTUNE_MAX_RETRIES` | ✓ | Requeue failed trials up to this many times. |
 | `TRIAL_TIMEOUT` | ✓ | Seconds without log activity before a running trial is requeued or failed. |
 | `HPTUNE_QUEUE` | ✓† | PBS queue name for submitted trial/controller jobs. |
@@ -145,7 +145,7 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | Variable | Description |
 |----------|-------------|
 | `PBS_JOBID` | PBS job id. When set, HPTune also writes `controller_logs/hptune_<PBS_JOBID>.txt`. |
-| `TRIAL_DIR` | Set by `scripts/controller.sh` to `HPTUNE_DIR/trials/<trial_id>` before submitting a trial. Trial `.env` overrides are sourced from here. |
+| `TRIAL_DIR` | Set by the controller (via `submit_trial` in `src/util/pbs.py`) to `HPTUNE_DIR/trials/<trial_id>` and exported into the trial job. `scripts/run_train.sh` sources `TRIAL_DIR/.env` for hyperparameter overrides. |
 
 #### Thread caps (recommended on HPC)
 
@@ -254,14 +254,15 @@ Run preprocessing and training on compute nodes (not login nodes):
 # From DLDL project root, with `.env` configured
 cd /path/to/DLDL
 
-# Edit scripts/run_preprocess.sh and scripts/run_train.sh:
-# - Uncomment and set your conda activation
-# - Adjust #PBS -A if your account differs from fusiondl_aesp
+# Conda activation is driven by DLDL_CONDASH / CONDA_ENV in `.env` (no edits needed).
+# Both scripts default to #PBS -A fusiondl_aesp and walltime 1:00:00 — edit the
+# #PBS headers in scripts/run_preprocess.sh / scripts/run_train.sh if your account,
+# queue, or walltime differ.
 
-# Submit preprocessing (CPU, ~2 hr walltime)
+# Submit preprocessing (CPU)
 qsub scripts/run_preprocess.sh
 
-# Submit training (GPU, ~4 hr walltime)
+# Submit training (GPU)
 qsub scripts/run_train.sh
 
 # Check status
@@ -309,19 +310,20 @@ column -t -s, /path/to/data/hptune_debug/trials/trials.csv | head
 
 Layout:
 - `scripts/start_hptune.sh`: submits the first controller job.
-- `scripts/controller.sh`: runs one Bayesian optimizer pass via `python -m hptune_serial`, submits at most one queued trial, chains the next controller, then exits.
-- `src/hptune_serial.py`: CLI wrapper around `BayesianHPTuner.run_serial()` (or `--trial-id` to mark trials running).
-- `src/model/bayesian_hptuner.py`: trial state, acquisition, retries, and dispatch.
+- `scripts/controller.sh`: thin launcher — sets up the environment (sources `.env`, activates conda) and `exec`s `python -m hptune_serial`. No dispatch logic lives in shell.
+- `src/hptune_serial.py`: CLI entry point for `BayesianHPTuner.dispatch_serial()` (or `--trial-id` to manually mark trials running for recovery).
+- `src/model/bayesian_hptuner.py`: trial state, acquisition, retries, and dispatch (`dispatch_serial` owns the submit/chain step).
+- `src/util/pbs.py`: `qsub` submission helpers (`submit_trial`, `submit_controller`); job ids are read directly from `qsub` stdout.
 - `src/model/hp_trial.py` (`HPTuneTrial`): creates each trial directory and per-trial `.env` overrides.
 - `src/service/trial_service.py`: reads/writes `{HPTUNE_DIR}/trials/trials.csv`.
 - `scripts/run_train.sh`: training entrypoint submitted for each trial; sources `TRIAL_DIR/.env` for hyperparameter overrides.
 
-Serial chain flow:
-1. Controller runs `hptune_serial`, which refreshes trial status from training logs and plans new trials if needed.
-2. Controller prints `Next trial -> trial_N` (parsed by `controller.sh`).
-3. Controller submits `scripts/run_train.sh` with `TRIAL_DIR=$HPTUNE_DIR/trials/trial_N`.
-4. After the trial job, controller submits another `scripts/controller.sh` with `-W depend=afterany`.
-5. Repeat until `HPTUNE_MAX_TRIALS` is reached and no trials are running or queued.
+Serial chain flow (all steps run in-process within `dispatch_serial`; no stdout parsing):
+1. Controller `exec`s `hptune_serial`, which refreshes trial status from training logs and plans a new trial if none is queued.
+2. It selects the next queued trial directly (no `Next trial ->` marker), then `qsub`s `scripts/run_train.sh` with `TRIAL_DIR=$HPTUNE_DIR/trials/trial_N`, capturing the job id from `qsub` stdout.
+3. It marks that trial `RUNNING` in `trials.csv` so the next controller ingests its score.
+4. It `qsub`s the next `scripts/controller.sh` with `-W depend=afterany:<trial_job>`.
+5. Repeat until `HPTUNE_MAX_TRIALS` is reached and no trials are running or queued, at which point dispatch logs "Chain complete." and submits no further jobs.
 
 Important serial env:
 - `PROJECT_ROOT`, `HPTUNE_DIR`, `HPTUNE_QUEUE`

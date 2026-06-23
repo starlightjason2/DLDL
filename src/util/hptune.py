@@ -118,9 +118,16 @@ def sync_best_trial_artifacts(
         ):
             existing.unlink()
 
-    shutil.copy2(env_src, dest / ".env")
-
     checkpoint_src = Path(best.dir_path) / f"{best.trial_id}_best_params.pt"
+    if not checkpoint_src.exists():
+        logger.warning(
+            "Best-trial sync skipped: missing checkpoint for {} at {}",
+            best.trial_id,
+            checkpoint_src,
+        )
+        return
+
+    shutil.copy2(env_src, dest / ".env")
     shutil.copy2(checkpoint_src, dest / checkpoint_src.name)
 
     logger.info(

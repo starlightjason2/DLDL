@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -20,6 +21,7 @@ from util.hptune import (
     sync_best_trial_artifacts,
 )
 from util.data_loading import env_int
+from util.pbs import submit_controller, submit_trial
 
 
 class BayesianHPTuner(BaseModel):
@@ -271,8 +273,36 @@ class BayesianHPTuner(BaseModel):
     # Serial Runner
     # ------------------------------------------------------------------
 
-    def run_serial(self) -> None:
-        """One dispatcher pass for the serial PBS controller."""
+    @staticmethod
+    def _utc_stamp() -> str:
+        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def _log_chain_step(self, trial_id: str, trial_job: str) -> None:
+        line = ",".join(
+            [
+                self._utc_stamp(),
+                os.environ.get("HPTUNE_CHAIN_ID", ""),
+                os.environ.get("PBS_JOBID", ""),
+                trial_id,
+                trial_job,
+            ]
+        )
+        with (self.log_dir / "chain_steps.csv").open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
+
+    def _log_chain_complete(self) -> None:
+        chain_id = os.environ.get("HPTUNE_CHAIN_ID", "")
+        with (self.log_dir / "chain_summary.log").open("a", encoding="utf-8") as f:
+            f.write(f"Chain {chain_id} finished at {self._utc_stamp()}\n")
+
+    def dispatch_serial(self) -> None:
+        """One serial controller step.
+
+        Refresh trial status, plan the next trial if none is queued, then submit
+        the trial job and chain the next controller — all in-process. The trial id
+        and PBS job ids are passed/returned directly, so no stdout scraping is
+        needed and the chosen trial is marked ``RUNNING`` in the same pass.
+        """
         trials = self.update_trials(TrialService.get_trials())
 
         queued_ids = [t.trial_id for t in trials if t.status == TrialStatus.QUEUED]
@@ -292,7 +322,31 @@ class BayesianHPTuner(BaseModel):
 
         if not queued_ids:
             logger.info("Chain complete.")
+            self._log_chain_complete()
             return
 
-        # Shell parser in controller.sh keys on this exact format
-        print(f"Next trial -> {queued_ids[0]}")
+        next_id = queued_ids[0]
+        queue = os.environ["HPTUNE_QUEUE"]
+
+        trial_job = submit_trial(
+            trial_dir=self.trials_dir / next_id,
+            log_dir=self.log_dir,
+            nodes=self.trial_nodes,
+            queue=queue,
+            walltime=os.environ["HPTUNE_TRAIN_WALLTIME"],
+        )
+        logger.info("Submitted {} as {}", next_id, trial_job)
+
+        # Mark RUNNING before chaining so the next controller parses this trial's
+        # score (via update_trials) instead of re-dispatching it.
+        self.mark_trials_running([next_id])
+        self._log_chain_step(next_id, trial_job)
+
+        controller_job = submit_controller(
+            depend_after=trial_job,
+            log_dir=self.log_dir,
+            nodes=self.controller_nodes or 1,
+            queue=queue,
+            walltime=os.environ["HPTUNE_CONTROLLER_WALLTIME"],
+        )
+        logger.info("Chained next controller as {}", controller_job)
