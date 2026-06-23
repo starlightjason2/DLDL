@@ -80,20 +80,18 @@ def main() -> None:
             int(os.environ["CONV3_KERNEL"]),
             int(os.environ["CONV3_PADDING"]),
         ),
+        conv4=(
+            int(os.environ["CONV4_FILTERS"]),
+            int(os.environ["CONV4_KERNEL"]),
+            int(os.environ["CONV4_PADDING"]),
+        ),
         pool_size=int(os.environ["POOL_SIZE"]),
         fc1_size=int(os.environ["FC1_SIZE"]),
         fc2_size=int(os.environ["FC2_SIZE"]),
         dropout_rate=float(os.environ["DROPOUT_RATE"]),
     )
 
-    rank = int(os.environ.get("PMI_RANK", 0))
-    world_size = int(os.environ.get("PMI_SIZE", 1))
-    local_rank = rank % 4  # GPUs per node
-
     model.train_model(
-        rank=rank,
-        world_size=world_size,
-        local_rank=local_rank,
         job_id=job_id,
         lr=float(os.environ["LEARNING_RATE"]),
         num_epochs=int(os.environ["NUM_EPOCHS"]),

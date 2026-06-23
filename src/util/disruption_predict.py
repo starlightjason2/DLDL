@@ -7,25 +7,14 @@ from dataclasses import dataclass
 import numpy as np
 
 
-@dataclass(frozen=True)
-class SmoothingConfig:
-    """Controls the box-filter smoothing applied before residual analysis."""
-
-    window_divisor: int = 100
-
-    def __post_init__(self) -> None:
-        if self.window_divisor < 1:
-            raise ValueError("window_divisor must be at least 1")
-
-
-DEFAULT_SMOOTHING = SmoothingConfig()
+DEFAULT_SMOOTHING = 100
 
 
 def _smooth_diff(
-    current: np.ndarray, smoothing: SmoothingConfig = DEFAULT_SMOOTHING
+    current: np.ndarray, smoothing: float = DEFAULT_SMOOTHING
 ) -> tuple[np.ndarray, np.ndarray]:
     time = np.arange(len(current)) / len(current)
-    window_size = max(1, len(time) // smoothing.window_divisor)
+    window_size = max(1, len(time) // smoothing)
     weights = np.ones(window_size) / window_size
     smoothed = np.convolve(current, weights, mode="same")
     diff = np.abs(current - smoothed)
@@ -33,7 +22,7 @@ def _smooth_diff(
 
 
 def predict_disruption_time(
-    current: np.ndarray, smoothing: SmoothingConfig = DEFAULT_SMOOTHING
+    current: np.ndarray, smoothing: float = DEFAULT_SMOOTHING
 ) -> float:
     """Predict disruption time as normalized index of max |current - smoothed|."""
     time, diff = _smooth_diff(current, smoothing)
@@ -41,7 +30,7 @@ def predict_disruption_time(
 
 
 def extract_disruption_features(
-    current: np.ndarray, smoothing: SmoothingConfig = DEFAULT_SMOOTHING
+    current: np.ndarray, smoothing: float = DEFAULT_SMOOTHING
 ) -> np.ndarray:
     """Build feature vector from smoothed-residual signal statistics."""
     time, diff = _smooth_diff(current, smoothing)

@@ -3,12 +3,10 @@
 import os
 from collections.abc import Sized
 from typing import Tuple, cast
-from datetime import timedelta
 from loguru import logger
 
 import pandas as pd
 import torch
-import torch.distributed as dist
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -19,8 +17,7 @@ from sklearn.metrics import (
     recall_score,
 )
 from torch import Tensor
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader, DistributedSampler
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from model.dataset import IpDataset
@@ -36,6 +33,7 @@ class IpCNN(nn.Module):
         conv1: Tuple[int, int, int],
         conv2: Tuple[int, int, int],
         conv3: Tuple[int, int, int],
+        conv4: Tuple[int, int, int],
         pool_size: int,
         fc1_size: int,
         fc2_size: int,
@@ -59,6 +57,9 @@ class IpCNN(nn.Module):
         )
         self.logger.info(
             f"  Conv3: filters={conv3[0]}, kernel={conv3[1]}, padding={conv3[2]}"
+        )
+        self.logger.info(
+            f"  Conv4: filters={conv4[0]}, kernel={conv4[1]}, padding={conv4[2]}"
         )
         self.logger.info(f"  Pool size: {pool_size}")
         self.logger.info(f"  FC1 size: {fc1_size}")
@@ -86,6 +87,10 @@ class IpCNN(nn.Module):
             conv2[0], conv3[0], kernel_size=conv3[1], stride=1, padding=conv3[2]
         )
         self.bn3 = nn.BatchNorm1d(conv3[0])
+        self.conv4 = nn.Conv1d(
+            conv3[0], conv4[0], kernel_size=conv4[1], stride=1, padding=conv4[2]
+        )
+        self.bn4 = nn.BatchNorm1d(conv4[0])
         self.pool = nn.MaxPool1d(kernel_size=pool_size, stride=pool_size, padding=0)
 
         # Compute FC input size dynamically
@@ -96,10 +101,10 @@ class IpCNN(nn.Module):
 
         # create FC layers
         self.fc1 = nn.Linear(num_features_before_fc, fc1_size)
-        self.bn4 = nn.BatchNorm1d(fc1_size)
+        self.bn5 = nn.BatchNorm1d(fc1_size)
         self.dropout1 = nn.Dropout(dropout_rate)
         self.fc2 = nn.Linear(fc1_size, fc2_size)
-        self.bn5 = nn.BatchNorm1d(fc2_size)
+        self.bn6 = nn.BatchNorm1d(fc2_size)
         self.dropout2 = nn.Dropout(dropout_rate)
         self.fc3 = nn.Linear(fc2_size, 2)
 
@@ -111,13 +116,14 @@ class IpCNN(nn.Module):
         x = self.pool(F.relu(self.bn1(self.conv1(x))))
         x = self.pool(F.relu(self.bn2(self.conv2(x))))
         x = self.pool(F.relu(self.bn3(self.conv3(x))))
+        x = self.pool(F.relu(self.bn4(self.conv4(x))))
         return x.view(x.size(0), -1)
 
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass."""
         x = self.forward_conv(x.unsqueeze(1))
-        x = self.dropout1(F.relu(self.bn4(self.fc1(x))))
-        x = self.dropout2(F.relu(self.bn5(self.fc2(x))))
+        x = self.dropout1(F.relu(self.bn5(self.fc1(x))))
+        x = self.dropout2(F.relu(self.bn6(self.fc2(x))))
         return self.fc3(x)
 
     def _loss(self, outputs: Tensor, labels: Tensor) -> Tensor:
@@ -199,9 +205,6 @@ class IpCNN(nn.Module):
 
     def train_model(
         self,
-        rank: int,
-        world_size: int,
-        local_rank: int,
         job_id: str,
         lr: float,
         num_epochs: int,
@@ -215,26 +218,11 @@ class IpCNN(nn.Module):
         batch_size: int,
         dataloader_num_workers: int,
     ) -> None:
-        """Train this model with distributed data parallel."""
+        """Train this model on a single device."""
         self.logger.info(f"GPUs Available: {torch.cuda.device_count()}")
-        use_distributed = world_size > 1
-        if use_distributed:
-            self.logger.info(
-                f"Distributed training - Rank: {rank}, Local Rank: {local_rank}, World Size: {world_size}"
-            )
-            dist.init_process_group(
-                backend="nccl",
-                init_method="env://",
-                world_size=world_size,
-                rank=rank,
-                timeout=timedelta(minutes=10),
-            )
-            torch.cuda.set_device(local_rank)
-        else:
-            self.logger.info("Single-process training (world_size=1)")
-            local_rank = 0
-            torch.cuda.set_device(local_rank)
-        torch.manual_seed(42 + rank)
+        if torch.cuda.is_available():
+            torch.cuda.set_device(0)
+        torch.manual_seed(42)
 
         lr_scheduler_enabled = lr_scheduler
         num_workers = dataloader_num_workers if torch.cuda.is_available() else 0
@@ -265,18 +253,10 @@ class IpCNN(nn.Module):
             num_workers=num_workers,
             persistent_workers=num_workers > 0,
         )
-        if use_distributed:
-            train_sampler = DistributedSampler(
-                train, num_replicas=world_size, rank=rank, shuffle=True
-            )
-            train_loader = DataLoader(train, sampler=train_sampler, **loader_kw)
-        else:
-            train_loader = DataLoader(train, shuffle=True, **loader_kw)
+        train_loader = DataLoader(train, shuffle=True, **loader_kw)
         dev_loader = DataLoader(dev, shuffle=False, **loader_kw)
 
         model = self.cuda()
-        if use_distributed:
-            model = DDP(model, device_ids=[local_rank], output_device=local_rank)
 
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         if lr_scheduler_enabled:
@@ -290,14 +270,13 @@ class IpCNN(nn.Module):
         mse_loss = torch.nn.MSELoss()
 
         logs = []
-        if rank == 0:
-            writer = SummaryWriter(self.prog_dir, filename_suffix=f"-job_{job_id}")
+        writer = SummaryWriter(self.prog_dir, filename_suffix=f"-job_{job_id}")
 
         best_val_loss = float("inf")
         epochs_without_improvement = 0
 
         for epoch in range(num_epochs):
-            if rank == 0 and epoch > 0:
+            if epoch > 0:
                 self.logger.info("--------------------------------")
 
             model.train()
@@ -310,7 +289,9 @@ class IpCNN(nn.Module):
                 optimizer.zero_grad()
                 output = model(data)
                 classification_output, time_output = output[:, 0], output[:, 1]
-                loss_classification = bce_loss(classification_output, classification_targets)
+                loss_classification = bce_loss(
+                    classification_output, classification_targets
+                )
                 loss_time = mse_loss(time_output, time_targets)
                 loss_value = self._loss(output, target)
 
@@ -320,7 +301,7 @@ class IpCNN(nn.Module):
                 optimizer.step()
                 total_train_loss += loss_value.item()
 
-                if batch_idx % log_interval == 0 and rank == 0:
+                if batch_idx % log_interval == 0:
                     dataset_size = len(cast(Sized, train_loader.dataset))
                     step = epoch * dataset_size + batch_idx
                     self.logger.info(
@@ -334,66 +315,52 @@ class IpCNN(nn.Module):
                     )
                     writer.add_scalar("Training Time Loss", loss_time.item(), step)
 
-            val_loss_t = torch.zeros(
-                1, device=f"cuda:{local_rank}", dtype=torch.float64
+            self._validate_epoch(
+                model=model,
+                dev_loader=dev_loader,
+                mse_loss=mse_loss,
+                epoch=epoch,
+                writer=writer,
+                total_train_loss=total_train_loss,
+                train_loader=train_loader,
+                logs=logs,
             )
-            if rank == 0:
-                self._validate_epoch(
-                    model=model,
-                    dev_loader=dev_loader,
-                    mse_loss=mse_loss,
-                    epoch=epoch,
-                    writer=writer,
-                    total_train_loss=total_train_loss,
-                    train_loader=train_loader,
-                    logs=logs,
-                )
-                val_loss_t[0] = logs[-1]["validation_loss"] if logs else float("inf")
-            if use_distributed:
-                dist.broadcast(val_loss_t, src=0)
-            avg_val_loss = val_loss_t.item()
+            avg_val_loss = logs[-1]["validation_loss"] if logs else float("inf")
 
             if lr_scheduler_enabled:
                 scheduler.step(avg_val_loss)
+                writer.add_scalar(
+                    "Learning Rate", optimizer.param_groups[0]["lr"], epoch
+                )
 
-            if rank == 0:
-                if lr_scheduler_enabled:
-                    writer.add_scalar(
-                        "Learning Rate", optimizer.param_groups[0]["lr"], epoch
-                    )
+            if avg_val_loss < best_val_loss:
+                best_val_loss = avg_val_loss
+                epochs_without_improvement = 0
+                torch.save(
+                    model.state_dict(),
+                    os.path.join(self.prog_dir, f"{job_id}_best_params.pt"),
+                )
+                self.logger.info(f"New best validation loss: {best_val_loss:.6f}")
+            else:
+                epochs_without_improvement += 1
 
-                if avg_val_loss < best_val_loss:
-                    best_val_loss = avg_val_loss
-                    epochs_without_improvement = 0
-                    torch.save(
-                        model.state_dict(),
-                        os.path.join(self.prog_dir, f"{job_id}_best_params.pt"),
-                    )
-                    self.logger.info(f"New best validation loss: {best_val_loss:.6f}")
-                else:
-                    epochs_without_improvement += 1
+            if (
+                early_stopping_patience > 0
+                and epochs_without_improvement >= early_stopping_patience
+            ):
+                self.logger.info(
+                    f"Early stopping triggered after {epoch + 1} epochs (no improvement for {early_stopping_patience} epochs)"
+                )
+                break
 
-                if (
-                    early_stopping_patience > 0
-                    and epochs_without_improvement >= early_stopping_patience
-                ):
-                    self.logger.info(
-                        f"Early stopping triggered after {epoch + 1} epochs (no improvement for {early_stopping_patience} epochs)"
-                    )
-                    break
-
-            if epoch % 5 == 0 and rank == 0:
+            if epoch % 5 == 0:
                 torch.save(
                     model.state_dict(),
                     os.path.join(self.prog_dir, f"{job_id}_params_epoch{epoch}.pt"),
                 )
 
-        if rank == 0:
-            writer.close()
-            df_logs = pd.DataFrame(logs)
-            df_logs.to_csv(
-                os.path.join(self.prog_dir, f"{job_id}_training_log.csv"), index=False
-            )
-
-        if use_distributed:
-            dist.destroy_process_group()
+        writer.close()
+        df_logs = pd.DataFrame(logs)
+        df_logs.to_csv(
+            os.path.join(self.prog_dir, f"{job_id}_training_log.csv"), index=False
+        )

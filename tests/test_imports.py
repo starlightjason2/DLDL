@@ -24,14 +24,3 @@ _CORE_MODULES = [
 @pytest.mark.parametrize("name", _CORE_MODULES)
 def test_import_core_module(name: str) -> None:
     importlib.import_module(name)
-
-
-def test_hptune_mpi_import_optional() -> None:
-    """Loads when MPI is available; skipped on laptops without libmpi."""
-    try:
-        importlib.import_module("hptune_mpi")
-    except RuntimeError as exc:
-        msg = str(exc).lower()
-        if "mpi" in msg or "libmpi" in msg:
-            pytest.skip(f"MPI runtime not available: {exc}")
-        raise

@@ -21,17 +21,7 @@ set +a
 source "$DLDL_CONDASH" && conda activate "$CONDA_ENV"
 export PYTHONPATH="$PROJECT_ROOT/src"
 
-# ── Distributed setup ──────────────────────────────────────────────────────
-NNODES=$(wc -l < "$PBS_NODEFILE")
-NRANKS_PER_NODE=${NRANKS_PER_NODE:-4}
-WORLD_SIZE=$(( NNODES * NRANKS_PER_NODE ))
-export WORLD_SIZE
-
-# ── Train ──────────────────────────────────────────────────────────────────
+# ── Train (single process, single GPU) ─────────────────────────────────────
 cd "$PROJECT_ROOT"
 
-mpiexec \
-    --np "$WORLD_SIZE" \
-    --ppn "$NRANKS_PER_NODE" \
-    --hostfile "$PBS_NODEFILE" \
-    python src/train.py
+python src/train.py

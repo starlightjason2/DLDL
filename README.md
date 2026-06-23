@@ -84,6 +84,7 @@ Everything is read from the process environment (typically via a project-root `.
 | `CONV1_FILTERS`, `CONV1_KERNEL`, `CONV1_PADDING` | ✓ | Conv1 layer (integers ≥ 0 where applicable). |
 | `CONV2_FILTERS`, `CONV2_KERNEL`, `CONV2_PADDING` | ✓ | Conv2 layer. |
 | `CONV3_FILTERS`, `CONV3_KERNEL`, `CONV3_PADDING` | ✓ | Conv3 layer. |
+| `CONV4_FILTERS`, `CONV4_KERNEL`, `CONV4_PADDING` | ✓ | Conv4 layer. |
 | `POOL_SIZE` | ✓ | Integer ≥ 1. |
 | `FC1_SIZE`, `FC2_SIZE` | ✓ | Integer ≥ 1. |
 
@@ -130,7 +131,6 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | `DLDL_CONDASH` | ✓‡ | Path to `conda.sh` (sourced by PBS scripts). |
 | `CONDA_ENV` | ✓‡ | Conda environment name. |
 | `TMPDIR` | | Temp directory (recommended on HPC). |
-| `NRANKS_PER_NODE` | | MPI ranks per node in `scripts/run_train.sh` (default `4`). |
 | `RESET` | | Set to `1` when calling `scripts/start_hptune.sh` to wipe files under `HPTUNE_DIR`. |
 
 ‡Required by PBS training/preprocess/HPTune scripts.
@@ -140,9 +140,7 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | Variable | Description |
 |----------|-------------|
 | `PBS_JOBID` | PBS job id. When set, HPTune also writes `controller_logs/hptune_<PBS_JOBID>.txt`. |
-| `PBS_NODEFILE` | Node list for `mpiexec` in `scripts/run_train.sh`. |
 | `TRIAL_DIR` | Set by `scripts/controller.sh` to `HPTUNE_DIR/trials/<trial_id>` before submitting a trial. Trial `.env` overrides are sourced from here. |
-| `PMI_RANK`, `PMI_SIZE` | MPI rank/size read by `train.py` under `mpiexec` (defaults: `0`, `1`). |
 
 #### Thread caps (recommended on HPC)
 
@@ -194,7 +192,7 @@ python src/train.py
 
 * Loads preprocessed tensors at `DATA_PATH` and `TRAIN_LABELS_PATH` (must match preprocessing / `NORMALIZATION_TYPE`)
 * Validates files exist, splits 80/10/10 train/dev/test
-* Uses distributed training when `PMI_SIZE` is greater than 1 (`PMI_RANK`, `PMI_SIZE`; set by `mpiexec` in `scripts/run_train.sh`)
+* Trains on a single process / single GPU
 * Saves checkpoints and logs to `PROG_DIR`
 
 Training hyperparameters (learning rate, epochs, architecture sizes, etc.) are read from environment variables (see [Environment Variables](#environment-variables)).
@@ -330,10 +328,6 @@ Data and logging layout:
 - Controller logs: `{HPTUNE_DIR}/controller_logs/` (`chain_steps.csv`, `chain_summary.log`, PBS stdout/stderr)
 - Per-trial training logs/checkpoints: `{HPTUNE_DIR}/trials/trial_*/`
 - Under PBS, Loguru also writes `{HPTUNE_DIR}/controller_logs/hptune_<PBS_JOBID>.txt`
-
-#### MPI / parallel HPTune (experimental)
-
-`src/hptune_mpi.py` is an experimental Redis/MPI worker stub (not wired into the serial PBS chain above). There are no `start_hptune_parallel.sh` or `controller_parallel.sh` scripts in this repository yet. Multi-GPU training within a single PBS trial job is supported via `scripts/run_train.sh` + `mpiexec`.
 
 ## Quick Reference
 
