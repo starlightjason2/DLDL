@@ -5,9 +5,21 @@ import os
 import sys
 from pathlib import Path
 
+import torch
 from dotenv import load_dotenv
 from loguru import logger
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    fbeta_score,
+    precision_score,
+    recall_score,
+)
+from torch.utils.data import DataLoader
 
+from model.dataset import IpDataset
+from util.hptune import load_best_trial_cnn
 
 _REPO = Path(__file__).resolve().parents[1]
 load_dotenv(dotenv_path=_REPO / ".env", encoding="utf-8")
@@ -37,8 +49,6 @@ logger.add(
     format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
     level="INFO",
 )
-
-from model.dataset import IpDataset
 
 
 def validate_preprocessed_files() -> None:
@@ -85,21 +95,8 @@ def check_dataset(
 
 def evaluate_best_model(batch_size: int = 256) -> None:
     """Run the best-trial model over the full dataset and log classification and
-    timing metrics, plus the shot ids of all false positives and false negatives.
+    timing metrics,     plus the shot ids of all false positives and false negatives.
     """
-    import torch
-    from sklearn.metrics import (
-        accuracy_score,
-        confusion_matrix,
-        fbeta_score,
-        f1_score,
-        precision_score,
-        recall_score,
-    )
-    from torch.utils.data import DataLoader
-
-    from util.hptune import load_best_trial_cnn
-
     dataset = _build_dataset()
     model = load_best_trial_cnn(dataset)
     if model is None:

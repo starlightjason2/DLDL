@@ -19,6 +19,7 @@ from sklearn.metrics import (
     recall_score,
 )
 
+from model.dataset import IpDataset
 from util.disruption_predict import (
     DEFAULT_SMOOTHING,
     DISRUPTION_FEATURE_NAMES,
@@ -138,8 +139,6 @@ def _extract_features_for_indices(
 
 
 def main() -> None:
-    from model.dataset import IpDataset
-
     logger.remove()
     logger.add(sys.stderr, level="INFO")
 

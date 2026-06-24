@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from enum import IntEnum
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -12,17 +11,8 @@ import numpy as np
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
+from model.trial_status import TrialStatus
 from util.hptune import write_env
-
-
-class TrialStatus(IntEnum):
-    """Persisted as integers in the trial CSV."""
-
-    COMPLETED = 0
-    RUNNING = -1
-    QUEUED = -2
-    FAILED = -3
-
 
 TrialSignature = tuple[str, int, str, str, int, str, int, str, int, int, str, str]
 

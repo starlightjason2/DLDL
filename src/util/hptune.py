@@ -12,10 +12,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
+import torch
 from loguru import logger
 
+from model.cnn import IpCNN
+from model.trial_status import TrialStatus
+
 if TYPE_CHECKING:
-    from model.cnn import IpCNN
     from model.dataset import IpDataset
     from model.hp_trial import HPTuneTrial
 
@@ -107,8 +110,6 @@ def sync_best_trial_artifacts(
     trained outside the planner, e.g. via ``run_train.sh``). A missing checkpoint no
     longer blocks the rest of the snapshot.
     """
-    from model.hp_trial import TrialStatus
-
     dest = Path(best_trial_dir)
     dest.mkdir(parents=True, exist_ok=True)
 
@@ -150,10 +151,6 @@ def load_best_trial_cnn(dataset: "IpDataset") -> "IpCNN | None":
     ``train.py`` uses) and the weights come from ``best_trial/*_best_params.pt``.
     Returns an eval-mode model on CPU, or ``None`` if no best checkpoint exists.
     """
-    import torch
-
-    from model.cnn import IpCNN
-
     repo = Path(__file__).resolve().parents[2]
     hptune_dir = Path(os.environ["HPTUNE_DIR"])
     if not hptune_dir.is_absolute():

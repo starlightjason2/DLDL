@@ -10,6 +10,9 @@ import numpy as np
 from dotenv import load_dotenv
 from loguru import logger
 
+from model.dataset import IpDataset
+from util.disruption_predict import predict_disruption_time
+
 _REPO = Path(__file__).resolve().parents[1]
 load_dotenv(dotenv_path=_REPO / ".env", encoding="utf-8")
 
@@ -34,9 +37,6 @@ def _configure_logging(prog_dir: Path) -> None:
 
 
 def main() -> None:
-    from model.dataset import IpDataset
-    from util.disruption_predict import predict_disruption_time
-
     prog_dir = _abs(os.environ["PROG_DIR"])
     _configure_logging(prog_dir)
 

@@ -1,13 +1,6 @@
-from .bayesian_hptuner import BayesianHPTuner
-from .cnn import IpCNN
-from .dataset import IpDataset
-from .hyperparam_space import HyperparameterSpace
-from .hp_trial import HPTuneTrial
+"""Model package.
 
-__all__ = [
-    "BayesianHPTuner",
-    "HPTuneTrial",
-    "IpDataset",
-    "IpCNN",
-    "HyperparameterSpace",
-]
+Intentionally does not eagerly import submodules: importing the package used to
+pull in ``bayesian_hptuner`` (and transitively ``util.hptune``), which created a
+circular import. Import submodules directly, e.g. ``from model.cnn import IpCNN``.
+"""
