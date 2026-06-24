@@ -1,4 +1,5 @@
 #!/bin/bash
+# Train one model (single process, single GPU).
 #PBS -N dldl_train
 #PBS -l select=1:system=polaris,place=scatter
 #PBS -l walltime=01:00:00
@@ -6,22 +7,27 @@
 #PBS -q debug
 #PBS -A fusiondl_aesp
 #PBS -k doe
+#PBS -j oe
 
 set -euo pipefail
 
-# ── Environment ────────────────────────────────────────────────────────────
+cd "$PROJECT_ROOT"
+
+# Load every setting from .env into the environment.
 set -a
-# shellcheck source=/dev/null
-source "$PROJECT_ROOT/.env"
-# shellcheck source=/dev/null
-[[ -f "${TRIAL_DIR:-}/.env" ]] && source "$TRIAL_DIR/.env"
+source .env
 set +a
 
-# shellcheck source=/dev/null
-source "$DLDL_CONDASH" && conda activate "$CONDA_ENV"
-export PYTHONPATH="$PROJECT_ROOT/src"
+# For a tuning trial, TRIAL_DIR/.env holds the hyperparameter overrides.
+if [[ -f "${TRIAL_DIR:-}/.env" ]]; then
+    set -a
+    source "$TRIAL_DIR/.env"
+    set +a
+fi
 
-# ── Train (single process, single GPU) ─────────────────────────────────────
-cd "$PROJECT_ROOT"
+# Activate the conda environment that has PyTorch etc.
+source "$DLDL_CONDASH"
+conda activate "$CONDA_ENV"
+export PYTHONPATH="$PROJECT_ROOT/src"
 
 python src/train.py

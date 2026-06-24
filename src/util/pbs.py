@@ -1,9 +1,10 @@
-"""Thin ``qsub`` submission helpers for the serial HP-tune controller chain.
+"""Thin ``qsub`` submission helper for the serial HP-tune chain.
 
-All PBS orchestration lives here (and in ``BayesianHPTuner.dispatch_serial``) so the
-shell scripts stay dumb launchers and the chaining logic stays unit-testable: the
-trial id is passed in directly and the job id is read straight from ``qsub`` stdout —
-no log-line scraping.
+The chain is one self-resubmitting job (see ``BayesianHPTuner.run_step``): each job
+trains one trial in-process and then submits the next step. There are never two
+jobs pending at once, so it fits queues that allow only one running + one queued
+job per user (e.g. Polaris ``debug``). The job id is read straight from ``qsub``
+stdout — no log scraping.
 """
 
 from __future__ import annotations
@@ -20,18 +21,19 @@ _PBS_PLACE = "scatter"
 _PBS_FILESYSTEMS = "home:eagle"
 
 
-def _select(nodes: int, walltime: str) -> str:
+def _select(walltime: str) -> str:
+    # The serial chain runs one trial per job on a single node.
     return (
-        f"select={nodes}:system={_PBS_SYSTEM},place={_PBS_PLACE},"
+        f"select=1:system={_PBS_SYSTEM},place={_PBS_PLACE},"
         f"walltime={walltime},filesystems={_PBS_FILESYSTEMS}"
     )
 
 
-def _qsub(args: list[str], *, env: dict[str, str] | None = None) -> str:
+def _qsub(args: list[str]) -> str:
     """Run ``qsub`` and return the job id (its sole stdout token)."""
     cmd = ["qsub", *args]
     logger.debug("qsub: {}", " ".join(cmd))
-    result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(
             f"qsub failed (code {result.returncode}): {result.stderr.strip()}"
@@ -42,21 +44,13 @@ def _qsub(args: list[str], *, env: dict[str, str] | None = None) -> str:
     return job_id
 
 
-def submit_trial(
+def submit_hptune_step(
     *,
-    trial_dir: Path,
     log_dir: Path,
-    nodes: int,
     queue: str,
     walltime: str,
 ) -> str:
-    """Submit the training job for one trial; returns its PBS job id.
-
-    ``TRIAL_DIR`` is exported into the job's environment (via ``-V``) so
-    ``run_train.sh`` can source the trial's per-trial ``.env`` overrides.
-    """
-    project_root = os.environ["PROJECT_ROOT"]
-    env = {**os.environ, "TRIAL_DIR": str(trial_dir)}
+    """Submit the next HP-tune step job; returns its PBS job id."""
     return _qsub(
         [
             "-k",
@@ -68,39 +62,8 @@ def submit_trial(
             "-e",
             f"{log_dir}/",
             "-l",
-            _select(nodes, walltime),
+            _select(walltime),
             "-V",
-            f"{project_root}/scripts/run_train.sh",
-        ],
-        env=env,
-    )
-
-
-def submit_controller(
-    *,
-    depend_after: str,
-    log_dir: Path,
-    nodes: int,
-    queue: str,
-    walltime: str,
-) -> str:
-    """Chain the next controller, gated on ``depend_after`` finishing (any exit)."""
-    project_root = os.environ["PROJECT_ROOT"]
-    return _qsub(
-        [
-            "-k",
-            "doe",
-            "-q",
-            queue,
-            "-o",
-            f"{log_dir}/",
-            "-e",
-            f"{log_dir}/",
-            "-l",
-            _select(nodes, walltime),
-            "-W",
-            f"depend=afterany:{depend_after}",
-            "-V",
-            f"{project_root}/scripts/controller.sh",
+            f"{os.environ["PROJECT_ROOT"]}/scripts/run_hptune.sh",
         ]
     )

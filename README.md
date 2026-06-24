@@ -113,21 +113,18 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | `HPTUNE_RANDOM_INSERT_EVERY` | ✓ | Insert a random trial every N completed trials after warmup (integer ≥ 0). |
 | `HPTUNE_EI_XI` | ✓ | Expected-improvement ξ for Bayesian optimization (float ≥ 0). |
 
-#### HPTune controllers and PBS jobs
+#### HPTune step jobs and PBS
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `HPTUNE_MAX_TRIALS` | ✓ | Stop when this many trials exist and none are running or queued. |
-| `HPTUNE_TRIAL_NODES` | ✓ | Nodes per trial: sets the trial job's `qsub` `select=` and feeds slot sizing in the controller. |
-| `HPTUNE_CONTROLLER_NODES` | ✓ | Nodes in the controller allocation: sets the chained controller's `qsub` `select=` and feeds slot sizing. |
 | `HPTUNE_MAX_RETRIES` | ✓ | Requeue failed trials up to this many times. |
-| `TRIAL_TIMEOUT` | ✓ | Seconds without log activity before a running trial is requeued or failed. |
-| `HPTUNE_QUEUE` | ✓† | PBS queue name for submitted trial/controller jobs. |
-| `HPTUNE_CONTROLLER_WALLTIME` | ✓† | Controller job walltime (passed to `qsub`). |
-| `HPTUNE_TRAIN_WALLTIME` | ✓† | Trial training job walltime (passed to `qsub`). |
+| `TRIAL_TIMEOUT` | ✓ | Seconds without log activity before a stale `RUNNING` trial (e.g. from a lost step) is requeued or failed. |
+| `HPTUNE_QUEUE` | ✓† | PBS queue for the step jobs. Use `debug` (allows 1 running + 1 queued per user), not `debug-scaling` (1 job total). |
+| `HPTUNE_TRAIN_WALLTIME` | ✓† | Walltime for each step job (passed to `qsub`). |
 | `HPTUNE_CHAIN_ID` | ✓† | Label written to `controller_logs/chain_steps.csv` and `chain_summary.log`. |
 
-†Required for the serial PBS chain (`scripts/start_hptune.sh`, `scripts/controller.sh`).
+†Required for the serial PBS chain (`scripts/start_hptune.sh`, `scripts/run_hptune.sh`).
 
 #### Shell, conda, and runtime
 
@@ -145,7 +142,7 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | Variable | Description |
 |----------|-------------|
 | `PBS_JOBID` | PBS job id. When set, HPTune also writes `controller_logs/hptune_<PBS_JOBID>.txt`. |
-| `TRIAL_DIR` | Set by the controller (via `submit_trial` in `src/util/pbs.py`) to `HPTUNE_DIR/trials/<trial_id>` and exported into the trial job. `scripts/run_train.sh` sources `TRIAL_DIR/.env` for hyperparameter overrides. |
+| `TRIAL_DIR` | Optional override path `HPTUNE_DIR/trials/<trial_id>` whose `.env` `scripts/run_train.sh` sources for a manual single-trial run. The HP-tune chain does **not** use it — `run_step` trains each trial in-process and passes its hyperparameters through the environment. |
 
 #### Thread caps (recommended on HPC)
 
@@ -275,7 +272,7 @@ Output logs: `preprocess_<jobid>.out`, `train_<jobid>.out` (and `.err`).
 
 HPTune reads the same project-root `.env` as the rest of the workflow. On Polaris, that is typically a symlink to `.env.polaris`.
 
-The supported path is a **serial PBS chain**: one controller job plans the next trial, submits one training job, then chains another controller after the trial finishes.
+The supported path is a **serial, self-resubmitting PBS chain**: each job plans the next trial, trains it in-process, records its score, then submits the next step job and exits. Exactly one trial runs per job, and at most one job is ever pending (the running job plus the queued next step), so it fits queues that cap you at one running + one queued job per user (Polaris `debug`). There is no separate controller job and no job dependency.
 
 **Objective:** each trial's score (the `score` column in `trials.csv`) is its best validation F-beta (`FBETA`, default F2). The optimizer **maximizes** this score, and `best_trial/` tracks the highest-scoring trial. Because F-beta with `beta>1` weights recall over precision, tuning pushes `cls_pos_weight` and `decision_threshold` toward catching more disruptions.
 
@@ -293,12 +290,12 @@ To wipe a previous run tree first:
 RESET=1 ./scripts/start_hptune.sh
 ```
 
-**Debug queue (smoke-test / short chain)** — point `HPTUNE_DIR` at an isolated tree, cap trials, and use your site’s debug queue (example: `debug-scaling`):
+**Debug queue (smoke-test / short chain)** — point `HPTUNE_DIR` at an isolated tree, cap trials, and use the `debug` queue:
 
 ```bash
 export HPTUNE_DIR=/path/to/data/hptune_debug
 export HPTUNE_MAX_TRIALS=10
-export HPTUNE_QUEUE=debug-scaling   # or your site's debug queue name
+export HPTUNE_QUEUE=debug   # 1 running + 1 queued per user; debug-scaling allows only 1 total
 ./scripts/start_hptune.sh
 ```
 
@@ -309,25 +306,26 @@ column -t -s, /path/to/data/hptune_debug/trials/trials.csv | head
 ```
 
 Layout:
-- `scripts/start_hptune.sh`: submits the first controller job.
-- `scripts/controller.sh`: thin launcher — sets up the environment (sources `.env`, activates conda) and `exec`s `python -m hptune_serial`. No dispatch logic lives in shell.
-- `src/hptune_serial.py`: CLI entry point for `BayesianHPTuner.dispatch_serial()` (or `--trial-id` to manually mark trials running for recovery).
-- `src/model/bayesian_hptuner.py`: trial state, acquisition, retries, and dispatch (`dispatch_serial` owns the submit/chain step).
-- `src/util/pbs.py`: `qsub` submission helpers (`submit_trial`, `submit_controller`); job ids are read directly from `qsub` stdout.
-- `src/model/hp_trial.py` (`HPTuneTrial`): creates each trial directory and per-trial `.env` overrides.
+- `scripts/start_hptune.sh`: submits the first step job (and handles `RESET=1`).
+- `scripts/run_hptune.sh`: the step job — sets up the environment (sources `.env`, activates conda) and `exec`s `python -m hptune_serial`. No logic lives in shell.
+- `src/hptune_serial.py`: CLI entry point for `BayesianHPTuner.run_step()` (or `--trial-id` to manually mark trials running for recovery).
+- `src/model/bayesian_hptuner.py`: trial state, acquisition, retries, and `run_step` (plan → train in-process → record → submit next step).
+- `src/util/pbs.py`: `submit_hptune_step` `qsub` helper; the job id is read directly from `qsub` stdout.
+- `src/model/hp_trial.py` (`HPTuneTrial`): creates each trial directory and per-trial `.env`.
 - `src/service/trial_service.py`: reads/writes `{HPTUNE_DIR}/trials/trials.csv`.
-- `scripts/run_train.sh`: training entrypoint submitted for each trial; sources `TRIAL_DIR/.env` for hyperparameter overrides.
+- `scripts/run_train.sh`: standalone training entrypoint (single trial / manual run); not used by the chain.
 
-Serial chain flow (all steps run in-process within `dispatch_serial`; no stdout parsing):
-1. Controller `exec`s `hptune_serial`, which refreshes trial status from training logs and plans a new trial if none is queued.
-2. It selects the next queued trial directly (no `Next trial ->` marker), then `qsub`s `scripts/run_train.sh` with `TRIAL_DIR=$HPTUNE_DIR/trials/trial_N`, capturing the job id from `qsub` stdout.
-3. It marks that trial `RUNNING` in `trials.csv` so the next controller ingests its score.
-4. It `qsub`s the next `scripts/controller.sh` with `-W depend=afterany:<trial_job>`.
-5. Repeat until `HPTUNE_MAX_TRIALS` is reached and no trials are running or queued, at which point dispatch logs "Chain complete." and submits no further jobs.
+Step flow (all in-process within `run_step`; no stdout parsing, no job dependency):
+1. The step job `exec`s `hptune_serial`, which refreshes trial status (ingesting any trial left over from a prior step) and plans a new trial if none is queued.
+2. It marks the chosen trial `RUNNING` and trains it in-process by running `src/train.py` as a subprocess with that trial's hyperparameters.
+3. It reads the trial's best validation F-beta from its `training_log.csv` and records it (`COMPLETED` with a score, or retried/`FAILED`); `best_trial/` is refreshed.
+4. Unless `HPTUNE_MAX_TRIALS` is reached, it submits the next `scripts/run_hptune.sh` step and exits. Because the queue allows one queued job, the next step waits until this one ends, then runs.
+5. When the cap is reached and nothing is running or queued, the step logs "Chain complete." and submits nothing further.
+
+If a step is ever lost (walltime kill, node failure) before it can submit the next one, just re-run `./scripts/start_hptune.sh` — `run_step` resumes from `trials.csv`.
 
 Important serial env:
-- `PROJECT_ROOT`, `HPTUNE_DIR`, `HPTUNE_QUEUE`
-- `HPTUNE_CONTROLLER_WALLTIME`, `HPTUNE_TRAIN_WALLTIME`
+- `PROJECT_ROOT`, `HPTUNE_DIR`, `HPTUNE_QUEUE`, `HPTUNE_TRAIN_WALLTIME`
 - `HPTUNE_MAX_TRIALS`, `HPTUNE_CHAIN_ID`
 - `OPENBLAS_NUM_THREADS` / `OMP_NUM_THREADS` (set to `1` in `.env`) — PBS often allocates many CPUs to one process; uncapped BLAS can try to spawn that many threads and fail (`pthread_create` / `Exit_status=1` with little log output).
 
@@ -335,9 +333,47 @@ Data and logging layout:
 - Trial state CSV: `{HPTUNE_DIR}/trials/trials.csv`
 - Trial directories: `{HPTUNE_DIR}/trials/trial_*`
 - Best-trial artifacts: `{HPTUNE_DIR}/best_trial/`
-- Controller logs: `{HPTUNE_DIR}/controller_logs/` (`chain_steps.csv`, `chain_summary.log`, PBS stdout/stderr)
+- Job logs: `{HPTUNE_DIR}/controller_logs/` (`chain_steps.csv`, `chain_summary.log`, PBS stdout/stderr)
 - Per-trial training logs/checkpoints: `{HPTUNE_DIR}/trials/trial_*/`
 - Under PBS, Loguru also writes `{HPTUNE_DIR}/controller_logs/hptune_<PBS_JOBID>.txt`
+
+#### Interactive run (`qsub -I`)
+
+To drive the workflow by hand on a compute node — useful for a quick smoke test or for debugging a single trial — first grab an interactive node:
+
+```bash
+qsub -I -A fusiondl_aesp -q debug \
+  -l select=1:system=polaris:ngpus=4 \
+  -l place=scatter \
+  -l walltime=1:00:00 \
+  -l filesystems=home:eagle
+```
+
+When the compute-node prompt appears, set up the environment once, from the repo root:
+
+```bash
+cd /eagle/fusiondl_aesp/starlightjason2/DLDL
+set -a; source .env; set +a      # load and export every .env setting
+source "$DLDL_CONDASH"           # make `conda` available
+conda activate "$CONDA_ENV"
+export PYTHONPATH="$PWD/src"
+```
+
+Then run whichever step you need directly:
+
+```bash
+python src/preprocess_data.py    # build the tensors (only if not already built)
+python src/train.py              # train one model using the hyperparameters in .env
+python -m hptune_serial          # one HPTune step: plan + train the next trial, then queue the next step
+```
+
+To launch the full serial Bayesian chain (each step job trains one trial and self-chains the next until `HPTUNE_MAX_TRIALS`):
+
+```bash
+./scripts/start_hptune.sh        # add RESET=1 to wipe the previous run first
+```
+
+> **Run the scripts; do not paste their lines.** Always execute a script with `./scripts/start_hptune.sh` (or `bash scripts/start_hptune.sh`). Pasting individual lines into an interactive shell breaks path detection: interactively `$0` is `-bash`, so `readlink -f "$0"` fails with `readlink: invalid option -- 'b'`, and under `set -u` a bare `${BASH_SOURCE[0]}` reports `unbound variable`.
 
 ## Quick Reference
 

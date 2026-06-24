@@ -411,3 +411,22 @@ class IpCNN(nn.Module):
         df_logs.to_csv(
             os.path.join(self.prog_dir, f"{job_id}_training_log.csv"), index=False
         )
+
+        if logs:
+            best = max(logs, key=lambda row: row["Validation Fbeta"])
+            self.logger.info("=" * 60)
+            self.logger.info(
+                "Training complete — best epoch {} (selected by F{:g}):",
+                best["epoch"],
+                fbeta,
+            )
+            self.logger.info("  Validation Recall:    {:.6f}", best["Validation Recall"])
+            self.logger.info(
+                "  Validation Precision: {:.6f}", best["Validation Precision"]
+            )
+            self.logger.info("  Validation F1:        {:.6f}", best["Validation F1 Score"])
+            self.logger.info(
+                "  Validation F{:g}:        {:.6f}", fbeta, best["Validation Fbeta"]
+            )
+            self.logger.info("  Validation Loss:      {:.6f}", best["validation_loss"])
+            self.logger.info("=" * 60)

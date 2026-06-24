@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from bayes_opt import BayesianOptimization, acquisition
 from loguru import logger
@@ -21,7 +23,7 @@ from util.hptune import (
     sync_best_trial_artifacts,
 )
 from util.data_loading import env_int
-from util.pbs import submit_controller, submit_trial
+from util.pbs import submit_hptune_step
 
 
 class BayesianHPTuner(BaseModel):
@@ -35,10 +37,7 @@ class BayesianHPTuner(BaseModel):
 
     # Config
     max_retries: int = Field(ge=0)
-    trial_nodes: int = Field(ge=1)
-    controller_nodes: Optional[int] = None
     max_trials: int = Field(ge=1)
-    num_slots: int = Field(ge=1)
     hp_space: HyperparameterSpace
 
     def model_post_init(self, __context: Any) -> None:
@@ -64,20 +63,11 @@ class BayesianHPTuner(BaseModel):
         trials_dir.mkdir(parents=True, exist_ok=True)
         log_dir.mkdir(parents=True, exist_ok=True)
 
-        trial_nodes = env_int("HPTUNE_TRIAL_NODES")
-        controller_nodes = env_int("HPTUNE_CONTROLLER_NODES")
-
         return cls(
             trials_dir=trials_dir,
             log_dir=log_dir,
             max_retries=env_int("HPTUNE_MAX_RETRIES"),
-            trial_nodes=trial_nodes,
-            controller_nodes=controller_nodes,
             max_trials=env_int("HPTUNE_MAX_TRIALS"),
-            # At least one slot for serial PBS (controller is its own job).
-            num_slots=(
-                max((controller_nodes - 1) // trial_nodes, 1) if controller_nodes else 1
-            ),
             hp_space=HyperparameterSpace.from_env(),
         )
 
@@ -204,48 +194,27 @@ class BayesianHPTuner(BaseModel):
     # Planning
     # ------------------------------------------------------------------
 
-    def _plan_new_trials(self, trials: list[HPTuneTrial]) -> list[HPTuneTrial]:
-        active = sum(
-            t.status in (TrialStatus.RUNNING, TrialStatus.QUEUED) for t in trials
+    def _plan_next_trial(self, trials: list[HPTuneTrial]) -> list[HPTuneTrial]:
+        """Append one new QUEUED trial (and its files) if under ``max_trials``."""
+        if len(trials) >= self.max_trials:
+            return trials
+
+        tid = next_trial_numbered_id(self.trials_dir, (t.trial_id for t in trials))
+        proposal = self.sample_hyperparameters(trials)
+
+        trial = HPTuneTrial.model_validate(
+            {
+                **proposal,
+                "trial_id": tid,
+                "status": TrialStatus.QUEUED,
+                "score": -1.0,
+            }
         )
 
-        plan_count = min(
-            max(self.num_slots - active, 0),
-            max(self.max_trials - len(trials), 0),
-        )
-
-        for _ in range(plan_count):
-            tid = next_trial_numbered_id(self.trials_dir, (t.trial_id for t in trials))
-            proposal = self.sample_hyperparameters(trials)
-
-            trial = HPTuneTrial.model_validate(
-                {
-                    **proposal,
-                    "trial_id": tid,
-                    "status": TrialStatus.QUEUED,
-                    "score": -1.0,
-                }
-            )
-
-            trial.create_files()
-            trials.append(trial)
-
+        trial.create_files()
+        trials.append(trial)
         TrialService.save_trials(trials)
         return trials
-
-    def mark_trials_running(self, trial_ids: list[str]) -> None:
-        want = frozenset(trial_ids)
-        promoted = [
-            t.model_copy(update={"status": TrialStatus.RUNNING})
-            for t in TrialService.get_trials()
-            if t.trial_id in want and t.status == TrialStatus.QUEUED
-        ]
-        TrialService.save_trials(promoted)
-        logger.info(
-            "Marked {} trial(s) running: {}",
-            len(promoted),
-            ",".join(t.trial_id for t in promoted),
-        )
 
     def mark_trial_failed(self, trial_id: str, *, return_code: int) -> None:
         trial = TrialService.get_trial(trial_id)
@@ -277,14 +246,14 @@ class BayesianHPTuner(BaseModel):
     def _utc_stamp() -> str:
         return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    def _log_chain_step(self, trial_id: str, trial_job: str) -> None:
+    def _log_chain_step(self, trial_id: str, step_job: str) -> None:
         line = ",".join(
             [
                 self._utc_stamp(),
                 os.environ.get("HPTUNE_CHAIN_ID", ""),
                 os.environ.get("PBS_JOBID", ""),
                 trial_id,
-                trial_job,
+                step_job,
             ]
         )
         with (self.log_dir / "chain_steps.csv").open("a", encoding="utf-8") as f:
@@ -295,58 +264,93 @@ class BayesianHPTuner(BaseModel):
         with (self.log_dir / "chain_summary.log").open("a", encoding="utf-8") as f:
             f.write(f"Chain {chain_id} finished at {self._utc_stamp()}\n")
 
-    def dispatch_serial(self) -> None:
-        """One serial controller step.
+    def _train_trial(self, trial: HPTuneTrial) -> int:
+        """Train one trial in a subprocess; returns the training exit code.
 
-        Refresh trial status, plan the next trial if none is queued, then submit
-        the trial job and chain the next controller — all in-process. The trial id
-        and PBS job ids are passed/returned directly, so no stdout scraping is
-        needed and the chosen trial is marked ``RUNNING`` in the same pass.
+        The trial's hyperparameters (and ``PROG_DIR``/``JOB_ID``) are passed to
+        ``train.py`` through the environment; everything else is inherited from the
+        already-sourced project ``.env``.
+        """
+        trial.log_pass_hyperparameters(context="train")
+        env = {
+            **os.environ,
+            **{k: str(v) for k, v in trial.trial_env_keys().items()},
+        }
+        logger.info("Training {} ...", trial.trial_id)
+        result = subprocess.run(
+            [sys.executable, "src/train.py"],
+            cwd=os.environ["PROJECT_ROOT"],
+            env=env,
+        )
+        logger.info(
+            "Training {} exited with code {}", trial.trial_id, result.returncode
+        )
+        return result.returncode
+
+    def run_step(self) -> None:
+        """One self-contained HP-tune step.
+
+        Ingest any finished trial, plan the next trial if none is queued, train it
+        in-process, record its score, then submit the next step and exit. Exactly
+        one trial runs per job and at most one job is ever pending (this running
+        job plus the queued next step), so it fits queues that allow only one
+        running + one queued job per user (e.g. Polaris ``debug``). Re-running
+        ``start_hptune.sh`` resumes from ``trials.csv`` if a step is ever lost.
         """
         trials = self.update_trials(TrialService.get_trials())
 
+        if self.is_complete(trials):
+            logger.info("Chain complete.")
+            self._log_chain_complete()
+            return
+
         queued_ids = [t.trial_id for t in trials if t.status == TrialStatus.QUEUED]
         if not queued_ids:
-            trials = self._plan_new_trials(trials)
+            trials = self._plan_next_trial(trials)
             queued_ids = [t.trial_id for t in trials if t.status == TrialStatus.QUEUED]
-
-        counts = TrialService.get_status_counts(trials)
-        logger.info(
-            "Dispatch status -> done={} active={} total={} num_slots={} complete={}",
-            counts["done"],
-            counts["active"],
-            counts["total"],
-            self.num_slots,
-            self.is_complete(trials),
-        )
 
         if not queued_ids:
             logger.info("Chain complete.")
             self._log_chain_complete()
             return
 
-        next_id = queued_ids[0]
-        queue = os.environ["HPTUNE_QUEUE"]
+        trial = next(t for t in trials if t.trial_id == queued_ids[0])
+        TrialService.update_trial(trial.trial_id, {"status": TrialStatus.RUNNING})
 
-        trial_job = submit_trial(
-            trial_dir=self.trials_dir / next_id,
+        counts = TrialService.get_status_counts(trials)
+        logger.info(
+            "Step start -> trial={} done={} total={} max_trials={}",
+            trial.trial_id,
+            counts["done"],
+            counts["total"],
+            self.max_trials,
+        )
+
+        return_code = self._train_trial(trial)
+
+        # Record the result of the trial we just ran.
+        completed, score = parse_trial_score(trial.dir_path)
+        if completed:
+            TrialService.save_trials(
+                [trial.model_copy(update={"score": score, "status": TrialStatus.COMPLETED})]
+            )
+            sync_best_trial_artifacts(
+                TrialService.get_trials(), self.trials_dir / "best_trial"
+            )
+            logger.info("Trial {} completed: score={:.6f}", trial.trial_id, score)
+        else:
+            self.mark_trial_failed(trial.trial_id, return_code=return_code)
+
+        # Chain the next step unless the run is done.
+        if self.is_complete(TrialService.get_trials()):
+            logger.info("Chain complete.")
+            self._log_chain_complete()
+            return
+
+        step_job = submit_hptune_step(
             log_dir=self.log_dir,
-            nodes=self.trial_nodes,
-            queue=queue,
+            queue=os.environ["HPTUNE_QUEUE"],
             walltime=os.environ["HPTUNE_TRAIN_WALLTIME"],
         )
-        logger.info("Submitted {} as {}", next_id, trial_job)
-
-        # Mark RUNNING before chaining so the next controller parses this trial's
-        # score (via update_trials) instead of re-dispatching it.
-        self.mark_trials_running([next_id])
-        self._log_chain_step(next_id, trial_job)
-
-        controller_job = submit_controller(
-            depend_after=trial_job,
-            log_dir=self.log_dir,
-            nodes=self.controller_nodes or 1,
-            queue=queue,
-            walltime=os.environ["HPTUNE_CONTROLLER_WALLTIME"],
-        )
-        logger.info("Chained next controller as {}", controller_job)
+        logger.info("Submitted next step as {}", step_job)
+        self._log_chain_step(trial.trial_id, step_job)

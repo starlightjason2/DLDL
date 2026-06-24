@@ -9,6 +9,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 from loguru import logger
 
+from model.cnn import IpCNN
+from model.dataset import IpDataset
+
 _REPO = Path(__file__).resolve().parents[1]  # project root (src/..)
 load_dotenv(dotenv_path=_REPO / ".env", encoding="utf-8")
 
@@ -34,9 +37,6 @@ def _configure_logging(prog_dir: Path, job_id: str) -> None:
 
 
 def main() -> None:
-    from model.cnn import IpCNN
-    from model.dataset import IpDataset
-
     prog_dir = _abs(os.environ["PROG_DIR"])
     job_id = os.environ["JOB_ID"]
     data_path = _abs(os.environ["DATA_PATH"])
