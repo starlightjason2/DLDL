@@ -10,12 +10,59 @@ matplotlib.use("QtAgg")
 import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 import numpy as np
+import torch
 from matplotlib.widgets import Slider, TextBox
 
+from model.cnn import IpCNN
 from model.dataset import IpDataset
 from util.disruption_predict import predict_disruption_time
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=True)
+
+
+def load_best_cnn(dataset, repo, abs_path):
+    """Build an IpCNN with the best trial's weights, or return None if absent."""
+    ckpts = sorted(
+        (Path(abs_path(os.environ["HPTUNE_DIR"])) / "trials" / "best_trial").glob(
+            "*_best_params.pt"
+        )
+    )
+    if not ckpts:
+        return None
+
+    model = IpCNN(
+        dataset,
+        prog_dir=str(repo),
+        conv1=(
+            int(os.environ["CONV1_FILTERS"]),
+            int(os.environ["CONV1_KERNEL"]),
+            int(os.environ["CONV1_PADDING"]),
+        ),
+        conv2=(
+            int(os.environ["CONV2_FILTERS"]),
+            int(os.environ["CONV2_KERNEL"]),
+            int(os.environ["CONV2_PADDING"]),
+        ),
+        conv3=(
+            int(os.environ["CONV3_FILTERS"]),
+            int(os.environ["CONV3_KERNEL"]),
+            int(os.environ["CONV3_PADDING"]),
+        ),
+        conv4=(
+            int(os.environ["CONV4_FILTERS"]),
+            int(os.environ["CONV4_KERNEL"]),
+            int(os.environ["CONV4_PADDING"]),
+        ),
+        pool_size=int(os.environ["POOL_SIZE"]),
+        fc1_size=int(os.environ["FC1_SIZE"]),
+        fc2_size=int(os.environ["FC2_SIZE"]),
+        dropout_rate=float(os.environ["DROPOUT_RATE"]),
+        cls_pos_weight=float(os.environ["CLS_POS_WEIGHT"]),
+        decision_threshold=float(os.environ["DECISION_THRESHOLD"]),
+    )
+    model.load_state_dict(torch.load(ckpts[0], map_location="cpu")["model"])
+    model.eval()
+    return model
 
 
 def main() -> None:
@@ -37,11 +84,14 @@ def main() -> None:
     )
     num_rows = len(dataset)
 
+    model = load_best_cnn(dataset, repo, abs_path)
+
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 5), sharex=True)
     fig.subplots_adjust(bottom=0.2)
 
     def draw(i: int) -> None:
-        shot = dataset.load_shot_view(max(0, min(int(i), num_rows - 1)))
+        idx = max(0, min(int(i), num_rows - 1))
+        shot = dataset.load_shot_view(idx)
 
         ax1.clear()
 
@@ -63,7 +113,20 @@ def main() -> None:
         predicted_time = predict_disruption_time(shot.current)
 
         ax2.plot(shot.time, diff, linewidth=2)
-        ax2.axvline(predicted_time, color="r", ls="--")
+        ax2.axvline(predicted_time, color="r", ls="--", label="Heuristic time")
+
+        if model is not None:
+            signal = dataset.data[idx].float().reshape(1, -1)
+            with torch.no_grad():
+                cls_logit, cnn_time = model.forward(signal)[0]
+            cnn_prob = torch.sigmoid(cls_logit).item()
+            cnn_disruptive = cnn_prob > model.decision_threshold
+            ax2.axvline(
+                float(cnn_time),
+                color="g",
+                ls=":",
+                label=f"CNN time (disrupt={cnn_disruptive}, p={cnn_prob:.2f})",
+            )
 
         ax2.legend()
         ax2.grid(True)

@@ -19,7 +19,7 @@ from model.hp_trial import HPTuneTrial, TrialStatus
 from service.trial_service import TrialService
 from util.hptune import (
     next_trial_numbered_id,
-    parse_trial_score,
+    parse_trial_metrics,
     sync_best_trial_artifacts,
 )
 from util.data_loading import env_int
@@ -153,11 +153,16 @@ class BayesianHPTuner(BaseModel):
                 updated.append(t)
                 continue
 
-            completed, score = parse_trial_score(t.dir_path)
+            done, metrics = parse_trial_metrics(t.dir_path)
 
-            if completed:
+            if done:
                 t = t.model_copy(
-                    update={"score": score, "status": TrialStatus.COMPLETED}
+                    update={
+                        "score": metrics["score"],
+                        "recall": metrics["recall"],
+                        "precision": metrics["precision"],
+                        "status": TrialStatus.COMPLETED,
+                    }
                 )
 
             elif logs := sorted(
@@ -264,18 +269,31 @@ class BayesianHPTuner(BaseModel):
         with (self.log_dir / "chain_summary.log").open("a", encoding="utf-8") as f:
             f.write(f"Chain {chain_id} finished at {self._utc_stamp()}\n")
 
+    def _best_trial_checkpoint(self) -> Path | None:
+        """Path to the global-best trial's checkpoint, if one exists yet."""
+        checkpoints = sorted((self.trials_dir / "best_trial").glob("*_best_params.pt"))
+        return checkpoints[0] if checkpoints else None
+
     def _train_trial(self, trial: HPTuneTrial) -> int:
         """Train one trial in a subprocess; returns the training exit code.
 
         The trial's hyperparameters (and ``PROG_DIR``/``JOB_ID``) are passed to
         ``train.py`` through the environment; everything else is inherited from the
-        already-sourced project ``.env``.
+        already-sourced project ``.env``. If a best-trial checkpoint exists, the
+        trial warm-starts from it so a terminated run picks up off the best model
+        found so far.
         """
         trial.log_pass_hyperparameters(context="train")
         env = {
             **os.environ,
             **{k: str(v) for k, v in trial.trial_env_keys().items()},
         }
+
+        warm_start = self._best_trial_checkpoint()
+        if warm_start is not None:
+            env["WARM_START_CHECKPOINT"] = str(warm_start)
+            logger.info("Warm-starting {} from {}", trial.trial_id, warm_start)
+
         logger.info("Training {} ...", trial.trial_id)
         result = subprocess.run(
             [sys.executable, "src/train.py"],
@@ -329,15 +347,30 @@ class BayesianHPTuner(BaseModel):
         return_code = self._train_trial(trial)
 
         # Record the result of the trial we just ran.
-        completed, score = parse_trial_score(trial.dir_path)
-        if completed:
+        done, metrics = parse_trial_metrics(trial.dir_path)
+        if done:
             TrialService.save_trials(
-                [trial.model_copy(update={"score": score, "status": TrialStatus.COMPLETED})]
+                [
+                    trial.model_copy(
+                        update={
+                            "score": metrics["score"],
+                            "recall": metrics["recall"],
+                            "precision": metrics["precision"],
+                            "status": TrialStatus.COMPLETED,
+                        }
+                    )
+                ]
             )
             sync_best_trial_artifacts(
                 TrialService.get_trials(), self.trials_dir / "best_trial"
             )
-            logger.info("Trial {} completed: score={:.6f}", trial.trial_id, score)
+            logger.info(
+                "Trial {} completed: score={:.6f} recall={:.6f} precision={:.6f}",
+                trial.trial_id,
+                metrics["score"],
+                metrics["recall"],
+                metrics["precision"],
+            )
         else:
             self.mark_trial_failed(trial.trial_id, return_code=return_code)
 

@@ -49,6 +49,8 @@ class HPTuneTrial(BaseModel):
     cls_pos_weight: float = 1.0
     decision_threshold: float = 0.5
     score: float = -1.0
+    recall: float = -1.0
+    precision: float = -1.0
     status: TrialStatus = TrialStatus.RUNNING
     retries: int = 0
     created_at: datetime | None = None

@@ -64,11 +64,13 @@ def next_trial_numbered_id(
     return f"trial_{max(log_max, fs_max) + 1}"
 
 
-def parse_trial_score(trial_dir: str | Path) -> tuple[bool, float]:
-    """Parse the best validation F-beta score from the most recent training log CSV.
+def parse_trial_metrics(trial_dir: str | Path) -> tuple[bool, dict[str, float]]:
+    """Parse the best epoch's validation metrics from the most recent training log CSV.
 
-    This is the trial objective the tuner maximizes (higher is better).
-    Returns ``(True, score)`` on success, ``(False, nan)`` if no valid log is found.
+    The "best" epoch maximizes validation F-beta (the trial objective the tuner
+    maximizes); recall and precision are read from that same epoch, so they describe
+    the selected model. Returns ``(True, {"score", "recall", "precision"})`` on
+    success, ``(False, {})`` if no valid log is found.
     """
     candidates = sorted(
         Path(trial_dir).glob("*training_log.csv"),
@@ -81,18 +83,27 @@ def parse_trial_score(trial_dir: str | Path) -> tuple[bool, float]:
         ):
             df = pd.read_csv(path)
             if not df.empty and "Validation Fbeta" in df.columns:
-                return True, float(
-                    df.loc[df["Validation Fbeta"].idxmax(), "Validation Fbeta"]
-                )
+                best = df.loc[df["Validation Fbeta"].idxmax()]
+                return True, {
+                    "score": float(best["Validation Fbeta"]),
+                    "recall": float(best.get("Validation Recall", float("nan"))),
+                    "precision": float(best.get("Validation Precision", float("nan"))),
+                }
 
-    return False, float("nan")
+    return False, {}
 
 
 def sync_best_trial_artifacts(
     trials: Sequence[HPTuneTrial],
     best_trial_dir: Path,
 ) -> None:
-    """Copy the current overall best trial's ``.env`` and checkpoint into ``best_trial/``."""
+    """Refresh ``best_trial/`` with the current overall best trial's ``.env`` and checkpoint.
+
+    The ``.env`` is regenerated from the trial itself rather than copied, so the sync
+    never depends on a per-trial ``.env`` file being present (it is absent for trials
+    trained outside the planner, e.g. via ``run_train.sh``). A missing checkpoint no
+    longer blocks the rest of the snapshot.
+    """
     from model.hp_trial import TrialStatus
 
     dest = Path(best_trial_dir)
@@ -103,31 +114,22 @@ def sync_best_trial_artifacts(
         return
 
     best = max(completed, key=lambda t: t.score)
-    env_src = Path(best.dir_path) / ".env"
 
-    if not env_src.exists():
-        logger.warning(
-            "Best-trial sync skipped: missing .env for {} at {}", best.trial_id, env_src
-        )
-        return
-
-    # Keep best_trial/ as a single-current-best snapshot — remove stale artefacts first.
-    for existing in dest.iterdir():
-        if existing.is_file() and (
-            existing.name == ".env" or existing.name.endswith("_best_params.pt")
-        ):
-            existing.unlink()
+    # Regenerate the snapshot .env from the trial's own hyperparameters.
+    write_env(str(dest / ".env"), best.trial_env_keys())
 
     checkpoint_src = Path(best.dir_path) / f"{best.trial_id}_best_params.pt"
     if not checkpoint_src.exists():
         logger.warning(
-            "Best-trial sync skipped: missing checkpoint for {} at {}",
+            "Best-trial sync: wrote .env but checkpoint missing for {} at {}",
             best.trial_id,
             checkpoint_src,
         )
         return
 
-    shutil.copy2(env_src, dest / ".env")
+    # Replace any stale checkpoint so best_trial/ holds only the current best's.
+    for existing in dest.glob("*_best_params.pt"):
+        existing.unlink()
     shutil.copy2(checkpoint_src, dest / checkpoint_src.name)
 
     logger.info(

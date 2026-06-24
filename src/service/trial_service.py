@@ -32,6 +32,8 @@ _CSV_COLUMNS = [
     "cls_pos_weight",
     "decision_threshold",
     "score",
+    "recall",
+    "precision",
     "status",
     "retries",
     "created_at",
@@ -91,6 +93,10 @@ class TrialService:
             data["decision_threshold"] = 0.5
         if pd.isna(data.get("score")):
             data["score"] = -1.0
+        if pd.isna(data.get("recall")):
+            data["recall"] = -1.0
+        if pd.isna(data.get("precision")):
+            data["precision"] = -1.0
         data["status"] = int(data["status"])
         return HPTuneTrial.model_validate(data)
 
@@ -111,6 +117,8 @@ class TrialService:
             "cls_pos_weight": trial.cls_pos_weight,
             "decision_threshold": trial.decision_threshold,
             "score": trial.score,
+            "recall": trial.recall,
+            "precision": trial.precision,
             "status": int(trial.status),
             "retries": trial.retries,
         }

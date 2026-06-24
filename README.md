@@ -308,7 +308,7 @@ column -t -s, /path/to/data/hptune_debug/trials/trials.csv | head
 Layout:
 - `scripts/start_hptune.sh`: submits the first step job (and handles `RESET=1`).
 - `scripts/run_hptune.sh`: the step job — sets up the environment (sources `.env`, activates conda) and `exec`s `python -m hptune_serial`. No logic lives in shell.
-- `src/hptune_serial.py`: CLI entry point for `BayesianHPTuner.run_step()` (or `--trial-id` to manually mark trials running for recovery).
+- `src/hptune_serial.py`: CLI entry point for `BayesianHPTuner.run_step()`.
 - `src/model/bayesian_hptuner.py`: trial state, acquisition, retries, and `run_step` (plan → train in-process → record → submit next step).
 - `src/util/pbs.py`: `submit_hptune_step` `qsub` helper; the job id is read directly from `qsub` stdout.
 - `src/model/hp_trial.py` (`HPTuneTrial`): creates each trial directory and per-trial `.env`.
@@ -317,12 +317,12 @@ Layout:
 
 Step flow (all in-process within `run_step`; no stdout parsing, no job dependency):
 1. The step job `exec`s `hptune_serial`, which refreshes trial status (ingesting any trial left over from a prior step) and plans a new trial if none is queued.
-2. It marks the chosen trial `RUNNING` and trains it in-process by running `src/train.py` as a subprocess with that trial's hyperparameters.
+2. It marks the chosen trial `RUNNING` and trains it in-process by running `src/train.py` as a subprocess with that trial's hyperparameters. If `best_trial/` already holds a checkpoint, the trial **warm-starts** from it: it loads the best model's weights and optimizer state (the trial still uses its own `lr`/`weight_decay`), so a terminated run picks up off the best model found so far rather than from a random init. Each trial's epoch counter and early-stopping state still start fresh, keeping trial scores independent and comparable.
 3. It reads the trial's best validation F-beta from its `training_log.csv` and records it (`COMPLETED` with a score, or retried/`FAILED`); `best_trial/` is refreshed.
 4. Unless `HPTUNE_MAX_TRIALS` is reached, it submits the next `scripts/run_hptune.sh` step and exits. Because the queue allows one queued job, the next step waits until this one ends, then runs.
 5. When the cap is reached and nothing is running or queued, the step logs "Chain complete." and submits nothing further.
 
-If a step is ever lost (walltime kill, node failure) before it can submit the next one, just re-run `./scripts/start_hptune.sh` — `run_step` resumes from `trials.csv`.
+If a step is ever lost (walltime kill, node failure) before it can submit the next one, just re-run `./scripts/start_hptune.sh` — `run_step` resumes from `trials.csv`, and because checkpoints are full-state (`model` + `optimizer` + `epoch` + selection counters), the next trial warm-starts from the best checkpoint kept in `best_trial/`. (`start_hptune.sh` preserves `trials.csv` and `*_best_params.pt`; only `RESET=1` clears the run, and even then it keeps the best checkpoints.)
 
 Important serial env:
 - `PROJECT_ROOT`, `HPTUNE_DIR`, `HPTUNE_QUEUE`, `HPTUNE_TRAIN_WALLTIME`

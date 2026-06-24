@@ -51,6 +51,9 @@ def main() -> None:
 
     lr_scheduler = os.environ["LR_SCHEDULER"].lower() in ("true", "1", "yes", "on")
 
+    warm_start = os.environ.get("WARM_START_CHECKPOINT") or None
+    warm_start_checkpoint = str(_abs(warm_start)) if warm_start else None
+
     dataset = IpDataset(
         normalization_type=os.environ["NORMALIZATION_TYPE"],
         data_file=str(data_path),
@@ -107,6 +110,7 @@ def main() -> None:
         batch_size=int(os.environ["BATCH_SIZE"]),
         dataloader_num_workers=int(os.environ["DATALOADER_NUM_WORKERS"]),
         fbeta=float(os.environ.get("FBETA", "2.0")),
+        warm_start_checkpoint=warm_start_checkpoint,
     )
 
 

@@ -165,6 +165,19 @@ wandb/
 *.pkl
 *.pickle
 
+# Allow committing the best-trial model checkpoint(s). Each parent directory must
+# be un-ignored before the file can be re-included (git can't un-ignore a file
+# whose parent dir is excluded), and this negation comes after `*.pt` so it wins.
+!data/
+data/*
+!data/hptune/
+data/hptune/*
+!data/hptune/trials/
+data/hptune/trials/*
+!data/hptune/trials/best_trial/
+data/hptune/trials/best_trial/*
+!data/hptune/trials/best_trial/*_best_params.pt
+
 # OS-specific
 .DS_Store
 .DS_Store?

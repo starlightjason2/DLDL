@@ -240,6 +240,63 @@ class IpCNN(nn.Module):
             epoch,
         )
 
+    @staticmethod
+    def _checkpoint(
+        model: nn.Module,
+        optimizer: optim.Optimizer,
+        epoch: int,
+        best_score: float,
+        epochs_without_improvement: int,
+        fbeta: float,
+    ) -> dict:
+        """Full-state checkpoint: weights plus everything needed to continue training."""
+        return {
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "epoch": epoch,
+            "best_score": best_score,
+            "epochs_without_improvement": epochs_without_improvement,
+            "fbeta": fbeta,
+        }
+
+    def _warm_start(
+        self,
+        checkpoint_path: str,
+        model: nn.Module,
+        optimizer: optim.Optimizer,
+        *,
+        lr: float,
+        weight_decay: float,
+    ) -> None:
+        """Initialize weights (and optimizer momentum) from a prior checkpoint.
+
+        Used to pick up off the best trial found so far. Only the model weights and
+        optimizer state transfer; this trial's own ``lr``/``weight_decay`` are kept,
+        and its epoch counter and early-stopping state start fresh so each trial
+        remains an independent, comparable evaluation for the tuner.
+        """
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        ckpt = torch.load(checkpoint_path, map_location=device)
+
+        # Tolerate both full-state checkpoints and bare weight state_dicts.
+        state = ckpt["model"] if isinstance(ckpt, dict) and "model" in ckpt else ckpt
+        model.load_state_dict(state)
+
+        if isinstance(ckpt, dict) and "optimizer" in ckpt:
+            optimizer.load_state_dict(ckpt["optimizer"])
+            for group in optimizer.param_groups:
+                group["lr"] = lr
+                group["weight_decay"] = weight_decay
+
+        source_epoch = ckpt.get("epoch") if isinstance(ckpt, dict) else None
+        source_score = ckpt.get("best_score") if isinstance(ckpt, dict) else None
+        self.logger.info(
+            "Warm-started from {} (source epoch={}, source best F-beta={})",
+            checkpoint_path,
+            source_epoch,
+            f"{source_score:.6f}" if isinstance(source_score, (int, float)) else "n/a",
+        )
+
     def train_model(
         self,
         job_id: str,
@@ -255,6 +312,7 @@ class IpCNN(nn.Module):
         batch_size: int,
         dataloader_num_workers: int,
         fbeta: float = 2.0,
+        warm_start_checkpoint: str | None = None,
     ) -> None:
         """Train this model on a single device.
 
@@ -311,6 +369,16 @@ class IpCNN(nn.Module):
                 factor=lr_scheduler_factor,
                 patience=lr_scheduler_patience,
             )
+
+        if warm_start_checkpoint:
+            self._warm_start(
+                warm_start_checkpoint,
+                model,
+                optimizer,
+                lr=lr,
+                weight_decay=weight_decay,
+            )
+
         bce_loss = self._cls_loss
         mse_loss = self._time_loss
 
@@ -384,7 +452,14 @@ class IpCNN(nn.Module):
                 best_score = current_score
                 epochs_without_improvement = 0
                 torch.save(
-                    model.state_dict(),
+                    self._checkpoint(
+                        model,
+                        optimizer,
+                        epoch,
+                        best_score,
+                        epochs_without_improvement,
+                        fbeta,
+                    ),
                     os.path.join(self.prog_dir, f"{job_id}_best_params.pt"),
                 )
                 self.logger.info(f"New best validation F{fbeta:g}: {best_score:.6f}")
@@ -402,7 +477,14 @@ class IpCNN(nn.Module):
 
             if epoch % 5 == 0:
                 torch.save(
-                    model.state_dict(),
+                    self._checkpoint(
+                        model,
+                        optimizer,
+                        epoch,
+                        best_score,
+                        epochs_without_improvement,
+                        fbeta,
+                    ),
                     os.path.join(self.prog_dir, f"{job_id}_params_epoch{epoch}.pt"),
                 )
 
