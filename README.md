@@ -7,7 +7,7 @@ A 1D CNN that uses plasma current to predict disruption time. For labeling D-III
 Interactive polaris shell
 
 ```
-qsub -I -A fusiondl_aesp -q debug-scaling \
+qsub -I -A fusiondl_aesp -q debug \
   -l select=1:system=polaris:ngpus=4 \
   -l place=scatter \
   -l walltime=0:30:00 \
@@ -30,7 +30,7 @@ qsub -I -A fusiondl_aesp -q debug-scaling \
    pip install -e .
    ```
 
-`.env` is loaded by entry scripts (``load_dotenv``) before training or controllers read ``os.environ``.
+`.env` is loaded by entry scripts (``load_dotenv``) before training or HPTune step jobs read ``os.environ``.
 
 **Hyperparameter tuning:** Trial state is stored in **`{HPTUNE_DIR}/trials/trials.csv`** (see `service.trial_service`) with **Pydantic** models (`model.hp_trial.HPTuneTrial`). Trial directories live under `{HPTUNE_DIR}/trials/trial_*`.
 
@@ -137,11 +137,12 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 
 ‡Required by PBS training/preprocess/HPTune scripts.
 
-#### Set by PBS or controllers (not in `.env`)
+#### Set by PBS or the tuner (not in `.env`)
 
 | Variable | Description |
 |----------|-------------|
 | `PBS_JOBID` | PBS job id. When set, HPTune also writes `controller_logs/hptune_<PBS_JOBID>.txt`. |
+| `WARM_START_CHECKPOINT` | Set by `run_step` for each `src/train.py` subprocess when `best_trial/` holds a checkpoint, so the trial warm-starts from the best model so far. Unset means a cold start. |
 | `TRIAL_DIR` | Optional override path `HPTUNE_DIR/trials/<trial_id>` whose `.env` `scripts/run_train.sh` sources for a manual single-trial run. The HP-tune chain does **not** use it — `run_step` trains each trial in-process and passes its hyperparameters through the environment. |
 
 #### Thread caps (recommended on HPC)
