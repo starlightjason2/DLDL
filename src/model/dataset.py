@@ -317,8 +317,10 @@ class IpDataset(Dataset):
         self, scale_labels: bool = True, num_checks: int = 100, verbose: bool = False
     ) -> None:
         """Verify preprocessed dataset integrity."""
-        # Initialize preprocessing state if not already done
-        if not hasattr(self, "shot_list"):
+        # Initialize the raw-lookup state (file list, max_length, shot->index maps).
+        # Guard on _shot_to_idx, not shot_list: loading a cached dataset already sets
+        # shot_list via _ensure_shot_metadata, but not these raw-comparison helpers.
+        if not hasattr(self, "_shot_to_idx"):
             self.shot_list = np.loadtxt(self.labels_path)
             self.file_list = [f"{int(shot[0])}.txt" for shot in self.shot_list]
             self.num_shots = len(self.file_list)
