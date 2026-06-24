@@ -14,7 +14,7 @@ import torch
 from matplotlib.widgets import Slider, TextBox
 
 from model.dataset import IpDataset
-from util.disruption_predict import predict_disruption_time
+from util.disruption_predict import predict_disruption_time, predict_disruption_time
 from util.hptune import load_best_trial_cnn
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=True)
@@ -59,7 +59,7 @@ def main() -> None:
             
             ax1.plot(shot.time, shot.current, label="Current")
             if shot.disruptive:
-                ax1.axvline(shot.t_disrupt, color="r", ls="--", label=f"Real disruption time: {shot.t_disrupt:.5f}s")
+                ax1.axvline(shot.t_disrupt, color="r", ls="--", label=f"Real disruption time: $t_0={shot.t_disrupt:.5f}$s")
             fig.suptitle(shot.title)
             
 
@@ -74,9 +74,9 @@ def main() -> None:
 
             ax2.clear()        
             
-            diff = np.abs(shot.current - smoothed_current)
+            predicted_time, diff = predict_disruption_time(shot.current)
+            
             ax2.plot(shot.time, diff, linewidth=2)                
-            predicted_time = predict_disruption_time(shot.current)
            
             cnn_prob = torch.sigmoid(cls_logit).item()
             cnn_disruptive = cnn_prob > model.decision_threshold
@@ -84,12 +84,12 @@ def main() -> None:
             ax1.set_title(f"CNN disruption probability: {100*cnn_prob:.2f}%", fontsize=10)
 
             if cnn_disruptive:
-                ax2.axvline(predicted_time, color="r", ls="--", label=f"Heuristic disruption time: {predicted_time:.5f}s, {abs(shot.t_disrupt - predicted_time) * 1e5:.2f} microsecond diff")
+                ax2.axvline(predicted_time, color="r", ls="--", label=f"Heuristic disruption time: {predicted_time:.5f}s, {abs(shot.t_disrupt - predicted_time) * 1e5:.2f} µs diff")
                 ax2.axvline(
                     float(cnn_time),
                     color="g",
                     ls=":",
-                    label=f"CNN disruption time",
+                    label=f"CNN disruption time: {float(cnn_time):.5f}s, {abs(shot.t_disrupt - float(cnn_time)) * 1e5:.2f} µs diff",
                 )
 
             ax1.legend()
