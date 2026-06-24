@@ -78,7 +78,14 @@ class TrialService:
     @staticmethod
     def _write_df(df: pd.DataFrame, path: Path) -> None:
         tmp_path = path.with_suffix(".csv.tmp")
-        df.sort_values("trial_id").to_csv(tmp_path, index=False, encoding="utf-8")
+        # Persist oldest-to-newest by creation time (rows without one sort last).
+        sort_key = pd.to_datetime(df["created_at"], errors="coerce", utc=True)
+        ordered = (
+            df.assign(_created_sort=sort_key)
+            .sort_values("_created_sort", kind="stable", na_position="last")
+            .drop(columns="_created_sort")
+        )
+        ordered.to_csv(tmp_path, index=False, encoding="utf-8")
         tmp_path.replace(path)
 
     @staticmethod
