@@ -60,7 +60,7 @@ def load_best_cnn(dataset, repo, abs_path):
         cls_pos_weight=float(os.environ["CLS_POS_WEIGHT"]),
         decision_threshold=float(os.environ["DECISION_THRESHOLD"]),
     )
-    model.load_state_dict(torch.load(ckpts[0], map_location="cpu")["model"])
+    model.load_state_dict(torch.load(ckpts[0], map_location="cpu"))
     model.eval()
     return model
 
@@ -85,73 +85,81 @@ def main() -> None:
     num_rows = len(dataset)
 
     model = load_best_cnn(dataset, repo, abs_path)
+    if model is None: return
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 5), sharex=True)
     fig.subplots_adjust(bottom=0.2)
-
-    def draw(i: int) -> None:
-        idx = max(0, min(int(i), num_rows - 1))
-        shot = dataset.load_shot_view(idx)
-
-        ax1.clear()
-
-        ax1.plot(shot.time, shot.current, label="Current")
-        if shot.disruptive:
-            ax1.axvline(shot.t_disrupt, color="r", ls="--")
-        ax1.set_title(shot.title)
-        ax1.set_xlabel("Normalized time")
-        ax1.set_ylabel("Normalized current")
-
-        window_size = len(shot.time) // 100
-        weights = np.ones(window_size) / window_size
-        smoothed_current = np.convolve(shot.current, weights, mode="same")
-        ax1.plot(shot.time, smoothed_current, label="Smoothed Current", ls="--")
-        ax1.grid(True)
-
-        ax2.clear()
-        diff = np.abs(shot.current - smoothed_current)
-        predicted_time = predict_disruption_time(shot.current)
-
-        ax2.plot(shot.time, diff, linewidth=2)
-        ax2.axvline(predicted_time, color="r", ls="--", label="Heuristic time")
-
-        if model is not None:
+    
+    with torch.no_grad():
+        
+        def draw(i: int) -> None:
+            shot = dataset.load_shot_view(i)
+        
+            idx = max(0, min(int(i), num_rows - 1))
             signal = dataset.data[idx].float().reshape(1, -1)
-            with torch.no_grad():
-                cls_logit, cnn_time = model.forward(signal)[0]
+            cls_logit, cnn_time = model.forward(signal)[0]
+
+            ax1.clear()
+            
+            ax1.plot(shot.time, shot.current, label="Current")
+            if shot.disruptive:
+                ax1.axvline(shot.t_disrupt, color="r", ls="--", label=f"Real disruption time: {shot.t_disrupt:.5f}s")
+            fig.suptitle(shot.title)
+            
+
+            ax1.set_xlabel("Normalized time")
+            ax1.set_ylabel("Normalized current")
+
+            window_size = len(shot.time) // 100
+            weights = np.ones(window_size) / window_size
+            smoothed_current = np.convolve(shot.current, weights, mode="same")
+            ax1.plot(shot.time, smoothed_current, label="Smoothed Current", ls="--")
+            ax1.grid(True)
+
+            ax2.clear()        
+            
+            diff = np.abs(shot.current - smoothed_current)
+            ax2.plot(shot.time, diff, linewidth=2)                
+            predicted_time = predict_disruption_time(shot.current)
+           
             cnn_prob = torch.sigmoid(cls_logit).item()
             cnn_disruptive = cnn_prob > model.decision_threshold
-            ax2.axvline(
-                float(cnn_time),
-                color="g",
-                ls=":",
-                label=f"CNN time (disrupt={cnn_disruptive}, p={cnn_prob:.2f})",
-            )
 
-        ax2.legend()
-        ax2.grid(True)
-        fig.legend()
-        fig.canvas.draw_idle()
+            ax1.set_title(f"CNN disruption probability: {100*cnn_prob:.2f}%", fontsize=10)
 
-    draw(start)
+            if cnn_disruptive:
+                ax2.axvline(predicted_time, color="r", ls="--", label=f"Heuristic disruption time: {predicted_time:.5f}s, {abs(shot.t_disrupt - predicted_time) * 1e5:.2f} microsecond diff")
+                ax2.axvline(
+                    float(cnn_time),
+                    color="g",
+                    ls=":",
+                    label=f"CNN disruption time",
+                )
 
-    index_slider = Slider(
-        fig.add_axes([0.12, 0.05, 0.55, 0.03]),
-        "Index",
-        0,
-        num_rows - 1,
-        valinit=start,
-        valstep=1,
-    )
-    index_slider.valtext.set_visible(False)
-    box = TextBox(fig.add_axes([0.72, 0.05, 0.12, 0.03]), "", initial=str(start))
+            ax1.legend()
+            ax2.legend()
+            ax2.grid(True)        
+            fig.canvas.draw_idle()
 
-    index_slider.on_changed(lambda v: (draw(v), box.set_val(str(int(v)))))
-    box.on_submit(
-        lambda t: index_slider.set_val(int(t)) if t.strip().isdigit() else None
-    )
+        draw(start)
 
-    plt.show()
+        index_slider = Slider(
+            fig.add_axes([0.12, 0.05, 0.55, 0.03]),
+            "Index",
+            0,
+            num_rows - 1,
+            valinit=start,
+            valstep=1,
+        )
+        index_slider.valtext.set_visible(False)
+        box = TextBox(fig.add_axes([0.72, 0.05, 0.12, 0.03]), "", initial=str(start))
+
+        index_slider.on_changed(lambda v: (draw(v), box.set_val(str(int(v)))))
+        box.on_submit(
+            lambda t: index_slider.set_val(int(t)) if t.strip().isdigit() else None
+        )
+
+        plt.show()
 
 
 if __name__ == "__main__":
