@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shlex
 import shutil
@@ -14,6 +15,8 @@ import pandas as pd
 from loguru import logger
 
 if TYPE_CHECKING:
+    from model.cnn import IpCNN
+    from model.dataset import IpDataset
     from model.hp_trial import HPTuneTrial
 
 # Enumerated trial folders: trial_1, trial_2, ...
@@ -138,6 +141,53 @@ def sync_best_trial_artifacts(
         float(best.score),
         dest,
     )
+
+
+def load_best_trial_cnn(dataset: "IpDataset") -> "IpCNN | None":
+    """Build an ``IpCNN`` initialized with the global-best trial's weights.
+
+    The network architecture is read from the environment (the same vars
+    ``train.py`` uses) and the weights come from ``best_trial/*_best_params.pt``.
+    Returns an eval-mode model on CPU, or ``None`` if no best checkpoint exists.
+    """
+    import torch
+
+    from model.cnn import IpCNN
+
+    repo = Path(__file__).resolve().parents[2]
+    hptune_dir = Path(os.environ["HPTUNE_DIR"])
+    if not hptune_dir.is_absolute():
+        hptune_dir = repo / hptune_dir
+
+    best_dir = hptune_dir / "trials" / "best_trial"
+    checkpoints = sorted(best_dir.glob("*_best_params.pt"))
+    if not checkpoints:
+        return None
+
+    def _conv(prefix: str) -> tuple[int, int, int]:
+        return (
+            int(os.environ[f"{prefix}_FILTERS"]),
+            int(os.environ[f"{prefix}_KERNEL"]),
+            int(os.environ[f"{prefix}_PADDING"]),
+        )
+
+    model = IpCNN(
+        dataset,
+        prog_dir=str(best_dir),
+        conv1=_conv("CONV1"),
+        conv2=_conv("CONV2"),
+        conv3=_conv("CONV3"),
+        conv4=_conv("CONV4"),
+        pool_size=int(os.environ["POOL_SIZE"]),
+        fc1_size=int(os.environ["FC1_SIZE"]),
+        fc2_size=int(os.environ["FC2_SIZE"]),
+        dropout_rate=float(os.environ["DROPOUT_RATE"]),
+        cls_pos_weight=float(os.environ["CLS_POS_WEIGHT"]),
+        decision_threshold=float(os.environ["DECISION_THRESHOLD"]),
+    )
+    model.load_state_dict(torch.load(checkpoints[0], map_location="cpu")["model"])
+    model.eval()
+    return model
 
 
 def write_env(
