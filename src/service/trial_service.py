@@ -74,6 +74,11 @@ class TrialService:
         for column in _CSV_COLUMNS:
             if column not in df.columns:
                 df[column] = pd.NA
+        # chain_id/job_id are free-form strings. When every cell is blank, pandas
+        # infers the column as float64 (all-NaN), which then rejects string writes
+        # (LossySetitemError) when a row is updated. Force object dtype, blanks -> "".
+        for column in ("chain_id", "job_id"):
+            df[column] = df[column].astype("object").where(df[column].notna(), "")
         return df[_CSV_COLUMNS]
 
     @staticmethod

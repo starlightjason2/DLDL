@@ -52,6 +52,7 @@ def main() -> None:
     lr_scheduler = os.environ["LR_SCHEDULER"].lower() in ("true", "1", "yes", "on")
 
     warm_start = os.environ.get("WARM_START_CHECKPOINT") or None
+    chained = os.environ.get("HPTUNE_CHAINED") == "1"
 
     dataset = IpDataset(
         normalization_type=os.environ["NORMALIZATION_TYPE"],
@@ -110,6 +111,7 @@ def main() -> None:
         dataloader_num_workers=int(os.environ["DATALOADER_NUM_WORKERS"]),
         fbeta=float(os.environ.get("FBETA", "1.8")),
         warm_start_checkpoint=str(_abs(warm_start)) if warm_start else None,
+        chained=chained,
     )
 
 

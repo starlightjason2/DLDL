@@ -10,10 +10,16 @@ set -euo pipefail
 
 cd "$PROJECT_ROOT"
 
+# Preserve a chain id provided by the launcher / previous step across the .env
+# reload (.env carries only a placeholder; the real id is generated once in
+# start_hptune.sh and propagated to each step via `qsub -V`).
+_CHAIN_ID="${HPTUNE_CHAIN_ID:-}"
 
 set -a
 source .env
 set +a
+
+[[ -n "$_CHAIN_ID" ]] && export HPTUNE_CHAIN_ID="$_CHAIN_ID"
 
 source "$DLDL_CONDASH"
 conda activate "$CONDA_ENV"

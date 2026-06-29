@@ -252,6 +252,7 @@ class IpCNN(nn.Module):
         *,
         lr: float,
         weight_decay: float,
+        chained: bool = False,
     ) -> None:
         """Initialize weights (and optimizer momentum) from a prior checkpoint.
 
@@ -275,8 +276,10 @@ class IpCNN(nn.Module):
 
         source_epoch = ckpt.get("epoch") if isinstance(ckpt, dict) else None
         source_score = ckpt.get("best_score") if isinstance(ckpt, dict) else None
+        verb = "Chained" if chained else "Warm-started"
         self.logger.info(
-            "Warm-started from {} (source epoch={}, source best F-beta={})",
+            "{} from {} (source epoch={}, source best F-beta={})",
+            verb,
             checkpoint_path,
             source_epoch,
             f"{source_score:.6f}" if isinstance(source_score, (int, float)) else "n/a",
@@ -298,6 +301,7 @@ class IpCNN(nn.Module):
         dataloader_num_workers: int,
         fbeta: float = 1.8,
         warm_start_checkpoint: str | None = None,
+        chained: bool = False,
     ) -> None:
         """Train this model on a single device.
 
@@ -362,6 +366,7 @@ class IpCNN(nn.Module):
                 optimizer,
                 lr=lr,
                 weight_decay=weight_decay,
+                chained=chained,
             )
 
         logs = []
