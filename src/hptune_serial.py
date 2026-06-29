@@ -7,7 +7,7 @@ from model.bayesian_hptuner import BayesianHPTuner
 
 
 def main() -> None:
-    tuner = BayesianHPTuner.create()
+    tuner = BayesianHPTuner()
     tuner.run_step()
 
 

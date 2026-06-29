@@ -2,7 +2,7 @@
 
 # DLDL: Disruption Labeling with Deep Learning
 
-A 1D CNN that uses plasma current to predict disruption time. For labeling D-IIID shots with the 'ipspr15V' plasma current PTDATA signal.
+A 1D CNN that uses plasma current to predict whether a shot disrupts (binary disruption classification). For labeling D-IIID shots with the 'ipspr15V' plasma current PTDATA signal.
 
 Interactive polaris shell
 
@@ -77,8 +77,8 @@ Everything is read from the process environment (typically via a project-root `.
 | `GRADIENT_CLIP` | ✓ | Float ≥ 0. |
 | `DATALOADER_NUM_WORKERS` | ✓ | DataLoader workers (forced to `0` when no GPU). |
 | `CLS_POS_WEIGHT` | ✓ | Positive-class (disruptive) weight in BCE loss (float ≥ 0). `>1` favors recall over precision. Tunable via `HPTUNE_CLS_POS_WEIGHT_*`. |
-| `DECISION_THRESHOLD` | ✓ | Sigmoid probability cutoff for the disruptive class (float in [0, 1]). `<0.5` favors recall. Tunable via `HPTUNE_DECISION_THRESHOLD_*`. |
-| `FBETA` | optional (default `2.0`) | Beta for the F-beta score used for model selection (best checkpoint + early stopping) and as the HPTune objective, which is **maximized**. `beta>1` weights recall over precision (`2.0` = F2). This defines the objective and is not itself tuned. |
+| `DECISION_THRESHOLD` | ✓ | Sigmoid probability cutoff for the disruptive class (float in [0, 1]). Fixed (not tuned); typically `0.5`. |
+| `FBETA` | optional (default `1.8`) | Beta for the F-beta score used for model selection (best checkpoint + early stopping) and as the HPTune objective, which is **maximized**. `beta>1` weights recall over precision (default `1.8`). This defines the objective and is not itself tuned. |
 
 #### Architecture (`train.py` → `IpCNN`)
 
@@ -91,7 +91,7 @@ Everything is read from the process environment (typically via a project-root `.
 | `POOL_SIZE` | ✓ | Integer ≥ 1. |
 | `FC1_SIZE`, `FC2_SIZE` | ✓ | Integer ≥ 1. |
 
-#### Bayesian HPTune search space (`BayesianHPTuner.create`)
+#### Bayesian HPTune search space (`BayesianHPTuner`)
 
 Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`). All keys below are required when running `hptune_serial`.
 
@@ -109,7 +109,6 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | `HPTUNE_LR_SCHEDULER_PATIENCE_MIN`, `HPTUNE_LR_SCHEDULER_PATIENCE_MAX` | ✓ | Integers ≥ 1, `min` ≤ `max`. |
 | `HPTUNE_EARLY_STOPPING_PATIENCE_MIN`, `HPTUNE_EARLY_STOPPING_PATIENCE_MAX` | ✓ | Integers ≥ 1, `min` ≤ `max`. |
 | `HPTUNE_CLS_POS_WEIGHT_MIN`, `HPTUNE_CLS_POS_WEIGHT_MAX` | ✓ | BCE positive-class weight bounds (float ≥ 0; `min` ≤ `max`). Higher values push toward recall. |
-| `HPTUNE_DECISION_THRESHOLD_MIN`, `HPTUNE_DECISION_THRESHOLD_MAX` | ✓ | Decision-threshold bounds (floats in [0, 1]; `min` ≤ `max`). Lower values push toward recall. |
 | `HPTUNE_RANDOM_INSERT_EVERY` | ✓ | Insert a random trial every N completed trials after warmup (integer ≥ 0). |
 | `HPTUNE_EI_XI` | ✓ | Expected-improvement ξ for Bayesian optimization (float ≥ 0). |
 
@@ -122,7 +121,7 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | `TRIAL_TIMEOUT` | ✓ | Seconds without log activity before a stale `RUNNING` trial (e.g. from a lost step) is requeued or failed. |
 | `HPTUNE_QUEUE` | ✓† | PBS queue for the step jobs. Use `debug` (allows 1 running + 1 queued per user), not `debug-scaling` (1 job total). |
 | `HPTUNE_TRAIN_WALLTIME` | ✓† | Walltime for each step job (passed to `qsub`). |
-| `HPTUNE_CHAIN_ID` | ✓† | Label written to `controller_logs/chain_steps.csv` and `chain_summary.log`. |
+| `HPTUNE_CHAIN_ID` | ✓† | Label written to `trials/chain_steps.csv` and `chain_summary.log`. |
 
 †Required for the serial PBS chain (`scripts/start_hptune.sh`, `scripts/run_hptune.sh`).
 
@@ -141,7 +140,7 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 
 | Variable | Description |
 |----------|-------------|
-| `PBS_JOBID` | PBS job id. When set, HPTune also writes `controller_logs/hptune_<PBS_JOBID>.txt`. |
+| `PBS_JOBID` | PBS job id (set on compute nodes). |
 | `WARM_START_CHECKPOINT` | Set by `run_step` for each `src/train.py` subprocess when `best_trial/` holds a checkpoint, so the trial warm-starts from the best model so far. Unset means a cold start. |
 | `TRIAL_DIR` | Optional override path `HPTUNE_DIR/trials/<trial_id>` whose `.env` `scripts/run_train.sh` sources for a manual single-trial run. The HP-tune chain does **not** use it — `run_step` trains each trial in-process and passes its hyperparameters through the environment. |
 
@@ -196,7 +195,7 @@ python src/train.py
 * Loads preprocessed tensors at `DATA_PATH` and `TRAIN_LABELS_PATH` (must match preprocessing / `NORMALIZATION_TYPE`)
 * Validates files exist, splits 80/10/10 train/dev/test
 * Trains on a single process / single GPU
-* Selects the best checkpoint and applies early stopping by **maximizing the validation F-beta** (`FBETA`, default F2), favoring recall over precision
+* Selects the best checkpoint and applies early stopping by **maximizing the validation F-beta** (`FBETA`, default `1.8`), favoring recall over precision
 * Saves checkpoints and logs to `PROG_DIR`
 
 Training hyperparameters (learning rate, epochs, architecture sizes, etc.) are read from environment variables (see [Environment Variables](#environment-variables)).
@@ -275,7 +274,7 @@ HPTune reads the same project-root `.env` as the rest of the workflow. On Polari
 
 The supported path is a **serial, self-resubmitting PBS chain**: each job plans the next trial, trains it in-process, records its score, then submits the next step job and exits. Exactly one trial runs per job, and at most one job is ever pending (the running job plus the queued next step), so it fits queues that cap you at one running + one queued job per user (Polaris `debug`). There is no separate controller job and no job dependency.
 
-**Objective:** each trial's score (the `score` column in `trials.csv`) is its best validation F-beta (`FBETA`, default F2). The optimizer **maximizes** this score, and `best_trial/` tracks the highest-scoring trial. Because F-beta with `beta>1` weights recall over precision, tuning pushes `cls_pos_weight` and `decision_threshold` toward catching more disruptions.
+**Objective:** each trial's score (the `score` column in `trials.csv`) is its best validation F-beta (`FBETA`, default `1.8`). The optimizer **maximizes** this score, and `best_trial/` tracks the highest-scoring trial. Because F-beta with `beta>1` weights recall over precision, tuning pushes `cls_pos_weight` toward catching more disruptions.
 
 #### Serial HPTune
 
@@ -334,9 +333,9 @@ Data and logging layout:
 - Trial state CSV: `{HPTUNE_DIR}/trials/trials.csv`
 - Trial directories: `{HPTUNE_DIR}/trials/trial_*`
 - Best-trial artifacts: `{HPTUNE_DIR}/best_trial/`
-- Job logs: `{HPTUNE_DIR}/controller_logs/` (`chain_steps.csv`, `chain_summary.log`, PBS stdout/stderr)
+- Chain logs: `{HPTUNE_DIR}/trials/` (`chain_steps.csv`, `chain_summary.log`)
+- PBS stdout/stderr: `{HPTUNE_DIR}/controller_logs/` (`.OU`/`.ER`)
 - Per-trial training logs/checkpoints: `{HPTUNE_DIR}/trials/trial_*/`
-- Under PBS, Loguru also writes `{HPTUNE_DIR}/controller_logs/hptune_<PBS_JOBID>.txt`
 
 #### Interactive run (`qsub -I`)
 

@@ -18,13 +18,18 @@ set +a
 : "${HPTUNE_QUEUE:?set it in .env}"
 : "${HPTUNE_TRAIN_WALLTIME:?set it in .env}"
 
-mkdir -p "$HPTUNE_DIR/controller_logs"
-
-# RESET=1 wipes the previous run, keeping only .env files and best checkpoints.
+# RESET=1 wipes the previous run
 if [[ "${RESET:-0}" == "1" ]]; then
-    find "$HPTUNE_DIR" -type f ! -name ".env" ! -name "*_best_params.pt" -delete
+    rm -rf "$$HPTUNE_DIR/controller_logs/"
+    rm -rf "$$HPTUNE_DIR/trials/trial_*"
+    rm -rf "$$HPTUNE_DIR/trials/best_trial"
     echo "Reset: cleared $HPTUNE_DIR"
 fi
+
+mkdir -p "$HPTUNE_DIR/controller_logs"
+mkdir -p "$HPTUNE_DIR/trials/best_trial"
+echo "Log directory: $HPTUNE_DIR/controller_logs"
+echo "Trial directory: $HPTUNE_DIR/trials"
 
 STEP_JOB=$(qsub \
     -A fusiondl_aesp \
@@ -37,4 +42,4 @@ STEP_JOB=$(qsub \
     scripts/run_hptune.sh)
 
 echo "First step job : $STEP_JOB"
-echo "Logs           : tail $HPTUNE_DIR/controller_logs/$STEP_JOB.txt"
+echo "Logs           : tail -f $HPTUNE_DIR/controller_logs/$STEP_JOB.OU"

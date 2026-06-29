@@ -30,7 +30,6 @@ _CSV_COLUMNS = [
     "lr_scheduler_patience",
     "early_stopping_patience",
     "cls_pos_weight",
-    "decision_threshold",
     "score",
     "recall",
     "precision",
@@ -98,8 +97,6 @@ class TrialService:
                 data[key] = None
         if pd.isna(data.get("cls_pos_weight")):
             data["cls_pos_weight"] = 1.0
-        if pd.isna(data.get("decision_threshold")):
-            data["decision_threshold"] = 0.5
         if pd.isna(data.get("score")):
             data["score"] = -1.0
         if pd.isna(data.get("recall")):
@@ -124,7 +121,6 @@ class TrialService:
             "lr_scheduler_patience": trial.lr_scheduler_patience,
             "early_stopping_patience": trial.early_stopping_patience,
             "cls_pos_weight": trial.cls_pos_weight,
-            "decision_threshold": trial.decision_threshold,
             "score": trial.score,
             "recall": trial.recall,
             "precision": trial.precision,

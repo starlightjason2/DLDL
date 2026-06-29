@@ -14,7 +14,7 @@ import torch
 from matplotlib.widgets import Slider, TextBox
 
 from model.dataset import IpDataset
-from util.disruption_predict import predict_disruption_time, predict_disruption_time
+from util.disruption_predict import predict_disruption_time
 from util.hptune import load_best_trial_cnn
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=True)
@@ -45,23 +45,27 @@ def main() -> None:
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 5), sharex=True)
     fig.subplots_adjust(bottom=0.2)
-    
+
     with torch.no_grad():
-        
+
         def draw(i: int) -> None:
             shot = dataset.load_shot_view(i)
-        
+
             idx = max(0, min(int(i), num_rows - 1))
             signal = dataset.data[idx].float().reshape(1, -1)
-            cls_logit, cnn_time = model.forward(signal)[0]
+            cls_logit = model.forward(signal)[0, 0]
 
             ax1.clear()
-            
+
             ax1.plot(shot.time, shot.current, label="Current")
             if shot.disruptive:
-                ax1.axvline(shot.t_disrupt, color="r", ls="--", label=f"Real disruption time: $t_0={shot.t_disrupt:.5f}$s")
+                ax1.axvline(
+                    shot.t_disrupt,
+                    color="r",
+                    ls="--",
+                    label=f"Real disruption time: $t_0={shot.t_disrupt:.5f}$s",
+                )
             fig.suptitle(shot.title)
-            
 
             ax1.set_xlabel("Normalized time")
             ax1.set_ylabel("Normalized current")
@@ -72,29 +76,30 @@ def main() -> None:
             ax1.plot(shot.time, smoothed_current, label="Smoothed Current", ls="--")
             ax1.grid(True)
 
-            ax2.clear()        
-            
+            ax2.clear()
+
             predicted_time, diff = predict_disruption_time(shot.current)
-            
-            ax2.plot(shot.time, diff, linewidth=2)                
-           
+
+            ax2.plot(shot.time, diff, linewidth=2)
+
             cnn_prob = torch.sigmoid(cls_logit).item()
             cnn_disruptive = cnn_prob > model.decision_threshold
 
-            ax1.set_title(f"CNN disruption probability: {100*cnn_prob:.2f}%", fontsize=10)
+            ax1.set_title(
+                f"CNN disruption probability: {100*cnn_prob:.2f}%", fontsize=10
+            )
 
             if cnn_disruptive:
-                ax2.axvline(predicted_time, color="r", ls="--", label=f"Heuristic disruption time: {predicted_time:.5f}s, {abs(shot.t_disrupt - predicted_time) * 1e5:.2f} µs diff")
                 ax2.axvline(
-                    float(cnn_time),
-                    color="g",
-                    ls=":",
-                    label=f"CNN disruption time: {float(cnn_time):.5f}s, {abs(shot.t_disrupt - float(cnn_time)) * 1e5:.2f} µs diff",
+                    predicted_time,
+                    color="r",
+                    ls="--",
+                    label=f"Heuristic disruption time: {predicted_time:.5f}s, {abs(shot.t_disrupt - predicted_time) * 1e5:.2f} µs diff",
                 )
 
             ax1.legend()
             ax2.legend()
-            ax2.grid(True)        
+            ax2.grid(True)
             fig.canvas.draw_idle()
 
         draw(start)

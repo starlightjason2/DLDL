@@ -12,7 +12,6 @@ from typing import Any
 
 from bayes_opt import BayesianOptimization, acquisition
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, Field
 
 from model.hyperparam_space import HyperparameterSpace
 from model.hp_trial import HPTuneTrial, TrialStatus
@@ -26,50 +25,40 @@ from util.data_loading import env_int
 from util.pbs import submit_hptune_step
 
 
-class BayesianHPTuner(BaseModel):
+class BayesianHPTuner:
     """Bayesian search over non-architecture training hyperparameters."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # Paths
     trials_dir: Path
     log_dir: Path
 
     # Config
-    max_retries: int = Field(ge=0)
-    max_trials: int = Field(ge=1)
+    max_retries: int
+    max_trials: int
     hp_space: HyperparameterSpace
-
-    def model_post_init(self, __context: Any) -> None:
-        job_id = os.environ.get("PBS_JOBID")
-        if job_id:
-            logger.add(
-                Path(self.log_dir) / f"hptune_{job_id}.txt",
-                format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
-                level="DEBUG",
-                enqueue=True,
-            )
 
     # ------------------------------------------------------------------
     # Construction
     # ------------------------------------------------------------------
 
-    @classmethod
-    def create(cls) -> BayesianHPTuner:
+    def __init__(self) -> None:
         root = Path(os.environ["HPTUNE_DIR"])
-        trials_dir = root / "trials"
-        log_dir = root / "controller_logs"
 
-        trials_dir.mkdir(parents=True, exist_ok=True)
-        log_dir.mkdir(parents=True, exist_ok=True)
+        self.trials_dir = root / "trials"
+        self.trials_dir.mkdir(parents=True, exist_ok=True)
 
-        return cls(
-            trials_dir=trials_dir,
-            log_dir=log_dir,
-            max_retries=env_int("HPTUNE_MAX_RETRIES"),
-            max_trials=env_int("HPTUNE_MAX_TRIALS"),
-            hp_space=HyperparameterSpace.from_env(),
-        )
+        self.log_dir = root / "controller_logs"
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+
+        self.max_retries = env_int("HPTUNE_MAX_RETRIES")
+        if self.max_retries < 0:
+            raise ValueError("HPTUNE_MAX_RETRIES must be >= 0")
+
+        self.max_trials = env_int("HPTUNE_MAX_TRIALS")
+        if self.max_trials < 1:
+            raise ValueError("HPTUNE_MAX_TRIALS must be >= 1")
+
+        self.hp_space = HyperparameterSpace.from_env()
 
     # ------------------------------------------------------------------
     # Helpers
@@ -261,12 +250,12 @@ class BayesianHPTuner(BaseModel):
                 step_job,
             ]
         )
-        with (self.log_dir / "chain_steps.csv").open("a", encoding="utf-8") as f:
+        with (self.trials_dir / "chain_steps.csv").open("a", encoding="utf-8") as f:
             f.write(line + "\n")
 
     def _log_chain_complete(self) -> None:
         chain_id = os.environ.get("HPTUNE_CHAIN_ID", "")
-        with (self.log_dir / "chain_summary.log").open("a", encoding="utf-8") as f:
+        with (self.trials_dir / "chain_summary.log").open("a", encoding="utf-8") as f:
             f.write(f"Chain {chain_id} finished at {self._utc_stamp()}\n")
 
     def _best_trial_checkpoint(self) -> Path | None:

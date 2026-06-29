@@ -25,7 +25,7 @@ from model.dataset import IpDataset
 
 
 class IpCNN(nn.Module):
-    """1D CNN for plasma disruption prediction (classification + time prediction)."""
+    """1D CNN for plasma disruption prediction (binary disruption classification)."""
 
     def __init__(
         self,
@@ -60,7 +60,6 @@ class IpCNN(nn.Module):
         self._cls_loss = nn.BCEWithLogitsLoss(
             pos_weight=torch.tensor(self.cls_pos_weight)
         )
-        self._time_loss = nn.MSELoss()
 
         # Log hyperparameters
         self.logger.info("=" * 60)
@@ -124,7 +123,7 @@ class IpCNN(nn.Module):
         self.fc2 = nn.Linear(fc1_size, fc2_size)
         self.bn6 = nn.BatchNorm1d(fc2_size)
         self.dropout2 = nn.Dropout(dropout_rate)
-        self.fc3 = nn.Linear(fc2_size, 2)
+        self.fc3 = nn.Linear(fc2_size, 1)
 
     def __len__(self) -> int:
         return sum(p.numel() for p in self.parameters())
@@ -138,23 +137,20 @@ class IpCNN(nn.Module):
         return x.view(x.size(0), -1)
 
     def forward(self, x: Tensor) -> Tensor:
-        """Forward pass."""
+        """Forward pass. Returns the disruption logit, shape ``(batch, 1)``."""
         x = self.forward_conv(x.unsqueeze(1))
         x = self.dropout1(F.relu(self.bn5(self.fc1(x))))
         x = self.dropout2(F.relu(self.bn6(self.fc2(x))))
         return self.fc3(x)
 
     def _loss(self, outputs: Tensor, labels: Tensor) -> Tensor:
-        """Combined loss for classification and time prediction."""
-        class_loss = self._cls_loss(outputs[:, 0], labels[:, 0])
-        time_loss = self._time_loss(outputs[:, 1], labels[:, 1])
-        return class_loss + time_loss
+        """Binary disruption-classification loss."""
+        return self._cls_loss(outputs[:, 0], labels[:, 0])
 
     def _validate_epoch(
         self,
         model: nn.Module,
         dev_loader: DataLoader,
-        mse_loss: nn.Module,
         epoch: int,
         writer: SummaryWriter,
         total_train_loss: float,
@@ -170,16 +166,13 @@ class IpCNN(nn.Module):
         model.eval()
         total_val_loss = 0.0
         all_classification_targets, all_classification_predictions = [], []
-        all_time_targets, all_time_predictions = [], []
 
         with torch.no_grad():
             for data, targets in dev_loader:
                 data, targets = data.cuda(), targets.cuda()
                 output = model(data)
-                classification_targets, time_targets = targets[:, 0], targets[:, 1]
-                classification_output, time_output = output[:, 0], output[:, 1]
-                all_time_targets.extend(time_targets.cpu().numpy())
-                all_time_predictions.extend(time_output.cpu().numpy())
+                classification_targets = targets[:, 0]
+                classification_output = output[:, 0]
 
                 classification_predictions = (
                     torch.sigmoid(classification_output) > self.decision_threshold
@@ -231,14 +224,6 @@ class IpCNN(nn.Module):
         for name, value in metrics.items():
             writer.add_scalar(name, value, epoch)
         writer.add_scalar("Validation Loss", avg_val_loss, epoch)
-        writer.add_scalar(
-            "Validation Time MSE",
-            mse_loss(
-                torch.tensor(all_time_predictions),
-                torch.tensor(all_time_targets),
-            ).item(),
-            epoch,
-        )
 
     @staticmethod
     def _checkpoint(
@@ -311,7 +296,7 @@ class IpCNN(nn.Module):
         gradient_clip: float,
         batch_size: int,
         dataloader_num_workers: int,
-        fbeta: float = 2.0,
+        fbeta: float = 1.8,
         warm_start_checkpoint: str | None = None,
     ) -> None:
         """Train this model on a single device.
@@ -379,9 +364,6 @@ class IpCNN(nn.Module):
                 weight_decay=weight_decay,
             )
 
-        bce_loss = self._cls_loss
-        mse_loss = self._time_loss
-
         logs = []
         writer = SummaryWriter(self.prog_dir, filename_suffix=f"-job_{job_id}")
 
@@ -397,15 +379,9 @@ class IpCNN(nn.Module):
 
             for batch_idx, (data, target) in enumerate(train_loader):
                 data, target = data.cuda(), target.cuda()
-                classification_targets, time_targets = target[:, 0], target[:, 1]
 
                 optimizer.zero_grad()
                 output = model(data)
-                classification_output, time_output = output[:, 0], output[:, 1]
-                loss_classification = bce_loss(
-                    classification_output, classification_targets
-                )
-                loss_time = mse_loss(time_output, time_targets)
                 loss_value = self._loss(output, target)
 
                 loss_value.backward()
@@ -421,17 +397,10 @@ class IpCNN(nn.Module):
                         f"Epoch {epoch}/{num_epochs}, Batch {batch_idx}, [{batch_idx * len(data)}/{dataset_size}] Loss {loss_value.item():.6f}"
                     )
                     writer.add_scalar("Training Loss", loss_value.item(), step)
-                    writer.add_scalar(
-                        "Training Classification Loss",
-                        loss_classification.item(),
-                        step,
-                    )
-                    writer.add_scalar("Training Time Loss", loss_time.item(), step)
 
             self._validate_epoch(
                 model=model,
                 dev_loader=dev_loader,
-                mse_loss=mse_loss,
                 epoch=epoch,
                 writer=writer,
                 total_train_loss=total_train_loss,

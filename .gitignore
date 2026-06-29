@@ -176,12 +176,10 @@ data/hptune/*
 !data/hptune/trials/
 data/hptune/trials/*
 !data/hptune/trials/trials.csv
+!data/hptune/trials/chain_steps.csv
 !data/hptune/trials/best_trial/
 data/hptune/trials/best_trial/*
 !data/hptune/trials/best_trial/*_best_params.pt
-!data/hptune/controller_logs/
-data/hptune/controller_logs/*
-!data/hptune/controller_logs/chain_steps.csv
 
 # OS-specific
 .DS_Store

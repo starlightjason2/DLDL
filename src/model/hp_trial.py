@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from model.trial_status import TrialStatus
 from util.hptune import write_env
 
-TrialSignature = tuple[str, int, str, str, int, str, int, str, int, int, str, str]
+TrialSignature = tuple[str, int, str, str, int, str, int, str, int, int, str]
 
 
 class HPTuneTrial(BaseModel):
@@ -25,7 +25,9 @@ class HPTuneTrial(BaseModel):
 
     model_config = ConfigDict(from_attributes=True, validate_assignment=True)
 
-    trial_id: str = Field(description="Primary key; column ``trial_id`` in ``trials.csv``.")
+    trial_id: str = Field(
+        description="Primary key; column ``trial_id`` in ``trials.csv``."
+    )
     lr: float
     epochs: int
     dropout: float
@@ -37,7 +39,6 @@ class HPTuneTrial(BaseModel):
     lr_scheduler_patience: int
     early_stopping_patience: int
     cls_pos_weight: float = 1.0
-    decision_threshold: float = 0.5
     score: float = -1.0
     recall: float = -1.0
     precision: float = -1.0
@@ -70,7 +71,6 @@ class HPTuneTrial(BaseModel):
             int(d["lr_scheduler_patience"]),
             int(d["early_stopping_patience"]),
             f"{float(d['cls_pos_weight']):.12g}",
-            f"{float(d['decision_threshold']):.12g}",
         )
 
     def log_pass_hyperparameters(self, *, context: str) -> None:
@@ -78,8 +78,7 @@ class HPTuneTrial(BaseModel):
             "Hyperparameters for this pass ({ctx}): trial_id={id} lr={lr:.2e} epochs={ep} "
             "dropout={do:.4f} weight_decay={wd:.2e} batch_size={bs} gradient_clip={gc:.3f} "
             "lr_scheduler={ls} lr_scheduler_factor={lf:.3f} lr_scheduler_patience={lp} "
-            "early_stopping_patience={esp} cls_pos_weight={cpw:.3f} "
-            "decision_threshold={dt:.3f}",
+            "early_stopping_patience={esp} cls_pos_weight={cpw:.3f}",
             ctx=lambda: context,
             id=lambda: self.trial_id,
             lr=lambda: self.lr,
@@ -93,7 +92,6 @@ class HPTuneTrial(BaseModel):
             lp=lambda: self.lr_scheduler_patience,
             esp=lambda: self.early_stopping_patience,
             cpw=lambda: self.cls_pos_weight,
-            dt=lambda: self.decision_threshold,
         )
 
     def bayesian_params(self, batch_sizes: tuple[int, ...]) -> dict[str, float]:
@@ -113,7 +111,6 @@ class HPTuneTrial(BaseModel):
             "lr_sched_patience": float(self.lr_scheduler_patience),
             "early_stop_patience": float(self.early_stopping_patience),
             "cls_pos_weight": self.cls_pos_weight,
-            "decision_threshold": self.decision_threshold,
             "batch_idx": float(batch_index),
         }
 
@@ -132,7 +129,6 @@ class HPTuneTrial(BaseModel):
             "LR_SCHEDULER_PATIENCE": str(self.lr_scheduler_patience),
             "EARLY_STOPPING_PATIENCE": str(self.early_stopping_patience),
             "CLS_POS_WEIGHT": str(self.cls_pos_weight),
-            "DECISION_THRESHOLD": str(self.decision_threshold),
             "PROG_DIR": self.dir_path,
         }
 
