@@ -19,6 +19,8 @@ from model.hp_trial import HPTuneTrial, TrialStatus
 
 _CSV_COLUMNS = [
     "trial_id",
+    "chain_id",
+    "job_id",
     "lr",
     "epochs",
     "dropout",
@@ -95,6 +97,9 @@ class TrialService:
         for key in ("created_at", "updated_at"):
             if pd.isna(data.get(key)):
                 data[key] = None
+        for key in ("chain_id", "job_id"):
+            if pd.isna(data.get(key)):
+                data[key] = ""
         if pd.isna(data.get("cls_pos_weight")):
             data["cls_pos_weight"] = 1.0
         if pd.isna(data.get("score")):
@@ -110,6 +115,8 @@ class TrialService:
     def _trial_to_row(trial: HPTuneTrial) -> dict[str, Any]:
         return {
             "trial_id": trial.trial_id,
+            "chain_id": trial.chain_id,
+            "job_id": trial.job_id,
             "lr": trial.lr,
             "epochs": trial.epochs,
             "dropout": trial.dropout,

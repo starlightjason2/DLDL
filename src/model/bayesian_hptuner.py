@@ -6,7 +6,6 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -200,6 +199,7 @@ class BayesianHPTuner:
             {
                 **proposal,
                 "trial_id": tid,
+                "chain_id": os.environ.get("HPTUNE_CHAIN_ID", ""),
                 "status": TrialStatus.QUEUED,
                 "score": -1.0,
             }
@@ -236,27 +236,8 @@ class BayesianHPTuner:
     # Serial Runner
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _utc_stamp() -> str:
-        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    def _log_chain_step(self, trial_id: str, step_job: str) -> None:
-        line = ",".join(
-            [
-                self._utc_stamp(),
-                os.environ.get("HPTUNE_CHAIN_ID", ""),
-                os.environ.get("PBS_JOBID", ""),
-                trial_id,
-                step_job,
-            ]
-        )
-        with (self.trials_dir / "chain_steps.csv").open("a", encoding="utf-8") as f:
-            f.write(line + "\n")
-
     def _log_chain_complete(self) -> None:
-        chain_id = os.environ.get("HPTUNE_CHAIN_ID", "")
-        with (self.trials_dir / "chain_summary.log").open("a", encoding="utf-8") as f:
-            f.write(f"Chain {chain_id} finished at {self._utc_stamp()}\n")
+        logger.info("Chain complete.")
 
     def _best_trial_checkpoint(self) -> Path | None:
         """Path to the global-best trial's checkpoint, if one exists yet."""
@@ -307,7 +288,6 @@ class BayesianHPTuner:
         trials = self.update_trials(TrialService.get_trials())
 
         if self.is_complete(trials):
-            logger.info("Chain complete.")
             self._log_chain_complete()
             return
 
@@ -317,12 +297,17 @@ class BayesianHPTuner:
             queued_ids = [t.trial_id for t in trials if t.status == TrialStatus.QUEUED]
 
         if not queued_ids:
-            logger.info("Chain complete.")
             self._log_chain_complete()
             return
 
-        trial = next(t for t in trials if t.trial_id == queued_ids[0])
-        TrialService.update_trial(trial.trial_id, {"status": TrialStatus.RUNNING})
+        trial = next(t for t in trials if t.trial_id == queued_ids[0]).model_copy(
+            update={
+                "status": TrialStatus.RUNNING,
+                "chain_id": os.environ.get("HPTUNE_CHAIN_ID", ""),
+                "job_id": os.environ.get("PBS_JOBID", ""),
+            }
+        )
+        TrialService.save_trials([trial])
 
         counts = TrialService.get_status_counts(trials)
         logger.info(
@@ -365,7 +350,7 @@ class BayesianHPTuner:
 
         # Chain the next step unless the run is done.
         if self.is_complete(TrialService.get_trials()):
-            logger.info("Chain complete.")
+
             self._log_chain_complete()
             return
 
@@ -375,4 +360,3 @@ class BayesianHPTuner:
             walltime=os.environ["HPTUNE_TRAIN_WALLTIME"],
         )
         logger.info("Submitted next step as {}", step_job)
-        self._log_chain_step(trial.trial_id, step_job)

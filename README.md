@@ -121,7 +121,7 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | `TRIAL_TIMEOUT` | ✓ | Seconds without log activity before a stale `RUNNING` trial (e.g. from a lost step) is requeued or failed. |
 | `HPTUNE_QUEUE` | ✓† | PBS queue for the step jobs. Use `debug` (allows 1 running + 1 queued per user), not `debug-scaling` (1 job total). |
 | `HPTUNE_TRAIN_WALLTIME` | ✓† | Walltime for each step job (passed to `qsub`). |
-| `HPTUNE_CHAIN_ID` | ✓† | Label written to `trials/chain_steps.csv` and `chain_summary.log`. |
+| `HPTUNE_CHAIN_ID` | ✓† |  |
 
 †Required for the serial PBS chain (`scripts/start_hptune.sh`, `scripts/run_hptune.sh`).
 
@@ -332,8 +332,7 @@ Important serial env:
 Data and logging layout:
 - Trial state CSV: `{HPTUNE_DIR}/trials/trials.csv`
 - Trial directories: `{HPTUNE_DIR}/trials/trial_*`
-- Best-trial artifacts: `{HPTUNE_DIR}/best_trial/`
-- Chain logs: `{HPTUNE_DIR}/trials/` (`chain_steps.csv`, `chain_summary.log`)
+- Best-trial artifacts: `{HPTUNE_DIR}/trials/best_trial/`
 - PBS stdout/stderr: `{HPTUNE_DIR}/controller_logs/` (`.OU`/`.ER`)
 - Per-trial training logs/checkpoints: `{HPTUNE_DIR}/trials/trial_*/`
 

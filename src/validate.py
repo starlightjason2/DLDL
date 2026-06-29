@@ -20,11 +20,11 @@ from torch.utils.data import DataLoader
 
 import matplotlib
 
-matplotlib.use("QtAgg")
 import matplotlib.pyplot as plt
 
 from model.dataset import IpDataset
 from util.hptune import load_best_trial_cnn
+from util.disruption_predict import predict_disruption_time
 
 _REPO = Path(__file__).resolve().parents[1]
 load_dotenv(dotenv_path=_REPO / ".env", encoding="utf-8")
@@ -34,16 +34,20 @@ def _abs(p: str) -> str:
     return p if os.path.isabs(p) else str(_REPO / p)
 
 
-os.makedirs(_abs(os.environ["PROG_DIR"]), exist_ok=True)
+prog_dir = _abs(os.environ["PROG_DIR"])
+os.makedirs(prog_dir, exist_ok=True)
 for _parent in {
     Path(_abs(os.environ["DATA_PATH"])).parent,
     Path(_abs(os.environ["TRAIN_LABELS_PATH"])).parent,
 }:
     os.makedirs(_parent, exist_ok=True)
-
-prog_dir = _abs(os.environ["PROG_DIR"])
 data_path = _abs(os.environ["DATA_PATH"])
 labels_pt_path = _abs(os.environ["TRAIN_LABELS_PATH"])
+
+fp_file = Path(prog_dir) / "false_positives.txt"
+fn_file = Path(prog_dir) / "false_negatives.txt"
+disruption_predictions_data = Path(prog_dir) / "predictions.csv"
+disruption_predictions_graph = Path(prog_dir) / "predictions.png"
 
 # Configure logging
 logger.remove()
@@ -98,7 +102,7 @@ def evaluate_best_model(batch_size: int = 256) -> None:
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
-    threshold = model.decision_threshold
+
     fbeta = float(os.environ.get("FBETA", "1.8"))
 
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
@@ -107,33 +111,39 @@ def evaluate_best_model(batch_size: int = 256) -> None:
     y_pred: list[int] = []
     fp_shot_ids: list[int] = []
     fn_shot_ids: list[int] = []
+    predicted_times: list[tuple[float, float]] = []
 
     logger.info(
-        "Evaluating best model on {} shots (device={}, threshold={:.4f})...",
+        "Evaluating best model on {} shots (device={}, model.decision_threshold={:.4f})...",
         len(dataset),
         device,
-        threshold,
+        model.decision_threshold,
     )
 
-    idx = 0
+    offset = 0
     with torch.no_grad():
-        for data, labels in loader:
-            outputs = model.forward(data.float().to(device))
+        for signal, labels in loader:
+            outputs = model.forward(signal.float().to(device))
             probs = torch.sigmoid(outputs[:, 0]).cpu().numpy()
 
-            preds = (probs > threshold).astype(int)
-            cls_true = labels[:, 0].cpu().numpy().astype(int)
+            predictions = (probs > model.decision_threshold).astype(int)
+            actuals = labels[:, 0].cpu().numpy().astype(int)
 
-            for row in range(len(preds)):
-                shot_id = dataset.shot_number(idx)
-                if preds[row] == 1 and cls_true[row] == 0:
-                    fp_shot_ids.append(shot_id)
-                elif preds[row] == 0 and cls_true[row] == 1:
-                    fn_shot_ids.append(shot_id)
-                idx += 1
+            for row, (predicted, actual) in enumerate(zip(predictions, actuals)):
+                shot = dataset.load_shot_view(offset + row)
 
-            y_true.extend(cls_true.tolist())
-            y_pred.extend(preds.tolist())
+                if predicted == 1 and actual == 0:
+                    fp_shot_ids.append(shot.shot_no)
+                elif predicted == 0 and actual == 1:
+                    fn_shot_ids.append(shot.shot_no)
+
+                if actual == 1:
+                    predicted_time, _ = predict_disruption_time(shot.current)
+                    predicted_times.append((predicted_time, shot.t_disrupt))
+
+            offset += len(predictions)
+            y_true.extend(actuals.tolist())
+            y_pred.extend(predictions.tolist())
 
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
 
@@ -158,44 +168,33 @@ def evaluate_best_model(batch_size: int = 256) -> None:
     logger.info("  False-negative shot ids: {}", sorted(fn_shot_ids))
     logger.info("=" * 60)
 
-    fp_file = Path(prog_dir) / "false_positives.txt"
-    fn_file = Path(prog_dir) / "false_negatives.txt"
-    preds_file = Path(prog_dir) / "predictions.csv"
     fp_file.write_text("\n".join(str(s) for s in sorted(fp_shot_ids)) + "\n")
     fn_file.write_text("\n".join(str(s) for s in sorted(fn_shot_ids)) + "\n")
-    preds_file.write_text(
-        "predicted_prob, true_prob".join(
-            f"{pred},{true}\n" for (pred, true) in zip(y_pred, y_true)
-        )
-    )
+    rows = ["predicted_time,true_time"]
+    rows += [f"{pred},{true}" for pred, true in predicted_times]
+    disruption_predictions_data.write_text("\n".join(rows) + "\n")
     logger.info(
         "Wrote misclassified shot ids to {} and {}. Wrote predictions data to {}.",
         fp_file,
         fn_file,
-        preds_file,
+        disruption_predictions_data,
     )
 
 
-def graph_predictions(preds_file: Path):
-    df = pd.read_csv("your_file.csv")
+def graph_predictions(preds_data: Path, preds_graph: Path):
+    df = pd.read_csv(preds_data)
 
-    # 2. Extract columns for X and Y axes
-    x_data = df["predicted_prob"]
-    y_data = df["true_prob"]
+    x_data = df["predicted_time"]
+    y_data = df["true_time"]
 
-    # 3. Create and customize the plot
     plt.figure(figsize=(10, 6))
-    plt.scatter(
-        x_data, y_data, marker="o", linestyle="-", color="b", label="Data Trend"
-    )
+    plt.scatter(x_data, y_data, marker="o", color="b")
 
-    # 4. Add titles and axis labels
-    plt.xlabel("Probability")
-    plt.ylabel("Probability")
+    plt.xlabel("Predicted disruption time (s)")
+    plt.ylabel("Real disruption time (s)")
 
-    # 5. Add grid and legend, then display
     plt.grid(True)
-    plt.legend()
+    plt.savefig(preds_graph, dpi=600)
     plt.show()
 
 
@@ -207,6 +206,11 @@ def main() -> None:
         "--skip-model-eval",
         action="store_true",
         help="Skip running the best-trial model over the dataset",
+    )
+    parser.add_argument(
+        "--graph",
+        action="store_true",
+        help="Show a graph of predicted vs. actual disruption time",
     )
     parser.add_argument(
         "--eval-batch-size",
@@ -221,6 +225,9 @@ def main() -> None:
 
     if not args.skip_model_eval:
         evaluate_best_model(batch_size=args.eval_batch_size)
+    if args.graph:
+        matplotlib.use("QtAgg")
+        graph_predictions(disruption_predictions_data, disruption_predictions_graph)
 
     logger.info("Validation complete.")
 

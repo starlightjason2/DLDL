@@ -165,8 +165,8 @@ wandb/
 *.pkl
 *.pickle
 
-# Allow committing the best-trial model checkpoint(s) and the CSV logs (trial state
-# and chain step history). Each parent directory must be un-ignored before a file can
+# Allow committing the best-trial model checkpoint(s) and the trial-state CSV.
+# Each parent directory must be un-ignored before a file can
 # be re-included (git can't un-ignore a file whose parent dir is excluded), and these
 # negations come after `*.pt` / `*.csv` so they win.
 !data/
@@ -176,7 +176,6 @@ data/hptune/*
 !data/hptune/trials/
 data/hptune/trials/*
 !data/hptune/trials/trials.csv
-!data/hptune/trials/chain_steps.csv
 !data/hptune/trials/best_trial/
 data/hptune/trials/best_trial/*
 !data/hptune/trials/best_trial/*_best_params.pt
