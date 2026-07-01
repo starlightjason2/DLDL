@@ -17,7 +17,7 @@ def remove_jump_to_zero(current: np.ndarray):
     We want to remove that jump and shift up by the last value to flatten the curve
     """
     # remove trailing zeroes
-    processed_current = np.trim_zeros(current) 
+    processed_current = np.trim_zeros(current).copy() 
     # shift up
     processed_current -= processed_current[-1]
     # pad with zeroes to match the original data shape
@@ -28,10 +28,9 @@ def apply_smoothing(current: np.ndarray):
     weights = np.ones(window_size) / window_size    
     return np.convolve(current, weights, mode="same")
    
-def apply_filter(shot: ShotView, ax: Axes = None):
-    processed_current = remove_jump_to_zero(shot.current)        
-    smoothed = apply_smoothing(processed_current)
-    filtered_current = np.abs(shot.current - smoothed)
+def apply_filter(current, ax: Axes = None):
+    smoothed = apply_smoothing(current)
+    filtered_current = np.abs(current - smoothed)
     
     # the algorithm is weird around the edges, so throw edge values out
     filtered_current[:2] = 0
@@ -40,7 +39,7 @@ def apply_filter(shot: ShotView, ax: Axes = None):
     return filtered_current
 
 def predict_disruption_time(
-    shot: ShotView, ax: Axes = None
+    time, current, ax: Axes = None
 ) -> tuple[np.ndarray, np.ndarray]:    
-    return float(shot.time[np.argmax(apply_filter(shot))])
+    return float(time[np.argmax(apply_filter(current))])
 
