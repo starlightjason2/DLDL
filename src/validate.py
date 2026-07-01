@@ -138,7 +138,7 @@ def evaluate_best_model(batch_size: int = 256) -> None:
                     fn_shot_ids.append(shot.shot_no)
 
                 if actual == 1:
-                    predicted_time, _ = predict_disruption_time(shot.current)
+                    predicted_time, _, _ = predict_disruption_time(shot.current)
                     predicted_times.append((predicted_time, shot.t_disrupt))
 
             offset += len(predictions)

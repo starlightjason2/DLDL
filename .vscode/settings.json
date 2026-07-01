@@ -1,4 +1,5 @@
 {
    "editor.multiCursorModifier": "alt",
-   "editor.formatOnSave": true
+   "editor.formatOnSave": true,
+   "python-envs.defaultEnvManager": "ms-python.python:venv"
 }
