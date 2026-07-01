@@ -121,7 +121,6 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | `TRIAL_TIMEOUT` | ✓ | Seconds without log activity before a stale `RUNNING` trial (e.g. from a lost step) is requeued or failed. |
 | `HPTUNE_QUEUE` | ✓† | PBS queue for the step jobs. Use `debug` (allows 1 running + 1 queued per user), not `debug-scaling` (1 job total). |
 | `HPTUNE_TRAIN_WALLTIME` | ✓† | Walltime for each step job (passed to `qsub`). |
-| `HPTUNE_CHAIN_ID` | ✓† |  |
 
 †Required for the serial PBS chain (`scripts/start_hptune.sh`, `scripts/run_hptune.sh`).
 
@@ -141,7 +140,6 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | Variable | Description |
 |----------|-------------|
 | `PBS_JOBID` | PBS job id (set on compute nodes). |
-| `WARM_START_CHECKPOINT` | Set by `run_step` for each `src/train.py` subprocess when `best_trial/` holds a checkpoint, so the trial warm-starts from the best model so far. Unset means a cold start. |
 | `TRIAL_DIR` | Optional override path `HPTUNE_DIR/trials/<trial_id>` whose `.env` `scripts/run_train.sh` sources for a manual single-trial run. The HP-tune chain does **not** use it — `run_step` trains each trial in-process and passes its hyperparameters through the environment. |
 
 #### Thread caps (recommended on HPC)
@@ -317,16 +315,16 @@ Layout:
 
 Step flow (all in-process within `run_step`; no stdout parsing, no job dependency):
 1. The step job `exec`s `hptune_serial`, which refreshes trial status (ingesting any trial left over from a prior step) and plans a new trial if none is queued.
-2. It marks the chosen trial `RUNNING` and trains it in-process by running `src/train.py` as a subprocess with that trial's hyperparameters. If `best_trial/` already holds a checkpoint, the trial **warm-starts** from it: it loads the best model's weights and optimizer state (the trial still uses its own `lr`/`weight_decay`), so a terminated run picks up off the best model found so far rather than from a random init. Each trial's epoch counter and early-stopping state still start fresh, keeping trial scores independent and comparable.
+2. It marks the chosen trial `RUNNING` and trains it in-process by running `src/train.py` as a subprocess with that trial's hyperparameters. Each trial trains from a fresh random initialization.
 3. It reads the trial's best validation F-beta from its `training_log.csv` and records it (`COMPLETED` with a score, or retried/`FAILED`); `best_trial/` is refreshed.
 4. Unless `HPTUNE_MAX_TRIALS` is reached, it submits the next `scripts/run_hptune.sh` step and exits. Because the queue allows one queued job, the next step waits until this one ends, then runs.
 5. When the cap is reached and nothing is running or queued, the step logs "Chain complete." and submits nothing further.
 
-If a step is ever lost (walltime kill, node failure) before it can submit the next one, just re-run `./scripts/start_hptune.sh` — `run_step` resumes from `trials.csv`, and because checkpoints are full-state (`model` + `optimizer` + `epoch` + selection counters), the next trial warm-starts from the best checkpoint kept in `best_trial/`. (`start_hptune.sh` preserves `trials.csv` and `*_best_params.pt`; only `RESET=1` clears the run, and even then it keeps the best checkpoints.)
+If a step is ever lost (walltime kill, node failure) before it can submit the next one, just re-run `./scripts/start_hptune.sh` — `run_step` resumes from `trials.csv` and continues planning new trials. (`start_hptune.sh` preserves `trials.csv` and `*_best_params.pt`; only `RESET=1` clears the run, and even then it keeps the best checkpoints.)
 
 Important serial env:
 - `PROJECT_ROOT`, `HPTUNE_DIR`, `HPTUNE_QUEUE`, `HPTUNE_TRAIN_WALLTIME`
-- `HPTUNE_MAX_TRIALS`, `HPTUNE_CHAIN_ID`
+- `HPTUNE_MAX_TRIALS`, 
 - `OPENBLAS_NUM_THREADS` / `OMP_NUM_THREADS` (set to `1` in `.env`) — PBS often allocates many CPUs to one process; uncapped BLAS can try to spawn that many threads and fail (`pthread_create` / `Exit_status=1` with little log output).
 
 Data and logging layout:

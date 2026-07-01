@@ -182,7 +182,10 @@ def load_best_trial_cnn(dataset: "IpDataset") -> "IpCNN | None":
         cls_pos_weight=float(os.environ["CLS_POS_WEIGHT"]),
         decision_threshold=float(os.environ["DECISION_THRESHOLD"]),
     )
-    model.load_state_dict(torch.load(checkpoints[0], map_location="cpu")["model"])
+    ckpt = torch.load(checkpoints[0], map_location="cpu")
+    # Checkpoints are plain weight state_dicts; tolerate older full-state dicts too.
+    state = ckpt["model"] if isinstance(ckpt, dict) and "model" in ckpt else ckpt
+    model.load_state_dict(state)
     model.eval()
     return model
 

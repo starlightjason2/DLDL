@@ -199,7 +199,6 @@ class BayesianHPTuner:
             {
                 **proposal,
                 "trial_id": tid,
-                "chain_id": os.environ.get("HPTUNE_CHAIN_ID", ""),
                 "status": TrialStatus.QUEUED,
                 "score": -1.0,
             }
@@ -239,33 +238,18 @@ class BayesianHPTuner:
     def _log_chain_complete(self) -> None:
         logger.info("Chain complete.")
 
-    def _best_trial_checkpoint(self) -> Path | None:
-        """Path to the global-best trial's checkpoint, if one exists yet."""
-        checkpoints = sorted((self.trials_dir / "best_trial").glob("*_best_params.pt"))
-        return checkpoints[0] if checkpoints else None
-
     def _train_trial(self, trial: HPTuneTrial) -> int:
         """Train one trial in a subprocess; returns the training exit code.
 
         The trial's hyperparameters (and ``PROG_DIR``/``JOB_ID``) are passed to
         ``train.py`` through the environment; everything else is inherited from the
-        already-sourced project ``.env``. If a best-trial checkpoint exists, the
-        trial warm-starts from it so a terminated run picks up off the best model
-        found so far.
+        already-sourced project ``.env``.
         """
         trial.log_pass_hyperparameters(context="train")
         env = {
             **os.environ,
             **{k: str(v) for k, v in trial.trial_env_keys().items()},
         }
-
-        warm_start = self._best_trial_checkpoint()
-        if warm_start is not None:
-            env["WARM_START_CHECKPOINT"] = str(warm_start)
-            if os.environ.get("HPTUNE_CHAINED") == "1":
-                logger.info("Chained {} from {}", trial.trial_id, warm_start)
-            else:
-                logger.info("Warm-starting {} from {}", trial.trial_id, warm_start)
 
         logger.info("Training {} ...", trial.trial_id)
         result = subprocess.run(
@@ -306,7 +290,6 @@ class BayesianHPTuner:
         trial = next(t for t in trials if t.trial_id == queued_ids[0]).model_copy(
             update={
                 "status": TrialStatus.RUNNING,
-                "chain_id": os.environ.get("HPTUNE_CHAIN_ID", ""),
                 "job_id": os.environ.get("PBS_JOBID", ""),
             }
         )
@@ -353,13 +336,9 @@ class BayesianHPTuner:
 
         # Chain the next step unless the run is done.
         if self.is_complete(TrialService.get_trials()):
-
             self._log_chain_complete()
             return
 
-        # Mark the next step as a chain continuation (propagated via qsub -V), so it
-        # logs "Chained from ..." rather than "Warm-starting from ...".
-        os.environ["HPTUNE_CHAINED"] = "1"
         step_job = submit_hptune_step(
             log_dir=self.log_dir,
             queue=os.environ["HPTUNE_QUEUE"],

@@ -28,7 +28,6 @@ class HPTuneTrial(BaseModel):
     trial_id: str = Field(
         description="Primary key; column ``trial_id`` in ``trials.csv``."
     )
-    chain_id: str = ""
     job_id: str = ""
     lr: float
     epochs: int

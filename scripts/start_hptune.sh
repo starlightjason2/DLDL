@@ -18,24 +18,12 @@ set +a
 : "${HPTUNE_QUEUE:?set it in .env}"
 : "${HPTUNE_TRAIN_WALLTIME:?set it in .env}"
 
-# Tag this whole chain with a unique id. .env only carries a placeholder; this real
-# value flows to every step job via `qsub -V` and lands in each trials.csv row.
-export HPTUNE_CHAIN_ID="chain_$(date -u +%Y%m%dT%H%M%SZ)"
-echo "Chain id       : $HPTUNE_CHAIN_ID"
-
-# The first step is the chain's origin, not a continuation; later steps set this.
-unset HPTUNE_CHAINED
-
-# RESET=1 wipes the previous run
-if [[ "${RESET:-0}" == "1" ]]; then
-    rm -rf "$$HPTUNE_DIR/controller_logs/"
-    rm -rf "$$HPTUNE_DIR/trials/trial_*"
-    rm -rf "$$HPTUNE_DIR/trials/best_trial"
-    echo "Reset: cleared $HPTUNE_DIR"
-fi
-
+# wipe the previous run
+rm -rf "$HPTUNE_DIR/controller_logs/"
+rm -rf "$HPTUNE_DIR/trials/"
 mkdir -p "$HPTUNE_DIR/controller_logs"
 mkdir -p "$HPTUNE_DIR/trials/best_trial"
+
 echo "Log directory: $HPTUNE_DIR/controller_logs"
 echo "Trial directory: $HPTUNE_DIR/trials"
 
