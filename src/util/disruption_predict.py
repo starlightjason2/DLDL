@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from model.dataset import ShotView
+import os
 
 import numpy as np
 from matplotlib.axes import Axes
 
-DEFAULT_SMOOTHING = 200
+
+def smoothing_divisor_from_env() -> int:
+    """Moving-average window is ``max(1, len(current) // divisor)``."""
+    return max(1, int(os.environ["SMOOTHING_DIVISOR"]))
 
 
 def remove_jump_to_zero(current: np.ndarray):
@@ -24,10 +26,22 @@ def remove_jump_to_zero(current: np.ndarray):
     return np.pad(processed_current, (0, len(current) - len(processed_current)))
 
 
-def apply_smoothing(current: np.ndarray):
-    window_size = max(1, len(current) // DEFAULT_SMOOTHING)
+def apply_smoothing(current: np.ndarray, *, smoothing_divisor: int | None = None):
+    divisor = (
+        smoothing_divisor_from_env()
+        if smoothing_divisor is None
+        else max(1, int(smoothing_divisor))
+    )
+    window_size = max(1, len(current) // divisor)
     weights = np.ones(window_size) / window_size
     return np.convolve(current, weights, mode="same")
+
+
+def compute_current_derivative(time: np.ndarray, current: np.ndarray) -> np.ndarray:
+    """Smoothed dI/dt from plasma current, using the same steps as ``graph.py``."""
+    processed = remove_jump_to_zero(current)
+    smoothed = apply_smoothing(processed)
+    return np.gradient(smoothed, time)
 
 
 def apply_filter(current, ax: Axes = None):

@@ -56,7 +56,8 @@ Everything is read from the process environment (typically via a project-root `.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `NORMALIZATION_TYPE` | ✓ | `scale`, `meanvar-whole`, or `meanvar-single`; must match how tensors were built and filename conventions. |
+| `NORMALIZATION_TYPE` | ✓ | `scale`, `meanvar-whole`, or `meanvar-single`, optionally suffixed with `-derivative` for smoothed dI/dt; must match `DATA_PATH`. |
+| `SMOOTHING_DIVISOR` | ✓ (derivative) | Integer ≥ 1. Moving-average window for dI/dt is `max(1, len(current) // divisor)`. Tunable via `HPTUNE_SMOOTHING_DIVISOR_*`. |
 | `CPU_USE` | ✓ | Fraction of CPU cores for preprocessing workers (e.g. `0.2`). |
 | `PREPROCESSOR_MAX_WORKERS` | ✓ | Max parallel preprocessing processes (e.g. `4`). |
 
@@ -78,7 +79,8 @@ Everything is read from the process environment (typically via a project-root `.
 | `DATALOADER_NUM_WORKERS` | ✓ | DataLoader workers (forced to `0` when no GPU). |
 | `CLS_POS_WEIGHT` | ✓ | Positive-class (disruptive) weight in BCE loss (float ≥ 0). `>1` favors recall over precision. Tunable via `HPTUNE_CLS_POS_WEIGHT_*`. |
 | `DECISION_THRESHOLD` | ✓ | Sigmoid probability cutoff for the disruptive class (float in [0, 1]). Fixed (not tuned); typically `0.5`. |
-| `FBETA` | optional (default `1.8`) | Beta for the F-beta score used for model selection (best checkpoint + early stopping) and as the HPTune objective, which is **maximized**. `beta>1` weights recall over precision (default `1.8`). This defines the objective and is not itself tuned. |
+| `MIN_RECALL` | optional (default `0.98`) | Recall floor for model selection and HPTune scoring. Among epochs with recall **above** this value, **precision** is maximized. Infeasible epochs/trials score `-1`. |
+| `FBETA` | optional (default `1.8`) | Beta for F-beta logged in training CSV only (not used for selection or HPTune). |
 
 #### Architecture (`train.py` → `IpCNN`)
 
@@ -109,6 +111,12 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | `HPTUNE_LR_SCHEDULER_PATIENCE_MIN`, `HPTUNE_LR_SCHEDULER_PATIENCE_MAX` | ✓ | Integers ≥ 1, `min` ≤ `max`. |
 | `HPTUNE_EARLY_STOPPING_PATIENCE_MIN`, `HPTUNE_EARLY_STOPPING_PATIENCE_MAX` | ✓ | Integers ≥ 1, `min` ≤ `max`. |
 | `HPTUNE_CLS_POS_WEIGHT_MIN`, `HPTUNE_CLS_POS_WEIGHT_MAX` | ✓ | BCE positive-class weight bounds (float ≥ 0; `min` ≤ `max`). Higher values push toward recall. |
+| `HPTUNE_SMOOTHING_DIVISOR_MIN`, `HPTUNE_SMOOTHING_DIVISOR_MAX` | ✓ | Integer bounds for derivative smoothing (min ≤ max). |
+| `HPTUNE_ALLOWED_CONV_FILTERS` | ✓ | Comma-separated positive integers (filter counts for each conv layer). |
+| `HPTUNE_ALLOWED_KERNELS` | ✓ | Comma-separated odd positive integers (kernel sizes; padding is `kernel // 2`). |
+| `HPTUNE_ALLOWED_POOL_SIZES` | ✓ | Comma-separated positive integers. |
+| `HPTUNE_FC1_MIN`, `HPTUNE_FC1_MAX` | ✓ | Fully-connected layer 1 width bounds (integers, min ≤ max). |
+| `HPTUNE_FC2_MIN`, `HPTUNE_FC2_MAX` | ✓ | Fully-connected layer 2 width bounds (integers, min ≤ max). |
 | `HPTUNE_RANDOM_INSERT_EVERY` | ✓ | Insert a random trial every N completed trials after warmup (integer ≥ 0). |
 | `HPTUNE_EI_XI` | ✓ | Expected-improvement ξ for Bayesian optimization (float ≥ 0). |
 
@@ -174,6 +182,8 @@ python src/preprocess_data.py
 | `meanvar-whole` | `(x - μ) / σ` dataset-wide | Same scale across all shots |
 | `meanvar-single` | `(x - μ) / σ` per shot | Per-shot standardization |
 
+Append `-derivative` to any value above to preprocess `np.gradient(apply_smoothing(I), t)` instead of raw current (e.g. `meanvar-whole-derivative`). Point `DATA_PATH` at a separate `.pt` file (e.g. `processed_dataset_meanvar-whole-derivative.pt`).
+
 ### 2. Validation (optional)
 
 ```bash
@@ -193,7 +203,7 @@ python src/train.py
 * Loads preprocessed tensors at `DATA_PATH` and `TRAIN_LABELS_PATH` (must match preprocessing / `NORMALIZATION_TYPE`)
 * Validates files exist, splits 80/10/10 train/dev/test
 * Trains on a single process / single GPU
-* Selects the best checkpoint and applies early stopping by **maximizing the validation F-beta** (`FBETA`, default `1.8`), favoring recall over precision
+* Selects the best checkpoint and applies early stopping by **maximizing validation precision** among epochs with recall above `MIN_RECALL` (default `0.98`)
 * Saves checkpoints and logs to `PROG_DIR`
 
 Training hyperparameters (learning rate, epochs, architecture sizes, etc.) are read from environment variables (see [Environment Variables](#environment-variables)).
@@ -272,7 +282,7 @@ HPTune reads the same project-root `.env` as the rest of the workflow. On Polari
 
 The supported path is a **serial, self-resubmitting PBS chain**: each job plans the next trial, trains it in-process, records its score, then submits the next step job and exits. Exactly one trial runs per job, and at most one job is ever pending (the running job plus the queued next step), so it fits queues that cap you at one running + one queued job per user (Polaris `debug`). There is no separate controller job and no job dependency.
 
-**Objective:** each trial's score (the `score` column in `trials.csv`) is its best validation F-beta (`FBETA`, default `1.8`). The optimizer **maximizes** this score, and `best_trial/` tracks the highest-scoring trial. Because F-beta with `beta>1` weights recall over precision, tuning pushes `cls_pos_weight` toward catching more disruptions.
+**Objective:** each trial's `score` in `trials.csv` is validation **precision** from its best epoch with recall above `MIN_RECALL` (default `0.98`). Trials that never meet the recall floor score `-1`. The optimizer **maximizes** `score`, and `best_trial/` tracks the highest-scoring trial.
 
 #### Serial HPTune
 
@@ -316,7 +326,7 @@ Layout:
 Step flow (all in-process within `run_step`; no stdout parsing, no job dependency):
 1. The step job `exec`s `hptune_serial`, which refreshes trial status (ingesting any trial left over from a prior step) and plans a new trial if none is queued.
 2. It marks the chosen trial `RUNNING` and trains it in-process by running `src/train.py` as a subprocess with that trial's hyperparameters. Each trial trains from a fresh random initialization.
-3. It reads the trial's best validation F-beta from its `training_log.csv` and records it (`COMPLETED` with a score, or retried/`FAILED`); `best_trial/` is refreshed.
+3. It reads the trial's best validation metrics from its `training_log.csv` and records it (`COMPLETED` with a score, or retried/`FAILED`); `best_trial/` is refreshed.
 4. Unless `HPTUNE_MAX_TRIALS` is reached, it submits the next `scripts/run_hptune.sh` step and exits. Because the queue allows one queued job, the next step waits until this one ends, then runs.
 5. When the cap is reached and nothing is running or queued, the step logs "Chain complete." and submits nothing further.
 

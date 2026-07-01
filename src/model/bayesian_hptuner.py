@@ -25,7 +25,7 @@ from util.pbs import submit_hptune_step
 
 
 class BayesianHPTuner:
-    """Bayesian search over non-architecture training hyperparameters."""
+    """Bayesian search over training, preprocessing, and architecture hyperparameters."""
 
     # Paths
     trials_dir: Path
@@ -99,7 +99,12 @@ class BayesianHPTuner:
 
         for t in completed:
             optimizer.register(
-                params=t.bayesian_params(self.hp_space.batch_sizes),
+                params=t.bayesian_params(
+                    self.hp_space.batch_sizes,
+                    allowed_conv_filters=self.hp_space.allowed_conv_filters,
+                    allowed_kernels=self.hp_space.allowed_kernels,
+                    allowed_pool_sizes=self.hp_space.allowed_pool_sizes,
+                ),
                 target=t.score,
             )
 

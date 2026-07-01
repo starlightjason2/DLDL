@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from util.disruption_predict import compute_current_derivative
+
 
 # env helpers
 
@@ -68,6 +70,17 @@ def get_means(filename: str, data_dir: str) -> List[float]:
     return [float(np.mean(data)), float(np.mean(data**2))]
 
 
+def _load_derivative_signal(filename: str, data_dir: str) -> NDArray[np.float64]:
+    shot_no = int(filename[:-4])
+    time, current = load_shot_signal(data_dir, shot_no)
+    return compute_current_derivative(time, current)
+
+
+def get_derivative_means(filename: str, data_dir: str) -> List[float]:
+    data = _load_derivative_signal(filename, data_dir)
+    return [float(np.mean(data)), float(np.mean(data**2))]
+
+
 def _load_and_pad_base(
     filename: str, data_dir: str, max_length: int, data: NDArray
 ) -> Tuple[int, NDArray[np.float32]]:
@@ -103,3 +116,30 @@ def load_and_pad_scale(
         else np.zeros_like(data)
     )
     return _load_and_pad_base(filename, data_dir, max_length, data)
+
+
+def load_and_pad_norm_derivative(
+    filename: str,
+    data_dir: str,
+    max_length: int,
+    mean: Optional[float] = None,
+    std: Optional[float] = None,
+) -> Tuple[int, NDArray[np.float32]]:
+    data = _load_derivative_signal(filename, data_dir)
+    if mean is None or std is None:
+        mean, std = float(np.mean(data)), float(np.std(data))
+    data = (data - mean) / std if std > 0 else np.zeros_like(data)
+    return _load_and_pad_base(filename, data_dir, max_length, data.astype(np.float32))
+
+
+def load_and_pad_scale_derivative(
+    filename: str, data_dir: str, max_length: int
+) -> Tuple[int, NDArray[np.float32]]:
+    data = _load_derivative_signal(filename, data_dir)
+    data_min, data_max = np.min(data), np.max(data)
+    data = (
+        (data - data_min) / (data_max - data_min)
+        if data_max > data_min
+        else np.zeros_like(data)
+    )
+    return _load_and_pad_base(filename, data_dir, max_length, data.astype(np.float32))

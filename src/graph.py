@@ -18,8 +18,10 @@ from util.disruption_predict import (
     predict_disruption_time,
     apply_filter,
     apply_smoothing,
+    compute_current_derivative,
     remove_jump_to_zero,
 )
+from util.data_loading import load_shot_signal
 from util.hptune import load_best_trial_cnn
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=True)
@@ -60,20 +62,33 @@ def main() -> None:
             idx = max(0, min(int(i), num_rows - 1))
             signal = dataset.data[idx].float().reshape(1, -1)
             cnn_prob = torch.sigmoid(model.forward(signal)[0, 0]).item()
-            current = remove_jump_to_zero(shot.current)
-            predicted_time = predict_disruption_time(shot.time, current)
+
+            raw_time, raw_current = load_shot_signal(
+                abs_path(os.environ["DATA_DIR"]), shot.shot_no
+            )
+            raw_current = remove_jump_to_zero(raw_current)
+
+            if dataset.uses_derivative:
+                ax1_signal = signal.squeeze().numpy()
+                ax1_label = "Normalized dI/dt"
+                predicted_time = predict_disruption_time(raw_time, raw_current)
+            else:
+                ax1_signal = shot.current
+                ax1_label = "Normalized current"
+                predicted_time = predict_disruption_time(raw_time, raw_current)
 
             ax1.clear()
             ax1.set_title(
                 f"CNN disruption probability: {100*cnn_prob:.2f}%", fontsize=10
             )
-            ax1.plot(shot.time, shot.current, label="Current $I(t)$")
-            ax1.plot(
-                shot.time,
-                apply_smoothing(current),
-                label="Smoothed & shifted $I(t)$",
-                linestyle="--",
-            )
+            ax1.plot(shot.time, ax1_signal, label=ax1_label)
+            if not dataset.uses_derivative:
+                ax1.plot(
+                    shot.time,
+                    apply_smoothing(raw_current),
+                    label="Smoothed & shifted $I(t)$",
+                    linestyle="--",
+                )
             if shot.disruptive:
                 ax1.axvline(
                     shot.t_disrupt,
@@ -83,14 +98,14 @@ def main() -> None:
                 )
 
             ax1.set_xlabel("Normalized time")
-            ax1.set_ylabel("Normalized current")
+            ax1.set_ylabel(ax1_label)
             ax1.legend()
             ax1.grid(True)
 
             ax2.clear()
             ax2.plot(
-                shot.time,
-                np.gradient(apply_smoothing(current), shot.time),
+                raw_time,
+                compute_current_derivative(raw_time, raw_current),
                 label="$dI/dt$",
             )
             ax2.legend()
@@ -98,7 +113,7 @@ def main() -> None:
 
             ax3.clear()
             ax3.plot(
-                shot.time, apply_filter(remove_jump_to_zero(current)), label="Filter"
+                raw_time, apply_filter(raw_current), label="Filter"
             )
             diff_microsec = (
                 abs(shot.t_disrupt - predicted_time) * 1e5

@@ -22,6 +22,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from model.dataset import IpDataset
+from util.objective import PRECISION_COL, RECALL_COL, best_row, min_recall, score
 
 
 class IpCNN(nn.Module):
@@ -83,6 +84,10 @@ class IpCNN(nn.Module):
         self.logger.info(f"  Classification pos_weight: {self.cls_pos_weight}")
         self.logger.info(f"  Decision threshold: {self.decision_threshold}")
         self.logger.info(f"  Normalization type: {dataset.normalization_type}")
+        if dataset.uses_derivative:
+            self.logger.info("  Input signal: smoothed dI/dt (derivative only)")
+        else:
+            self.logger.info("  Input signal: normalized plasma current I(t)")
         self.logger.info("=" * 60)
 
         self.dataset = dataset
@@ -158,11 +163,7 @@ class IpCNN(nn.Module):
         logs: list,
         fbeta: float,
     ) -> None:
-        """Run validation for a single epoch and update logs.
-
-        ``fbeta`` is the beta used for the F-beta score that drives model
-        selection (beta > 1 weights recall over precision).
-        """
+        """Run validation for a single epoch and update logs."""
         model.eval()
         total_val_loss = 0.0
         all_classification_targets, all_classification_predictions = [], []
@@ -243,10 +244,9 @@ class IpCNN(nn.Module):
     ) -> None:
         """Train this model on a single device.
 
-        Model selection (best checkpoint + early stopping) maximizes the
-        validation F-beta score, where ``fbeta`` > 1 prioritizes recall over
-        precision. The same F-beta is the scalar objective reported to the
-        hyperparameter tuner.
+        Model selection (best checkpoint + early stopping) maximizes validation
+        precision among epochs with recall above ``MIN_RECALL`` (default 0.98).
+        Infeasible epochs score ``-1`` for selection purposes.
         """
         self.logger.info(f"GPUs Available: {torch.cuda.device_count()}")
         if torch.cuda.is_available():
@@ -272,7 +272,10 @@ class IpCNN(nn.Module):
         self.logger.info(f"  Early stopping patience: {early_stopping_patience}")
         self.logger.info(f"  Gradient clip: {gradient_clip}")
         self.logger.info(f"  DataLoader num_workers: {num_workers}")
-        self.logger.info(f"  Selection objective: F{fbeta:g} score (maximize)")
+        self.logger.info(
+            "  Selection objective: maximize precision with recall > {:.4f}",
+            min_recall(),
+        )
         self.logger.info("=" * 60)
 
         train, dev, _ = self.dataset.split()
@@ -342,7 +345,10 @@ class IpCNN(nn.Module):
                 fbeta=fbeta,
             )
             avg_val_loss = logs[-1]["validation_loss"] if logs else float("inf")
-            current_score = logs[-1]["Validation Fbeta"] if logs else float("-inf")
+            last = logs[-1]
+            current_score = score(
+                float(last[RECALL_COL]), float(last[PRECISION_COL])
+            )
 
             if lr_scheduler_enabled:
                 scheduler.step(avg_val_loss)
@@ -357,7 +363,13 @@ class IpCNN(nn.Module):
                     model.state_dict(),
                     os.path.join(self.prog_dir, f"{job_id}_best_params.pt"),
                 )
-                self.logger.info(f"New best validation F{fbeta:g}: {best_score:.6f}")
+                self.logger.info(
+                    "New best validation score {:.6f} "
+                    "(precision {:.6f}, recall {:.6f})",
+                    best_score,
+                    last[PRECISION_COL],
+                    last[RECALL_COL],
+                )
             else:
                 epochs_without_improvement += 1
 
@@ -383,20 +395,25 @@ class IpCNN(nn.Module):
         )
 
         if logs:
-            best = max(logs, key=lambda row: row["Validation Fbeta"])
+            best = best_row(logs)
             self.logger.info("=" * 60)
             self.logger.info(
-                "Training complete — best epoch {} (selected by F{:g}):",
+                "Training complete — best epoch {} (precision {:.6f}, recall {:.6f}, "
+                "recall floor {:.4f}):",
                 best["epoch"],
-                fbeta,
+                best[PRECISION_COL],
+                best[RECALL_COL],
+                min_recall(),
             )
-            self.logger.info("  Validation Recall:    {:.6f}", best["Validation Recall"])
-            self.logger.info(
-                "  Validation Precision: {:.6f}", best["Validation Precision"]
-            )
+            self.logger.info("  Validation Recall:    {:.6f}", best[RECALL_COL])
+            self.logger.info("  Validation Precision: {:.6f}", best[PRECISION_COL])
             self.logger.info("  Validation F1:        {:.6f}", best["Validation F1 Score"])
             self.logger.info(
                 "  Validation F{:g}:        {:.6f}", fbeta, best["Validation Fbeta"]
+            )
+            self.logger.info(
+                "  Selection score:      {:.6f}",
+                score(float(best[RECALL_COL]), float(best[PRECISION_COL])),
             )
             self.logger.info("  Validation Loss:      {:.6f}", best["validation_loss"])
             self.logger.info("=" * 60)

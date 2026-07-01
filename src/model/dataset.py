@@ -15,17 +15,38 @@ from torch import Tensor
 from torch.utils.data import Dataset, Subset
 
 from util.data_loading import (
+    get_derivative_means,
     get_length,
     get_means,
     get_scaled_t_disrupt,
     load_and_pad_norm,
+    load_and_pad_norm_derivative,
     load_and_pad_scale,
+    load_and_pad_scale_derivative,
 )
 from util.processing import (
     convert_tensors_to_float,
     create_binary_labels,
     get_use_cores,
 )
+
+DERIVATIVE_SUFFIX = "-derivative"
+BASE_NORMALIZATION_TYPES = ("scale", "meanvar-whole", "meanvar-single")
+
+
+def parse_normalization_type(normalization_type: str) -> tuple[str, bool]:
+    """Return ``(base_type, uses_derivative)`` for a normalization env value."""
+    if normalization_type.endswith(DERIVATIVE_SUFFIX):
+        base = normalization_type[: -len(DERIVATIVE_SUFFIX)]
+    else:
+        base = normalization_type
+    if base not in BASE_NORMALIZATION_TYPES:
+        raise ValueError(
+            f"Unknown normalization: {normalization_type!r} "
+            f"(expected one of {BASE_NORMALIZATION_TYPES} with optional "
+            f"{DERIVATIVE_SUFFIX!r} suffix)"
+        )
+    return base, normalization_type.endswith(DERIVATIVE_SUFFIX)
 
 
 @dataclass(frozen=True)
@@ -71,6 +92,9 @@ class IpDataset(Dataset):
         self.cpu_use = cpu_use
         self.preprocessor_max_workers = preprocessor_max_workers
         self.logger = logger.bind(name=__name__)
+        self.base_normalization_type, self.uses_derivative = parse_normalization_type(
+            self.normalization_type
+        )
 
         if not os.path.exists(self.data_file) or not os.path.exists(self.labels_file):
             self.logger.info(
@@ -83,7 +107,7 @@ class IpDataset(Dataset):
             self.max_length = self._get_max_length()
             self.mean, self.std = (
                 self._get_mean_std()
-                if self.normalization_type == "meanvar-whole"
+                if self.base_normalization_type == "meanvar-whole"
                 else (None, None)
             )
             self.sorted_shot_numbers = None
@@ -123,22 +147,27 @@ class IpDataset(Dataset):
         """Get sample and label at index."""
         return self.data[idx], self.labels[idx]
 
+    def _signal_loaders(self) -> dict[str, Callable[..., Tuple[int, NDArray[float32]]]]:
+        if self.uses_derivative:
+            return {
+                "scale": load_and_pad_scale_derivative,
+                "meanvar-whole": load_and_pad_norm_derivative,
+                "meanvar-single": load_and_pad_norm_derivative,
+            }
+        return {
+            "scale": load_and_pad_scale,
+            "meanvar-whole": load_and_pad_norm,
+            "meanvar-single": load_and_pad_norm,
+        }
+
     def _load_single_file(self, filename: str) -> Tuple[int, NDArray[float32]]:
         """Load and preprocess a single file."""
-        loaders = {
-            "scale": lambda: load_and_pad_scale(
-                filename, self.data_dir, self.max_length
-            ),
-            "meanvar-whole": lambda: load_and_pad_norm(
-                filename, self.data_dir, self.max_length, self.mean, self.std
-            ),
-            "meanvar-single": lambda: load_and_pad_norm(
-                filename, self.data_dir, self.max_length, None, None
-            ),
-        }
-        if self.normalization_type not in loaders:
-            raise ValueError(f"Unknown normalization: {self.normalization_type}")
-        return loaders[self.normalization_type]()
+        loader = self._signal_loaders()[self.base_normalization_type]
+        if self.base_normalization_type == "scale":
+            return loader(filename, self.data_dir, self.max_length)
+        if self.base_normalization_type == "meanvar-single":
+            return loader(filename, self.data_dir, self.max_length, None, None)
+        return loader(filename, self.data_dir, self.max_length, self.mean, self.std)
 
     def _process_files_parallel(
         self, func: Callable[..., Any], *args: Any, desc: str = "Processing"
@@ -167,10 +196,16 @@ class IpDataset(Dataset):
 
     def _get_mean_std(self) -> Tuple[float, float]:
         """Compute dataset-wide mean and std."""
-        results = self._process_files_parallel(get_means, desc="Computing mean/std")
+        stats_fn = get_derivative_means if self.uses_derivative else get_means
+        signal_label = "derivative" if self.uses_derivative else "current"
+        results = self._process_files_parallel(
+            stats_fn, desc=f"Computing {signal_label} mean/std"
+        )
         mean = float(np.mean(results[:, 0]))
         std = float(max(0.0, float(np.mean(results[:, 1]) - mean**2)) ** 0.5)
-        self.logger.info(f"Dataset statistics: mean={mean:.6f}, std={std:.6f}")
+        self.logger.info(
+            f"Dataset {signal_label} statistics: mean={mean:.6f}, std={std:.6f}"
+        )
         return mean, std
 
     def load_shot_view(self, index: int) -> ShotView:
@@ -209,13 +244,14 @@ class IpDataset(Dataset):
         self, data_dir_args: List[str], max_length_args: List[int]
     ) -> Tuple[Callable[..., Tuple[int, NDArray[float32]]], Tuple[Any, ...]]:
         """Get loader function and arguments for current normalization method."""
+        signal_loaders = self._signal_loaders()
         loaders = {
             "scale": (
-                load_and_pad_scale,
+                signal_loaders["scale"],
                 (self.file_list, data_dir_args, max_length_args),
             ),
             "meanvar-whole": (
-                load_and_pad_norm,
+                signal_loaders["meanvar-whole"],
                 (
                     self.file_list,
                     data_dir_args,
@@ -225,7 +261,7 @@ class IpDataset(Dataset):
                 ),
             ),
             "meanvar-single": (
-                load_and_pad_norm,
+                signal_loaders["meanvar-single"],
                 (
                     self.file_list,
                     data_dir_args,
@@ -235,9 +271,7 @@ class IpDataset(Dataset):
                 ),
             ),
         }
-        if self.normalization_type not in loaders:
-            raise ValueError(f"Unknown normalization: {self.normalization_type}")
-        return loaders[self.normalization_type]
+        return loaders[self.base_normalization_type]
 
     def _make_dataset(self, make_labels: bool = True) -> None:
         """Build preprocessed dataset from raw signal files."""
@@ -327,7 +361,7 @@ class IpDataset(Dataset):
             self.max_length = self._get_max_length()
             self.mean, self.std = (
                 self._get_mean_std()
-                if self.normalization_type == "meanvar-whole"
+                if self.base_normalization_type == "meanvar-whole"
                 else (None, None)
             )
             self.sorted_shot_numbers = None

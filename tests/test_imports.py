@@ -12,6 +12,7 @@ _CORE_MODULES = [
     "schemas",
     "util.data_loading",
     "util.processing",
+    "util.objective",
     "util.hptune",
     "model.dataset",
     "model.bayesian_hptuner",
