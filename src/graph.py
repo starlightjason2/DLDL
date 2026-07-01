@@ -18,6 +18,7 @@ from util.disruption_predict import (
     predict_disruption_time,
     apply_filter,
     apply_smoothing,
+    remove_jump_to_zero,
 )
 from util.hptune import load_best_trial_cnn
 
@@ -59,7 +60,8 @@ def main() -> None:
             idx = max(0, min(int(i), num_rows - 1))
             signal = dataset.data[idx].float().reshape(1, -1)
             cnn_prob = torch.sigmoid(model.forward(signal)[0, 0]).item()
-            predicted_time = predict_disruption_time(shot)
+            current = remove_jump_to_zero(shot.current)
+            predicted_time = predict_disruption_time(shot.time, current)
 
             ax1.clear()
             ax1.set_title(
@@ -68,7 +70,7 @@ def main() -> None:
             ax1.plot(shot.time, shot.current, label="Current $I(t)$")
             ax1.plot(
                 shot.time,
-                apply_smoothing(shot.current),
+                apply_smoothing(current),
                 label="Smoothed $I(t)$",
                 linestyle="--",
             )
@@ -88,14 +90,16 @@ def main() -> None:
             ax2.clear()
             ax2.plot(
                 shot.time,
-                np.gradient(apply_smoothing(shot.current), shot.time),
+                np.gradient(apply_smoothing(current), shot.time),
                 label="$dI/dt$",
             )
             ax2.legend()
             ax2.grid(True)
 
             ax3.clear()
-            ax3.plot(shot.time, apply_filter(shot), label="Filter")
+            ax3.plot(
+                shot.time, apply_filter(remove_jump_to_zero(current)), label="Filter"
+            )
             diff_microsec = (
                 abs(shot.t_disrupt - predicted_time) * 1e5
                 if shot.t_disrupt is not None
