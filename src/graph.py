@@ -6,7 +6,7 @@ from pathlib import Path
 
 import matplotlib
 
-# matplotlib.use("QtAgg")
+matplotlib.use("QtAgg")
 import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 import numpy as np
@@ -71,7 +71,7 @@ def main() -> None:
             ax1.plot(
                 shot.time,
                 apply_smoothing(current),
-                label="Smoothed $I(t)$",
+                label="Smoothed & shifted $I(t)$",
                 linestyle="--",
             )
             if shot.disruptive:
@@ -119,23 +119,23 @@ def main() -> None:
 
         draw(start)
 
-        # index_slider = Slider(
-        #     fig.add_axes([0.12, 0.05, 0.55, 0.03]),
-        #     "Index",
-        #     0,
-        #     num_rows - 1,
-        #     valinit=start,
-        #     valstep=1,
-        # )
-        # index_slider.valtext.set_visible(False)
-        # box = TextBox(fig.add_axes([0.72, 0.05, 0.12, 0.03]), "", initial=str(start))
+        index_slider = Slider(
+            fig.add_axes([0.12, 0.05, 0.55, 0.03]),
+            "Index",
+            0,
+            num_rows - 1,
+            valinit=start,
+            valstep=1,
+        )
+        index_slider.valtext.set_visible(False)
+        box = TextBox(fig.add_axes([0.72, 0.05, 0.12, 0.03]), "", initial=str(start))
 
-        # index_slider.on_changed(lambda v: (draw(v), box.set_val(str(int(v)))))
-        # box.on_submit(
-        #     lambda t: index_slider.set_val(int(t)) if t.strip().isdigit() else None
-        # )
+        index_slider.on_changed(lambda v: (draw(v), box.set_val(str(int(v)))))
+        box.on_submit(
+            lambda t: index_slider.set_val(int(t)) if t.strip().isdigit() else None
+        )
 
-        plt.savefig("./fig.png")
+        plt.show()
 
 
 if __name__ == "__main__":
