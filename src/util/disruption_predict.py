@@ -11,34 +11,30 @@ from matplotlib.axes import Axes
 DEFAULT_SMOOTHING = 200
 
 
-def remove_jump_to_zero(current: np.ndarray):
+def clean_zeros(current: np.ndarray, time: np.ndarray):
     """
     D3D data has a jump to 0 at the end when the shot terminates.
     We want to remove that jump and shift up by the last value to flatten the curve
     """
     # remove trailing zeroes
     processed_current = np.trim_zeros(current).copy()
-    # shift up
-    processed_current -= processed_current[-1]
-    # pad with zeroes to match the original data shape
-    return np.pad(processed_current, (0, len(current) - len(processed_current)))
+    processed_time = time[: len(processed_current)].copy()
+    return processed_current, processed_time
 
 
 def apply_smoothing(current: np.ndarray):
     window_size = max(1, len(current) // DEFAULT_SMOOTHING)
     weights = np.ones(window_size) / window_size
-    return np.convolve(current, weights, mode="same")
+    smoothed = np.convolve(current, weights, mode="same")
+    # smoothing is rough around the edges, so flatten the curve
+    smoothed[:window_size] = smoothed[window_size]
+    smoothed[-window_size:] = smoothed[-window_size]
+    return smoothed
 
 
 def apply_filter(current, ax: Axes = None):
     smoothed = apply_smoothing(current)
-    filtered_current = np.abs(current - smoothed)
-
-    # the algorithm is weird around the edges, so throw edge values out
-    filtered_current[:2] = 0
-    filtered_current[-2:] = 0
-
-    return filtered_current
+    return np.pow(current - smoothed, 2)
 
 
 def predict_disruption_time(

@@ -18,7 +18,7 @@ from util.disruption_predict import (
     predict_disruption_time,
     apply_filter,
     apply_smoothing,
-    remove_jump_to_zero,
+    clean_zeros,
 )
 from util.hptune import load_best_trial_cnn
 
@@ -33,7 +33,6 @@ def main() -> None:
         return p if os.path.isabs(p) else str(repo / p)
 
     dataset = IpDataset(
-        normalization_type=os.environ["NORMALIZATION_TYPE"],
         data_file=abs_path(os.environ["DATA_PATH"]),
         labels_file=abs_path(os.environ["TRAIN_LABELS_PATH"]),
         labels_path=abs_path(os.environ["LABELS_PATH"]),
@@ -60,17 +59,18 @@ def main() -> None:
             idx = max(0, min(int(i), num_rows - 1))
             signal = dataset.data[idx].float().reshape(1, -1)
             cnn_prob = torch.sigmoid(model.forward(signal)[0, 0]).item()
-            current = remove_jump_to_zero(shot.current)
-            predicted_time = predict_disruption_time(shot.time, current)
+            current, time = clean_zeros(shot.current, shot.time)
+            predicted_time = predict_disruption_time(time, current)
 
             ax1.clear()
             ax1.set_title(
                 f"CNN disruption probability: {100*cnn_prob:.2f}%", fontsize=10
             )
-            ax1.plot(shot.time, shot.current, label="Current $I(t)$")
+            ax1.plot(time, current, label="Current $I(t)$")
+            smoothed = apply_smoothing(current)
             ax1.plot(
-                shot.time,
-                apply_smoothing(current),
+                time,
+                smoothed,
                 label="Smoothed & shifted $I(t)$",
                 linestyle="--",
             )
@@ -89,17 +89,15 @@ def main() -> None:
 
             ax2.clear()
             ax2.plot(
-                shot.time,
-                np.gradient(apply_smoothing(current), shot.time),
+                time,
+                np.gradient(smoothed, time),
                 label="$dI/dt$",
             )
             ax2.legend()
             ax2.grid(True)
 
             ax3.clear()
-            ax3.plot(
-                shot.time, apply_filter(remove_jump_to_zero(current)), label="Filter"
-            )
+            ax3.plot(time, apply_filter(current), label="Filter")
             diff_microsec = (
                 abs(shot.t_disrupt - predicted_time) * 1e5
                 if shot.t_disrupt is not None

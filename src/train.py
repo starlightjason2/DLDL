@@ -52,7 +52,7 @@ def main() -> None:
     lr_scheduler = os.environ["LR_SCHEDULER"].lower() in ("true", "1", "yes", "on")
 
     dataset = IpDataset(
-        normalization_type=os.environ["NORMALIZATION_TYPE"],
+        
         data_file=str(data_path),
         labels_file=str(labels_path),
         labels_path=str(_abs(os.environ["LABELS_PATH"])),

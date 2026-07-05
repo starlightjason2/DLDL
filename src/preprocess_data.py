@@ -45,7 +45,7 @@ if __name__ == "__main__":
             os.remove(path)
             logger.info(f"Deleted cached file: {path}")
     IpDataset(
-        normalization_type=os.environ["NORMALIZATION_TYPE"],
+        
         data_file=data_path,
         labels_file=labels_pt_path,
         labels_path=_abs(os.environ["LABELS_PATH"]),

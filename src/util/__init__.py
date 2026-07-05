@@ -5,10 +5,9 @@ from .data_loading import (
     get_scaled_t_disrupt,
     get_means,
     load_and_pad_norm,
-    load_and_pad_scale,
     env_float,
     env_int,
-    env_tuple
+    env_tuple,
 )
 from .processing import (
     get_use_cores,
@@ -24,7 +23,6 @@ __all__ = [
     "get_scaled_t_disrupt",
     "get_means",
     "load_and_pad_norm",
-    "load_and_pad_scale",
     "get_use_cores",
     "create_binary_labels",
     "convert_tensors_to_float",

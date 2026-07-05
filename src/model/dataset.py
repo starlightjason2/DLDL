@@ -19,7 +19,6 @@ from util.data_loading import (
     get_means,
     get_scaled_t_disrupt,
     load_and_pad_norm,
-    load_and_pad_scale,
 )
 from util.processing import (
     convert_tensors_to_float,
@@ -36,15 +35,11 @@ class ShotView:
     current: np.ndarray
     disruptive: bool
     t_disrupt: float | None
-    normalization_type: str
 
     @property
     def title(self) -> str:
         status = "disruptive" if self.disruptive else "non-disruptive"
-        return (
-            f"Shot {self.shot_no} (index {self.index}, {status}, "
-            f"{self.normalization_type})"
-        )
+        return f"Shot {self.shot_no} (index {self.index}, {status}"
 
 
 class IpDataset(Dataset):
@@ -52,7 +47,6 @@ class IpDataset(Dataset):
 
     def __init__(
         self,
-        normalization_type: str,
         data_file: str,
         labels_file: str,
         labels_path: str,
@@ -62,7 +56,6 @@ class IpDataset(Dataset):
         preprocessor_max_workers: int,
     ) -> None:
         """Initialize dataset, creating preprocessed files if missing."""
-        self.normalization_type = normalization_type
         self.data_file = data_file
         self.labels_file = labels_file
         self.labels_path = labels_path
@@ -73,19 +66,12 @@ class IpDataset(Dataset):
         self.logger = logger.bind(name=__name__)
 
         if not os.path.exists(self.data_file) or not os.path.exists(self.labels_file):
-            self.logger.info(
-                f"Preprocessed files not found. Creating dataset "
-                f"(normalization_type='{self.normalization_type}')"
-            )
+            self.logger.info(f"Preprocessed files not found. Creating dataset.")
             self.shot_list = np.loadtxt(self.labels_path)
             self.file_list = [f"{int(shot[0])}.txt" for shot in self.shot_list]
             self.num_shots = len(self.file_list)
             self.max_length = self._get_max_length()
-            self.mean, self.std = (
-                self._get_mean_std()
-                if self.normalization_type == "meanvar-whole"
-                else (None, None)
-            )
+            self.mean, self.std = self._get_mean_std()
             self.sorted_shot_numbers = None
             self._shot_to_idx = {
                 int(shot[0]): idx for idx, shot in enumerate(self.shot_list)
@@ -123,23 +109,6 @@ class IpDataset(Dataset):
         """Get sample and label at index."""
         return self.data[idx], self.labels[idx]
 
-    def _load_single_file(self, filename: str) -> Tuple[int, NDArray[float32]]:
-        """Load and preprocess a single file."""
-        loaders = {
-            "scale": lambda: load_and_pad_scale(
-                filename, self.data_dir, self.max_length
-            ),
-            "meanvar-whole": lambda: load_and_pad_norm(
-                filename, self.data_dir, self.max_length, self.mean, self.std
-            ),
-            "meanvar-single": lambda: load_and_pad_norm(
-                filename, self.data_dir, self.max_length, None, None
-            ),
-        }
-        if self.normalization_type not in loaders:
-            raise ValueError(f"Unknown normalization: {self.normalization_type}")
-        return loaders[self.normalization_type]()
-
     def _process_files_parallel(
         self, func: Callable[..., Any], *args: Any, desc: str = "Processing"
     ) -> NDArray:
@@ -147,15 +116,19 @@ class IpDataset(Dataset):
         workers = min(get_use_cores(self.cpu_use), self.preprocessor_max_workers)
         chunksize = max(1, self.num_shots // (workers * 4))  # Reduce IPC overhead
         self.logger.info(f"{desc}: {self.num_shots} files, {workers} workers")
+
         with ProcessPoolExecutor(max_workers=workers) as executor:
-            it = executor.map(
-                func,
-                self.file_list,
-                [self.data_dir] * self.num_shots,
-                *args,
-                chunksize=chunksize,
+            return np.asarray(
+                list(
+                    executor.map(
+                        func,
+                        self.file_list,
+                        [self.data_dir] * self.num_shots,
+                        *args,
+                        chunksize=chunksize,
+                    )
+                )
             )
-            return np.asarray(list(it))
 
     def _get_max_length(self) -> int:
         """Compute maximum time series length across all shots."""
@@ -187,7 +160,6 @@ class IpDataset(Dataset):
             current=current,
             disruptive=disruptive,
             t_disrupt=float(label[1]) if disruptive else None,
-            normalization_type=self.normalization_type,
         )
 
     def make_labels(
@@ -208,13 +180,8 @@ class IpDataset(Dataset):
     def _get_normalization_loader(
         self, data_dir_args: List[str], max_length_args: List[int]
     ) -> Tuple[Callable[..., Tuple[int, NDArray[float32]]], Tuple[Any, ...]]:
-        """Get loader function and arguments for current normalization method."""
-        loaders = {
-            "scale": (
-                load_and_pad_scale,
-                (self.file_list, data_dir_args, max_length_args),
-            ),
-            "meanvar-whole": (
+        return (
+            (
                 load_and_pad_norm,
                 (
                     self.file_list,
@@ -224,32 +191,21 @@ class IpDataset(Dataset):
                     [self.std] * self.num_shots,
                 ),
             ),
-            "meanvar-single": (
-                load_and_pad_norm,
-                (
-                    self.file_list,
-                    data_dir_args,
-                    max_length_args,
-                    [None] * self.num_shots,
-                    [None] * self.num_shots,
-                ),
-            ),
-        }
-        if self.normalization_type not in loaders:
-            raise ValueError(f"Unknown normalization: {self.normalization_type}")
-        return loaders[self.normalization_type]
+        )
 
     def _make_dataset(self, make_labels: bool = True) -> None:
         """Build preprocessed dataset from raw signal files."""
-        self.logger.info(
-            f"Building dataset for {self.num_shots} shots (normalization={self.normalization_type})"
-        )
+        self.logger.info(f"Building dataset for {self.num_shots} shots")
         self.logger.info(
             f"Estimated memory: ~{(self.num_shots * self.max_length * 4) / (1024**3):.2f} GB"
         )
 
-        loader_func, loader_args = self._get_normalization_loader(
-            [self.data_dir] * self.num_shots, [self.max_length] * self.num_shots
+        loader_args = (
+            self.file_list,
+            [self.data_dir] * self.num_shots,
+            [self.max_length] * self.num_shots,
+            [self.mean] * self.num_shots,
+            [self.std] * self.num_shots,
         )
 
         workers = min(get_use_cores(self.cpu_use), self.preprocessor_max_workers)
@@ -258,7 +214,9 @@ class IpDataset(Dataset):
             f"Loading and normalizing: {self.num_shots} files, {workers} workers"
         )
         with ProcessPoolExecutor(max_workers=workers) as executor:
-            results = list(executor.map(loader_func, *loader_args, chunksize=chunksize))
+            results = list(
+                executor.map(load_and_pad_norm, *loader_args, chunksize=chunksize)
+            )
 
         sorted_data = sorted(results, key=lambda x: x[0])
         sorted_shot_numbers, dataset_data = zip(*sorted_data)
@@ -309,9 +267,15 @@ class IpDataset(Dataset):
                 shot_no, self.data_dir, t_disrupt, self.max_length
             )
 
-        return torch.tensor(self._load_single_file(f"{shot_no}.txt")[1]), torch.tensor(
-            label
-        )
+        return torch.tensor(
+            load_and_pad_norm(
+                (f"{shot_no}.txt")[1],
+                self.data_dir,
+                self.max_length,
+                self.mean,
+                self.std,
+            )
+        ), torch.tensor(label)
 
     def check_dataset(
         self, scale_labels: bool = True, num_checks: int = 100, verbose: bool = False
@@ -325,11 +289,7 @@ class IpDataset(Dataset):
             self.file_list = [f"{int(shot[0])}.txt" for shot in self.shot_list]
             self.num_shots = len(self.file_list)
             self.max_length = self._get_max_length()
-            self.mean, self.std = (
-                self._get_mean_std()
-                if self.normalization_type == "meanvar-whole"
-                else (None, None)
-            )
+            self.mean, self.std = self._get_mean_std()
             self.sorted_shot_numbers = None
             self._shot_to_idx = {
                 int(shot[0]): idx for idx, shot in enumerate(self.shot_list)

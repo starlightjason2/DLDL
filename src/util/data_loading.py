@@ -82,24 +82,10 @@ def load_and_pad_norm(
     filename: str,
     data_dir: str,
     max_length: int,
-    mean: Optional[float] = None,
-    std: Optional[float] = None,
+    mean,
+    std
 ) -> Tuple[int, NDArray[np.float32]]:
     data = _read_signal_file(os.path.join(data_dir, filename), col=1)
-    if mean is None or std is None:
-        mean, std = float(np.mean(data)), float(np.std(data))
     data = (data - mean) / std if std > 0 else np.zeros_like(data)
     return _load_and_pad_base(filename, data_dir, max_length, data)
 
-
-def load_and_pad_scale(
-    filename: str, data_dir: str, max_length: int
-) -> Tuple[int, NDArray[np.float32]]:
-    data = _read_signal_file(os.path.join(data_dir, filename), col=1)
-    data_min, data_max = np.min(data), np.max(data)
-    data = (
-        (data - data_min) / (data_max - data_min)
-        if data_max > data_min
-        else np.zeros_like(data)
-    )
-    return _load_and_pad_base(filename, data_dir, max_length, data)

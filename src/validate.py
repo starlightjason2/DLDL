@@ -83,7 +83,7 @@ def evaluate_best_model(batch_size: int = 256) -> None:
     metrics, plus the shot ids of all false positives and false negatives.
     """
     dataset = IpDataset(
-        normalization_type=os.environ["NORMALIZATION_TYPE"],
+        
         data_file=data_path,
         labels_file=labels_pt_path,
         labels_path=_abs(os.environ["LABELS_PATH"]),

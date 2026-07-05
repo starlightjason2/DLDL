@@ -82,7 +82,6 @@ class IpCNN(nn.Module):
         self.logger.info(f"  Dropout rate: {dropout_rate}")
         self.logger.info(f"  Classification pos_weight: {self.cls_pos_weight}")
         self.logger.info(f"  Decision threshold: {self.decision_threshold}")
-        self.logger.info(f"  Normalization type: {dataset.normalization_type}")
         self.logger.info("=" * 60)
 
         self.dataset = dataset
@@ -390,11 +389,15 @@ class IpCNN(nn.Module):
                 best["epoch"],
                 fbeta,
             )
-            self.logger.info("  Validation Recall:    {:.6f}", best["Validation Recall"])
+            self.logger.info(
+                "  Validation Recall:    {:.6f}", best["Validation Recall"]
+            )
             self.logger.info(
                 "  Validation Precision: {:.6f}", best["Validation Precision"]
             )
-            self.logger.info("  Validation F1:        {:.6f}", best["Validation F1 Score"])
+            self.logger.info(
+                "  Validation F1:        {:.6f}", best["Validation F1 Score"]
+            )
             self.logger.info(
                 "  Validation F{:g}:        {:.6f}", fbeta, best["Validation Fbeta"]
             )
