@@ -25,9 +25,9 @@ from util.objective import (
     RECALL_COL,
     THRESHOLD_COL,
     best_row,
-    best_threshold,
     min_precision,
     score,
+    validation_metrics,
 )
 
 
@@ -165,8 +165,7 @@ class IpCNN(nn.Module):
     ) -> None:
         """Run validation for a single epoch and update logs.
 
-        Metrics use the threshold that maximizes recall subject to
-        ``MIN_PRECISION`` on the dev set. F-beta is logged only.
+        Metrics use the fixed ``DECISION_THRESHOLD`` (default 0.5). F-beta is logged only.
         """
         model.eval()
         total_val_loss = 0.0
@@ -187,7 +186,7 @@ class IpCNN(nn.Module):
                 val_total_loss = self._loss(output, targets)
                 total_val_loss += val_total_loss.item()
 
-        threshold, val_precision, val_recall = best_threshold(
+        threshold, val_precision, val_recall = validation_metrics(
             all_classification_targets, all_classification_probs
         )
         all_classification_predictions = [
@@ -244,9 +243,7 @@ class IpCNN(nn.Module):
 
         Model selection (best checkpoint + early stopping) maximizes validation
         recall among epochs with precision at or above ``MIN_PRECISION``
-        (default 0.90), using per-epoch threshold tuning on the dev set.
-        F-beta is logged only. The selection score is reported to the
-        hyperparameter tuner.
+        (default 0.90) at the fixed decision threshold. F-beta is logged only.
         """
         self.logger.info(f"GPUs Available: {torch.cuda.device_count()}")
         if torch.cuda.is_available():
@@ -357,11 +354,6 @@ class IpCNN(nn.Module):
                     self.prog_dir, f"{job_id}_best_params.pt"
                 )
                 torch.save(model.state_dict(), checkpoint_path)
-                threshold_path = os.path.join(
-                    self.prog_dir, f"{job_id}_best_threshold.txt"
-                )
-                with open(threshold_path, "w", encoding="utf-8") as fh:
-                    fh.write(f"{last[THRESHOLD_COL]}\n")
                 self.logger.info(
                     "New best validation score {:.6f} "
                     "(precision {:.6f}, recall {:.6f}, threshold {:.6f})",

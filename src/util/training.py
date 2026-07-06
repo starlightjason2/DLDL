@@ -102,22 +102,10 @@ def build_cnn_from_env(dataset: "IpDataset", prog_dir: str) -> "IpCNN":
     )
 
 
-def _companion_threshold_path(checkpoint_path: Path) -> Path:
-    return checkpoint_path.with_name(
-        checkpoint_path.name.replace("_best_params.pt", "_best_threshold.txt")
-    )
-
-
 def load_checkpoint_into_model(model: "IpCNN", checkpoint_path: Path) -> None:
     ckpt = torch.load(checkpoint_path, map_location="cpu")
     state = ckpt["model"] if isinstance(ckpt, dict) and "model" in ckpt else ckpt
     model.load_state_dict(state)
-
-    threshold_path = _companion_threshold_path(checkpoint_path)
-    if threshold_path.exists():
-        model.decision_threshold = float(
-            threshold_path.read_text(encoding="utf-8").strip()
-        )
 
 
 def sync_best_epoch_artifacts(job_id: str, prog_dir: str | Path) -> None:
@@ -142,12 +130,6 @@ def sync_best_epoch_artifacts(job_id: str, prog_dir: str | Path) -> None:
         existing.unlink()
     shutil.copy2(checkpoint_src, dest / checkpoint_src.name)
 
-    threshold_src = _companion_threshold_path(checkpoint_src)
-    if threshold_src.exists():
-        for existing in dest.glob("*_best_threshold.txt"):
-            existing.unlink()
-        shutil.copy2(threshold_src, dest / threshold_src.name)
-
     log_src = root / f"{job_id}_training_log.csv"
     if log_src.exists():
         for existing in dest.glob("*_training_log.csv"):
@@ -157,10 +139,6 @@ def sync_best_epoch_artifacts(job_id: str, prog_dir: str | Path) -> None:
     from util.hptune import write_env
 
     env_keys = training_env_keys(job_id, dest)
-    if threshold_src.exists():
-        env_keys["DECISION_THRESHOLD"] = threshold_src.read_text(
-            encoding="utf-8"
-        ).strip()
 
     write_env(
         str(dest / ".env"),

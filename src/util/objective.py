@@ -25,59 +25,30 @@ def score(
     return recall if precision >= floor else INFEASIBLE_SCORE
 
 
-def _threshold_candidates(probs: np.ndarray) -> np.ndarray:
-    """Candidate cutoffs: uniform grid plus every distinct predicted probability."""
-    grid = np.linspace(0.01, 0.99, 99)
-    return np.unique(np.concatenate([probs, grid]))
-
-
-def _metrics_at_threshold(
-    labels: np.ndarray, probs: np.ndarray, threshold: float
-) -> tuple[float, float]:
-    predictions = probs > threshold
-    if not predictions.any():
-        return 0.0, 0.0
-    return (
-        precision_score(labels, predictions, zero_division=0),
-        recall_score(labels, predictions, zero_division=0),
-    )
-
-
 def default_threshold() -> float:
     return float(os.environ.get("DECISION_THRESHOLD", "0.5"))
 
 
-def best_threshold(
+def validation_metrics(
     y_true: Sequence[float] | np.ndarray,
     y_prob: Sequence[float] | np.ndarray,
-    *,
-    precision_floor: float | None = None,
 ) -> tuple[float, float, float]:
-    """Return ``(threshold, precision, recall)`` maximizing recall with P >= floor."""
-    floor = min_precision() if precision_floor is None else precision_floor
+    """Return ``(threshold, precision, recall)`` at the fixed decision threshold."""
+    threshold = default_threshold()
     labels = np.asarray(y_true, dtype=int)
     probs = np.asarray(y_prob, dtype=float)
-
     if probs.size == 0:
-        return default_threshold(), 0.0, INFEASIBLE_SCORE
+        return threshold, 0.0, 0.0
 
-    best_t, best_p, best_r = default_threshold(), 0.0, INFEASIBLE_SCORE
-    for threshold in _threshold_candidates(probs):
-        precision, recall = _metrics_at_threshold(labels, probs, float(threshold))
-        candidate_score = score(recall, precision, precision_floor=floor)
-        if candidate_score <= INFEASIBLE_SCORE:
-            continue
-        if candidate_score > best_r or (
-            candidate_score == best_r and precision > best_p
-        ):
-            best_t, best_p, best_r = float(threshold), precision, recall
+    predictions = probs > threshold
+    if not predictions.any():
+        return threshold, 0.0, 0.0
 
-    if best_r > INFEASIBLE_SCORE:
-        return best_t, best_p, best_r
-
-    fallback_t = default_threshold()
-    fallback_p, fallback_r = _metrics_at_threshold(labels, probs, fallback_t)
-    return fallback_t, fallback_p, fallback_r
+    return (
+        threshold,
+        precision_score(labels, predictions, zero_division=0),
+        recall_score(labels, predictions, zero_division=0),
+    )
 
 
 def best_row(

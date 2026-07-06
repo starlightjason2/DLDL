@@ -148,14 +148,12 @@ cython_debug/
 core
 core.*
 
-# Project-specific
+# Checkpoints (ignore by default; allow canonical best snapshots below)
 *.pt
 *.pth
 *.ckpt
-*.h5
-*.hdf5
-logs/
-runs/
+!**/best_trial/*_best_params.pt
+!**/best_epoch/*_best_params.pt
 
 wandb/
 *.csv

@@ -185,14 +185,6 @@ def sync_best_trial_artifacts(
         existing.unlink()
     shutil.copy2(checkpoint_src, dest / checkpoint_src.name)
 
-    threshold_src = checkpoint_src.with_name(
-        checkpoint_src.name.replace("_best_params.pt", "_best_threshold.txt")
-    )
-    if threshold_src.exists():
-        for existing in dest.glob("*_best_threshold.txt"):
-            existing.unlink()
-        shutil.copy2(threshold_src, dest / threshold_src.name)
-
     logger.info(
         "Best-trial snapshot updated: trial_id={} score={:.6f} -> {}",
         best.trial_id,
