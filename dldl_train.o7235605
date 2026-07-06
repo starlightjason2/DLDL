@@ -1,0 +1,38 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1783031645.283614  535631 cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.dataset[0m:[36m__init__[0m:[36m97[0m - [1mLoading existing dataset from /eagle/fusiondl_aesp/starlightjason2/DLDL/data/processed_data/processed_dataset_meanvar-whole.pt[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.dataset[0m:[36m__init__[0m:[36m101[0m - [1mReady: 39428 shots[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m75[0m - [1m============================================================[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m76[0m - [1mCNN Architecture Hyperparameters:[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m77[0m - [1m  Conv1: filters=16, kernel=9, padding=4[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m80[0m - [1m  Conv2: filters=32, kernel=5, padding=2[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m83[0m - [1m  Conv3: filters=64, kernel=3, padding=1[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m86[0m - [1m  Conv4: filters=128, kernel=3, padding=1[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m89[0m - [1m  Pool size: 4[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m90[0m - [1m  FC1 size: 120[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m91[0m - [1m  FC2 size: 60[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m92[0m - [1m  Dropout rate: 0.6641600193527787[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m93[0m - [1m  Classification pos_weight: 1.427719386863257[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m94[0m - [1m  Decision threshold: 0.5[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m95[0m - [1m  Normalization type: meanvar-whole[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m96[0m - [1m============================================================[0m
+[32m2026-07-02 22:34:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m100[0m - [1mDataset: 39428 examples, max_length=60201[0m
+[32m2026-07-02 22:34:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m258[0m - [1mGPUs Available: 4[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m267[0m - [1m============================================================[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m268[0m - [1mTraining Hyperparameters:[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m269[0m - [1m  Learning rate: 0.0244755225090038[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m270[0m - [1m  Number of epochs: 200[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m271[0m - [1m  Batch size: 32[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m272[0m - [1m  Weight decay: 6.678279694104736e-07[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m273[0m - [1m  Log interval: 50[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m274[0m - [1m  LR scheduler: True[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m276[0m - [1m    Factor: 0.7170656196716738, Patience: 6[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m279[0m - [1m  Early stopping patience: 21[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m280[0m - [1m  Gradient clip: 9.852492430191496[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m281[0m - [1m  DataLoader num_workers: 4[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m282[0m - [1m  Selection objective: maximize recall with precision >= 0.9000 (per-epoch threshold tuning)[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m287[0m - [1m  F-beta (logged only): F1.5[0m
+[32m2026-07-02 22:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m288[0m - [1m============================================================[0m
+[32m2026-07-02 22:34:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/200, Batch 0, [0/31542] Loss 0.797942[0m
+[32m2026-07-02 22:34:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/200, Batch 50, [1600/31542] Loss 1.168981[0m

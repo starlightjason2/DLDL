@@ -1,0 +1,125 @@
+=== pytest: tests/test_objective.py ===
+.....                                                                    [100%]
+5 passed in 16.99s
+=== dev-set checkpoint smoke ===
+2026-07-02 22:37:35.173 | INFO     | model.dataset:__init__:97 - Loading existing dataset from /eagle/fusiondl_aesp/starlightjason2/DLDL/data/processed_data/processed_dataset_meanvar-whole.pt
+2026-07-02 22:37:35.267 | INFO     | model.dataset:__init__:101 - Ready: 39428 shots
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1783031856.224194 1541817 cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2026-07-02 22:37:41.887 | INFO     | model.cnn:__init__:75 - ============================================================
+2026-07-02 22:37:41.887 | INFO     | model.cnn:__init__:76 - CNN Architecture Hyperparameters:
+2026-07-02 22:37:41.887 | INFO     | model.cnn:__init__:77 -   Conv1: filters=16, kernel=9, padding=4
+2026-07-02 22:37:41.887 | INFO     | model.cnn:__init__:80 -   Conv2: filters=32, kernel=5, padding=2
+2026-07-02 22:37:41.887 | INFO     | model.cnn:__init__:83 -   Conv3: filters=64, kernel=3, padding=1
+2026-07-02 22:37:41.887 | INFO     | model.cnn:__init__:86 -   Conv4: filters=128, kernel=3, padding=1
+2026-07-02 22:37:41.887 | INFO     | model.cnn:__init__:89 -   Pool size: 4
+2026-07-02 22:37:41.887 | INFO     | model.cnn:__init__:90 -   FC1 size: 120
+2026-07-02 22:37:41.887 | INFO     | model.cnn:__init__:91 -   FC2 size: 60
+2026-07-02 22:37:41.887 | INFO     | model.cnn:__init__:92 -   Dropout rate: 0.6641600193527787
+2026-07-02 22:37:41.887 | INFO     | model.cnn:__init__:93 -   Classification pos_weight: 1.427719386863257
+2026-07-02 22:37:41.887 | INFO     | model.cnn:__init__:94 -   Decision threshold: 0.5
+2026-07-02 22:37:41.887 | INFO     | model.cnn:__init__:95 -   Normalization type: meanvar-whole
+2026-07-02 22:37:41.888 | INFO     | model.cnn:__init__:96 - ============================================================
+2026-07-02 22:37:41.888 | INFO     | model.cnn:__init__:100 - Dataset: 39428 examples, max_length=60201
+2026-07-02 22:37:56.169 | INFO     | __main__:main:64 - Smoke checkpoint: prec90rec_best_params.pt
+2026-07-02 22:37:56.170 | INFO     | __main__:main:65 - Dev-set size: 3943
+2026-07-02 22:37:56.170 | INFO     | __main__:main:66 - MIN_PRECISION: 0.9000
+2026-07-02 22:37:56.170 | INFO     | __main__:main:67 - Tuned threshold: 0.468811
+2026-07-02 22:37:56.170 | INFO     | __main__:main:68 - Precision: 0.901840
+2026-07-02 22:37:56.170 | INFO     | __main__:main:69 - Recall:    0.917930
+2026-07-02 22:37:56.170 | INFO     | __main__:main:70 - Objective score: 0.917930
+2026-07-02 22:37:56.170 | INFO     | __main__:main:83 - Smoke test passed.
+=== 2-epoch training smoke (JOB_ID=smoke_prec90) ===
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1783031882.594440 1541893 cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.dataset[0m:[36m__init__[0m:[36m97[0m - [1mLoading existing dataset from /eagle/fusiondl_aesp/starlightjason2/DLDL/data/processed_data/processed_dataset_meanvar-whole.pt[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.dataset[0m:[36m__init__[0m:[36m101[0m - [1mReady: 39428 shots[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m75[0m - [1m============================================================[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m76[0m - [1mCNN Architecture Hyperparameters:[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m77[0m - [1m  Conv1: filters=16, kernel=9, padding=4[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m80[0m - [1m  Conv2: filters=32, kernel=5, padding=2[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m83[0m - [1m  Conv3: filters=64, kernel=3, padding=1[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m86[0m - [1m  Conv4: filters=128, kernel=3, padding=1[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m89[0m - [1m  Pool size: 4[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m90[0m - [1m  FC1 size: 120[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m91[0m - [1m  FC2 size: 60[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m92[0m - [1m  Dropout rate: 0.6641600193527787[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m93[0m - [1m  Classification pos_weight: 1.427719386863257[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m94[0m - [1m  Decision threshold: 0.5[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m95[0m - [1m  Normalization type: meanvar-whole[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m96[0m - [1m============================================================[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m100[0m - [1mDataset: 39428 examples, max_length=60201[0m
+[32m2026-07-02 22:38:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m258[0m - [1mGPUs Available: 4[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m267[0m - [1m============================================================[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m268[0m - [1mTraining Hyperparameters:[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m269[0m - [1m  Learning rate: 0.0244755225090038[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m270[0m - [1m  Number of epochs: 2[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m271[0m - [1m  Batch size: 32[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m272[0m - [1m  Weight decay: 6.678279694104736e-07[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m273[0m - [1m  Log interval: 50[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m274[0m - [1m  LR scheduler: True[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m276[0m - [1m    Factor: 0.7170656196716738, Patience: 6[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m279[0m - [1m  Early stopping patience: 0[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m280[0m - [1m  Gradient clip: 9.852492430191496[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m281[0m - [1m  DataLoader num_workers: 4[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m282[0m - [1m  Selection objective: maximize recall with precision >= 0.9000 (per-epoch threshold tuning)[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m287[0m - [1m  F-beta (logged only): F1.5[0m
+[32m2026-07-02 22:38:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m288[0m - [1m============================================================[0m
+[32m2026-07-02 22:38:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 0, [0/31542] Loss 0.778553[0m
+[32m2026-07-02 22:38:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 50, [1600/31542] Loss 1.064620[0m
+[32m2026-07-02 22:38:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 100, [3200/31542] Loss 0.565338[0m
+[32m2026-07-02 22:39:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 150, [4800/31542] Loss 0.441679[0m
+[32m2026-07-02 22:39:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 200, [6400/31542] Loss 0.413649[0m
+[32m2026-07-02 22:39:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 250, [8000/31542] Loss 0.437673[0m
+[32m2026-07-02 22:39:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 300, [9600/31542] Loss 0.397294[0m
+[32m2026-07-02 22:40:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 350, [11200/31542] Loss 0.616787[0m
+[32m2026-07-02 22:40:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 400, [12800/31542] Loss 0.880252[0m
+[32m2026-07-02 22:40:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 450, [14400/31542] Loss 0.334309[0m
+[32m2026-07-02 22:40:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 500, [16000/31542] Loss 0.281776[0m
+[32m2026-07-02 22:41:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 550, [17600/31542] Loss 0.297364[0m
+[32m2026-07-02 22:41:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 600, [19200/31542] Loss 0.231652[0m
+[32m2026-07-02 22:41:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 650, [20800/31542] Loss 0.327603[0m
+[32m2026-07-02 22:41:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 700, [22400/31542] Loss 0.380771[0m
+[32m2026-07-02 22:42:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 750, [24000/31542] Loss 0.312508[0m
+[32m2026-07-02 22:42:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 800, [25600/31542] Loss 0.358580[0m
+[32m2026-07-02 22:42:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 850, [27200/31542] Loss 0.487504[0m
+[32m2026-07-02 22:42:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 900, [28800/31542] Loss 0.310564[0m
+[32m2026-07-02 22:42:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 0/2, Batch 950, [30400/31542] Loss 0.659506[0m
+[32m2026-07-02 22:43:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m380[0m - [1mNew best validation score 0.515611 (precision 0.900312, recall 0.515611, threshold 0.768502)[0m
+[32m2026-07-02 22:43:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m320[0m - [1m--------------------------------[0m
+[32m2026-07-02 22:43:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 0, [0/31542] Loss 0.635941[0m
+[32m2026-07-02 22:43:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 50, [1600/31542] Loss 0.278804[0m
+[32m2026-07-02 22:43:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 100, [3200/31542] Loss 0.335676[0m
+[32m2026-07-02 22:43:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 150, [4800/31542] Loss 0.303135[0m
+[32m2026-07-02 22:43:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 200, [6400/31542] Loss 0.330453[0m
+[32m2026-07-02 22:43:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 250, [8000/31542] Loss 0.464593[0m
+[32m2026-07-02 22:43:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 300, [9600/31542] Loss 0.281723[0m
+[32m2026-07-02 22:43:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 350, [11200/31542] Loss 0.198328[0m
+[32m2026-07-02 22:43:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 400, [12800/31542] Loss 0.354910[0m
+[32m2026-07-02 22:43:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 450, [14400/31542] Loss 0.234608[0m
+[32m2026-07-02 22:43:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 500, [16000/31542] Loss 0.164924[0m
+[32m2026-07-02 22:43:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 550, [17600/31542] Loss 0.294919[0m
+[32m2026-07-02 22:43:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 600, [19200/31542] Loss 0.262472[0m
+[32m2026-07-02 22:43:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 650, [20800/31542] Loss 0.252576[0m
+[32m2026-07-02 22:43:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 700, [22400/31542] Loss 0.225341[0m
+[32m2026-07-02 22:43:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 750, [24000/31542] Loss 0.240880[0m
+[32m2026-07-02 22:43:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 800, [25600/31542] Loss 0.409970[0m
+[32m2026-07-02 22:43:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 850, [27200/31542] Loss 0.377335[0m
+[32m2026-07-02 22:43:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 900, [28800/31542] Loss 0.239789[0m
+[32m2026-07-02 22:43:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m341[0m - [1mEpoch 1/2, Batch 950, [30400/31542] Loss 0.569081[0m
+[32m2026-07-02 22:43:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m380[0m - [1mNew best validation score 0.573595 (precision 0.900560, recall 0.573595, threshold 0.961015)[0m
+[32m2026-07-02 22:43:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m414[0m - [1m============================================================[0m
+[32m2026-07-02 22:43:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m415[0m - [1mTraining complete — best epoch 1 (precision 0.900560, recall 0.573595, precision floor 0.9000):[0m
+[32m2026-07-02 22:43:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m423[0m - [1m  Validation Threshold: 0.961015[0m
+[32m2026-07-02 22:43:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m426[0m - [1m  Validation Recall:    0.573595[0m
+[32m2026-07-02 22:43:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m427[0m - [1m  Validation Precision: 0.900560[0m
+[32m2026-07-02 22:43:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m428[0m - [1m  Validation F1:        0.700817[0m
+[32m2026-07-02 22:43:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m429[0m - [1m  Validation F1.5:        0.645732[0m
+[32m2026-07-02 22:43:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m432[0m - [1m  Selection score:      0.573595[0m
+[32m2026-07-02 22:43:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m436[0m - [1m  Validation Loss:      0.430518[0m
+[32m2026-07-02 22:43:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m437[0m - [1m============================================================[0m
+[32m2026-07-02 22:43:36[0m | [1mINFO    [0m | [36mutil.training[0m:[36msync_best_epoch_artifacts[0m:[36m169[0m - [1mBest-epoch snapshot updated: job_id=smoke_prec90 -> /eagle/fusiondl_aesp/starlightjason2/DLDL/data/train_progress/best_epoch[0m
+Training smoke OK: best logged precision=0.9006, recall=0.5736, threshold=0.9610, floor=0.90
+All smoke tests passed.

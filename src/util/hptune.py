@@ -17,6 +17,7 @@ from loguru import logger
 
 from model.cnn import IpCNN
 from model.trial_status import TrialStatus
+from util.objective import PRECISION_COL, RECALL_COL, best_row, trial_metrics
 
 if TYPE_CHECKING:
     from model.dataset import IpDataset
@@ -71,11 +72,10 @@ def next_trial_numbered_id(
 
 
 def parse_trial_metrics(trial_dir: str | Path) -> tuple[bool, dict[str, float]]:
-    """Parse the best epoch's validation metrics from the most recent training log CSV.
+    """Parse trial metrics from the best validation epoch per ``util.objective``.
 
-    The "best" epoch maximizes validation F-beta (the trial objective the tuner
-    maximizes); recall and precision are read from that same epoch, so they describe
-    the selected model. Returns ``(True, {"score", "recall", "precision"})`` on
+    The best epoch maximizes recall among rows with precision at or above
+    ``MIN_PRECISION``. Returns ``(True, {"score", "recall", "precision"})`` on
     success, ``(False, {})`` if no valid log is found.
     """
     candidates = sorted(
@@ -88,13 +88,13 @@ def parse_trial_metrics(trial_dir: str | Path) -> tuple[bool, dict[str, float]]:
             Exception, message=f"Skipping unreadable log {path}", reraise=False
         ):
             df = pd.read_csv(path)
-            if not df.empty and "Validation Fbeta" in df.columns:
-                best = df.loc[df["Validation Fbeta"].idxmax()]
-                return True, {
-                    "score": float(best["Validation Fbeta"]),
-                    "recall": float(best.get("Validation Recall", float("nan"))),
-                    "precision": float(best.get("Validation Precision", float("nan"))),
-                }
+            if (
+                not df.empty
+                and PRECISION_COL in df.columns
+                and RECALL_COL in df.columns
+            ):
+                best = best_row(df.to_dict("records"))
+                return True, trial_metrics(best)
 
     return False, {}
 

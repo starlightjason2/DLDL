@@ -60,7 +60,7 @@ def main() -> None:
             signal = dataset.data[idx].float().reshape(1, -1)
             cnn_prob = torch.sigmoid(model.forward(signal)[0, 0]).item()
             current, time = clean_zeros(shot.current, shot.time)
-            predicted_time = predict_disruption_time(time, current)
+            predicted_time = predict_disruption_time(shot.time, shot.current)
 
             ax1.clear()
             ax1.set_title(

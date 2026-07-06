@@ -14,14 +14,22 @@ from sklearn.metrics import (
     accuracy_score,
     f1_score,
     fbeta_score,
-    precision_score,
-    recall_score,
 )
 from torch import Tensor
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from model.dataset import IpDataset
+from util.objective import (
+    INFEASIBLE_SCORE,
+    PRECISION_COL,
+    RECALL_COL,
+    THRESHOLD_COL,
+    best_row,
+    best_threshold,
+    min_precision,
+    score,
+)
 
 
 class IpCNN(nn.Module):
@@ -159,12 +167,13 @@ class IpCNN(nn.Module):
     ) -> None:
         """Run validation for a single epoch and update logs.
 
-        ``fbeta`` is the beta used for the F-beta score that drives model
-        selection (beta > 1 weights recall over precision).
+        Metrics use the threshold that maximizes recall subject to
+        ``MIN_PRECISION`` on the dev set. F-beta is logged only.
         """
         model.eval()
         total_val_loss = 0.0
-        all_classification_targets, all_classification_predictions = [], []
+        all_classification_targets: list[float] = []
+        all_classification_probs: list[float] = []
 
         with torch.no_grad():
             for data, targets in dev_loader:
@@ -172,34 +181,30 @@ class IpCNN(nn.Module):
                 output = model(data)
                 classification_targets = targets[:, 0]
                 classification_output = output[:, 0]
+                classification_probs = torch.sigmoid(classification_output)
 
-                classification_predictions = (
-                    torch.sigmoid(classification_output) > self.decision_threshold
-                )
                 all_classification_targets.extend(classification_targets.cpu().numpy())
-                all_classification_predictions.extend(
-                    classification_predictions.cpu().numpy()
-                )
+                all_classification_probs.extend(classification_probs.cpu().numpy())
 
                 val_total_loss = self._loss(output, targets)
                 total_val_loss += val_total_loss.item()
 
+        threshold, val_precision, val_recall = best_threshold(
+            all_classification_targets, all_classification_probs
+        )
+        all_classification_predictions = [
+            prob > threshold for prob in all_classification_probs
+        ]
+
         avg_train_loss = total_train_loss / len(train_loader)
         avg_val_loss = total_val_loss / len(dev_loader)
         metrics = {
+            THRESHOLD_COL: threshold,
             "Validation Accuracy": accuracy_score(
                 all_classification_targets, all_classification_predictions
             ),
-            "Validation Precision": precision_score(
-                all_classification_targets,
-                all_classification_predictions,
-                zero_division=0,
-            ),
-            "Validation Recall": recall_score(
-                all_classification_targets,
-                all_classification_predictions,
-                zero_division=0,
-            ),
+            "Validation Precision": val_precision,
+            "Validation Recall": val_recall,
             "Validation F1 Score": f1_score(
                 all_classification_targets,
                 all_classification_predictions,
@@ -242,9 +247,10 @@ class IpCNN(nn.Module):
     ) -> None:
         """Train this model on a single device.
 
-        Model selection (best checkpoint + early stopping) maximizes the
-        validation F-beta score, where ``fbeta`` > 1 prioritizes recall over
-        precision. The same F-beta is the scalar objective reported to the
+        Model selection (best checkpoint + early stopping) maximizes validation
+        recall among epochs with precision at or above ``MIN_PRECISION``
+        (default 0.90), using per-epoch threshold tuning on the dev set.
+        F-beta is logged only. The selection score is reported to the
         hyperparameter tuner.
         """
         self.logger.info(f"GPUs Available: {torch.cuda.device_count()}")
@@ -271,7 +277,12 @@ class IpCNN(nn.Module):
         self.logger.info(f"  Early stopping patience: {early_stopping_patience}")
         self.logger.info(f"  Gradient clip: {gradient_clip}")
         self.logger.info(f"  DataLoader num_workers: {num_workers}")
-        self.logger.info(f"  Selection objective: F{fbeta:g} score (maximize)")
+        self.logger.info(
+            "  Selection objective: maximize recall with precision >= {:.4f} "
+            "(per-epoch threshold tuning)",
+            min_precision(),
+        )
+        self.logger.info(f"  F-beta (logged only): F{fbeta:g}")
         self.logger.info("=" * 60)
 
         train, dev, _ = self.dataset.split()
@@ -299,7 +310,7 @@ class IpCNN(nn.Module):
         logs = []
         writer = SummaryWriter(self.prog_dir, filename_suffix=f"-job_{job_id}")
 
-        best_score = float("-inf")
+        best_score = INFEASIBLE_SCORE
         epochs_without_improvement = 0
 
         for epoch in range(num_epochs):
@@ -341,7 +352,10 @@ class IpCNN(nn.Module):
                 fbeta=fbeta,
             )
             avg_val_loss = logs[-1]["validation_loss"] if logs else float("inf")
-            current_score = logs[-1]["Validation Fbeta"] if logs else float("-inf")
+            last = logs[-1]
+            current_score = score(
+                float(last[RECALL_COL]), float(last[PRECISION_COL])
+            )
 
             if lr_scheduler_enabled:
                 scheduler.step(avg_val_loss)
@@ -352,11 +366,23 @@ class IpCNN(nn.Module):
             if current_score > best_score:
                 best_score = current_score
                 epochs_without_improvement = 0
-                torch.save(
-                    model.state_dict(),
-                    os.path.join(self.prog_dir, f"{job_id}_best_params.pt"),
+                checkpoint_path = os.path.join(
+                    self.prog_dir, f"{job_id}_best_params.pt"
                 )
-                self.logger.info(f"New best validation F{fbeta:g}: {best_score:.6f}")
+                torch.save(model.state_dict(), checkpoint_path)
+                threshold_path = os.path.join(
+                    self.prog_dir, f"{job_id}_best_threshold.txt"
+                )
+                with open(threshold_path, "w", encoding="utf-8") as fh:
+                    fh.write(f"{last[THRESHOLD_COL]}\n")
+                self.logger.info(
+                    "New best validation score {:.6f} "
+                    "(precision {:.6f}, recall {:.6f}, threshold {:.6f})",
+                    best_score,
+                    last[PRECISION_COL],
+                    last[RECALL_COL],
+                    last[THRESHOLD_COL],
+                )
             else:
                 epochs_without_improvement += 1
 
@@ -382,24 +408,30 @@ class IpCNN(nn.Module):
         )
 
         if logs:
-            best = max(logs, key=lambda row: row["Validation Fbeta"])
+            best = best_row(logs)
             self.logger.info("=" * 60)
             self.logger.info(
-                "Training complete — best epoch {} (selected by F{:g}):",
+                "Training complete — best epoch {} (precision {:.6f}, recall {:.6f}, "
+                "precision floor {:.4f}):",
                 best["epoch"],
-                fbeta,
+                best[PRECISION_COL],
+                best[RECALL_COL],
+                min_precision(),
             )
             self.logger.info(
-                "  Validation Recall:    {:.6f}", best["Validation Recall"]
+                "  Validation Threshold: {:.6f}", best[THRESHOLD_COL]
             )
-            self.logger.info(
-                "  Validation Precision: {:.6f}", best["Validation Precision"]
-            )
+            self.logger.info("  Validation Recall:    {:.6f}", best[RECALL_COL])
+            self.logger.info("  Validation Precision: {:.6f}", best[PRECISION_COL])
             self.logger.info(
                 "  Validation F1:        {:.6f}", best["Validation F1 Score"]
             )
             self.logger.info(
                 "  Validation F{:g}:        {:.6f}", fbeta, best["Validation Fbeta"]
+            )
+            self.logger.info(
+                "  Selection score:      {:.6f}",
+                score(float(best[RECALL_COL]), float(best[PRECISION_COL])),
             )
             self.logger.info("  Validation Loss:      {:.6f}", best["validation_loss"])
             self.logger.info("=" * 60)

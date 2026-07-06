@@ -32,12 +32,11 @@ def apply_smoothing(current: np.ndarray):
     return smoothed
 
 
-def apply_filter(current, ax: Axes = None):
+def apply_filter(current):
     smoothed = apply_smoothing(current)
     return np.pow(current - smoothed, 2)
 
 
-def predict_disruption_time(
-    time, current, ax: Axes = None
-) -> tuple[np.ndarray, np.ndarray]:
-    return float(time[np.argmax(apply_filter(current))])
+def predict_disruption_time(current, time) -> tuple[np.ndarray, np.ndarray]:
+    clean_current, clean_time = clean_zeros(current, time)
+    return float(clean_time[np.argmax(apply_filter(clean_current))])
