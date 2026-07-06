@@ -154,6 +154,7 @@ core.*
 *.ckpt
 !**/best_trial/*_best_params.pt
 !**/best_epoch/*_best_params.pt
+!trials.csv
 
 wandb/
 *.csv
