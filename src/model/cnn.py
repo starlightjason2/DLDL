@@ -17,7 +17,6 @@ from sklearn.metrics import (
 )
 from torch import Tensor
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
 
 from model.dataset import IpDataset
 from util.objective import (
@@ -159,7 +158,6 @@ class IpCNN(nn.Module):
         model: nn.Module,
         dev_loader: DataLoader,
         epoch: int,
-        writer: SummaryWriter,
         total_train_loss: float,
         train_loader: DataLoader,
         logs: list,
@@ -225,9 +223,6 @@ class IpCNN(nn.Module):
                 **metrics,
             }
         )
-        for name, value in metrics.items():
-            writer.add_scalar(name, value, epoch)
-        writer.add_scalar("Validation Loss", avg_val_loss, epoch)
 
     def train_model(
         self,
@@ -308,8 +303,6 @@ class IpCNN(nn.Module):
             )
 
         logs = []
-        writer = SummaryWriter(self.prog_dir, filename_suffix=f"-job_{job_id}")
-
         best_score = INFEASIBLE_SCORE
         epochs_without_improvement = 0
 
@@ -335,17 +328,14 @@ class IpCNN(nn.Module):
 
                 if batch_idx % log_interval == 0:
                     dataset_size = len(cast(Sized, train_loader.dataset))
-                    step = epoch * dataset_size + batch_idx
                     self.logger.info(
                         f"Epoch {epoch}/{num_epochs}, Batch {batch_idx}, [{batch_idx * len(data)}/{dataset_size}] Loss {loss_value.item():.6f}"
                     )
-                    writer.add_scalar("Training Loss", loss_value.item(), step)
 
             self._validate_epoch(
                 model=model,
                 dev_loader=dev_loader,
                 epoch=epoch,
-                writer=writer,
                 total_train_loss=total_train_loss,
                 train_loader=train_loader,
                 logs=logs,
@@ -359,9 +349,6 @@ class IpCNN(nn.Module):
 
             if lr_scheduler_enabled:
                 scheduler.step(avg_val_loss)
-                writer.add_scalar(
-                    "Learning Rate", optimizer.param_groups[0]["lr"], epoch
-                )
 
             if current_score > best_score:
                 best_score = current_score
@@ -401,7 +388,6 @@ class IpCNN(nn.Module):
                     os.path.join(self.prog_dir, f"{job_id}_params_epoch{epoch}.pt"),
                 )
 
-        writer.close()
         df_logs = pd.DataFrame(logs)
         df_logs.to_csv(
             os.path.join(self.prog_dir, f"{job_id}_training_log.csv"), index=False

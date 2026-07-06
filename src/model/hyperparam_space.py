@@ -1,13 +1,18 @@
-"""Bayesian hyperparameter tuning orchestration (trial log, acquisition, trial dirs)."""
+"""Bayesian hyperparameter search spaces for training and architecture tuning."""
 
 from __future__ import annotations
 
 import os
 from typing import Any, Mapping
+
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
-from util.data_loading import env_tuple, env_float, env_int
+from util.data_loading import env_float, env_int, env_tuple
+
+
+def _same_padding(kernel: int) -> int:
+    return kernel // 2
 
 
 class HyperparameterSpace(BaseModel):
@@ -70,10 +75,6 @@ class HyperparameterSpace(BaseModel):
             bounds=bounds,
         )
 
-    # -----------------------------
-    # Sampling
-    # -----------------------------
-
     def sample_random(self) -> dict[str, Any]:
         b = self.bounds
         log_uniform = lambda lo, hi: 10 ** np.random.uniform(np.log10(lo), np.log10(hi))
@@ -112,3 +113,144 @@ class HyperparameterSpace(BaseModel):
             "early_stopping_patience": int(round(s["early_stop_patience"])),
             "cls_pos_weight": float(s["cls_pos_weight"]),
         }
+
+
+class ArchitectureHyperparameterSpace(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    conv_filters: tuple[int, ...]
+    kernels: tuple[int, ...]
+    pool_sizes: tuple[int, ...]
+    num_initial_trials: int = Field(ge=1)
+    random_insert_every: int = Field(ge=0)
+    expected_improvement_xi: float = Field(ge=0)
+    fc1_min: int = Field(ge=1)
+    fc1_max: int = Field(ge=1)
+    fc2_min: int = Field(ge=1)
+    fc2_max: int = Field(ge=1)
+    bounds: dict[str, tuple[float, float]]
+
+    @staticmethod
+    def from_env() -> ArchitectureHyperparameterSpace:
+        conv_filters = env_tuple("ARCH_HPTUNE_CONV_FILTERS")
+        kernels = env_tuple("ARCH_HPTUNE_KERNELS")
+        pool_sizes = env_tuple("ARCH_HPTUNE_POOL_SIZES")
+        fc1_min = env_int("ARCH_HPTUNE_FC1_MIN")
+        fc1_max = env_int("ARCH_HPTUNE_FC1_MAX")
+        fc2_min = env_int("ARCH_HPTUNE_FC2_MIN")
+        fc2_max = env_int("ARCH_HPTUNE_FC2_MAX")
+        if fc1_min > fc1_max:
+            raise ValueError("ARCH_HPTUNE_FC1_MIN must be <= ARCH_HPTUNE_FC1_MAX")
+        if fc2_min > fc2_max:
+            raise ValueError("ARCH_HPTUNE_FC2_MIN must be <= ARCH_HPTUNE_FC2_MAX")
+
+        def _idx_bounds(count: int) -> tuple[float, float]:
+            return (0.0, float(max(count - 1, 0)))
+
+        bounds = {
+            "conv1_f_idx": _idx_bounds(len(conv_filters)),
+            "conv2_f_idx": _idx_bounds(len(conv_filters)),
+            "conv3_f_idx": _idx_bounds(len(conv_filters)),
+            "conv4_f_idx": _idx_bounds(len(conv_filters)),
+            "conv1_k_idx": _idx_bounds(len(kernels)),
+            "conv2_k_idx": _idx_bounds(len(kernels)),
+            "conv3_k_idx": _idx_bounds(len(kernels)),
+            "conv4_k_idx": _idx_bounds(len(kernels)),
+            "pool_idx": _idx_bounds(len(pool_sizes)),
+            "fc1": (float(fc1_min), float(fc1_max)),
+            "fc2": (float(fc2_min), float(fc2_max)),
+        }
+
+        return ArchitectureHyperparameterSpace(
+            conv_filters=conv_filters,
+            kernels=kernels,
+            pool_sizes=pool_sizes,
+            num_initial_trials=env_int("ARCH_HPTUNE_NUM_INITIAL_TRIALS"),
+            random_insert_every=env_int("ARCH_HPTUNE_RANDOM_INSERT_EVERY"),
+            expected_improvement_xi=env_float("ARCH_HPTUNE_EI_XI"),
+            fc1_min=fc1_min,
+            fc1_max=fc1_max,
+            fc2_min=fc2_min,
+            fc2_max=fc2_max,
+            bounds=bounds,
+        )
+
+    @staticmethod
+    def _pick_index(options: tuple[int, ...], raw: float) -> int:
+        return int(np.clip(round(raw), 0, len(options) - 1))
+
+    def _resolve_architecture(self, s: dict[str, float]) -> dict[str, int]:
+        conv1_kernel = self.kernels[self._pick_index(self.kernels, s["conv1_k_idx"])]
+        conv2_kernel = self.kernels[self._pick_index(self.kernels, s["conv2_k_idx"])]
+        conv3_kernel = self.kernels[self._pick_index(self.kernels, s["conv3_k_idx"])]
+        conv4_kernel = self.kernels[self._pick_index(self.kernels, s["conv4_k_idx"])]
+
+        fc1_size = int(np.clip(round(s["fc1"]), self.fc1_min, self.fc1_max))
+        fc2_size = int(
+            np.clip(round(s["fc2"]), self.fc2_min, min(self.fc2_max, fc1_size))
+        )
+
+        return {
+            "conv1_filters": self.conv_filters[
+                self._pick_index(self.conv_filters, s["conv1_f_idx"])
+            ],
+            "conv1_kernel": conv1_kernel,
+            "conv1_padding": _same_padding(conv1_kernel),
+            "conv2_filters": self.conv_filters[
+                self._pick_index(self.conv_filters, s["conv2_f_idx"])
+            ],
+            "conv2_kernel": conv2_kernel,
+            "conv2_padding": _same_padding(conv2_kernel),
+            "conv3_filters": self.conv_filters[
+                self._pick_index(self.conv_filters, s["conv3_f_idx"])
+            ],
+            "conv3_kernel": conv3_kernel,
+            "conv3_padding": _same_padding(conv3_kernel),
+            "conv4_filters": self.conv_filters[
+                self._pick_index(self.conv_filters, s["conv4_f_idx"])
+            ],
+            "conv4_kernel": conv4_kernel,
+            "conv4_padding": _same_padding(conv4_kernel),
+            "pool_size": self.pool_sizes[
+                self._pick_index(self.pool_sizes, s["pool_idx"])
+            ],
+            "fc1_size": fc1_size,
+            "fc2_size": fc2_size,
+        }
+
+    def sample_random(self) -> dict[str, Any]:
+        sample = {
+            key: float(np.random.uniform(lo, hi))
+            for key, (lo, hi) in self.bounds.items()
+        }
+        return self.suggestion_to_trial(sample)
+
+    def suggestion_to_trial(self, s: Mapping[str, float]) -> dict[str, Any]:
+        return self._resolve_architecture(dict(s))
+
+    def bayesian_params(self, arch: Mapping[str, int]) -> dict[str, float]:
+        def _index(options: tuple[int, ...], value: int) -> float:
+            return float(
+                min(range(len(options)), key=lambda i: abs(options[i] - value))
+            )
+
+        return {
+            "conv1_f_idx": _index(self.conv_filters, int(arch["conv1_filters"])),
+            "conv2_f_idx": _index(self.conv_filters, int(arch["conv2_filters"])),
+            "conv3_f_idx": _index(self.conv_filters, int(arch["conv3_filters"])),
+            "conv4_f_idx": _index(self.conv_filters, int(arch["conv4_filters"])),
+            "conv1_k_idx": _index(self.kernels, int(arch["conv1_kernel"])),
+            "conv2_k_idx": _index(self.kernels, int(arch["conv2_kernel"])),
+            "conv3_k_idx": _index(self.kernels, int(arch["conv3_kernel"])),
+            "conv4_k_idx": _index(self.kernels, int(arch["conv4_kernel"])),
+            "pool_idx": _index(self.pool_sizes, int(arch["pool_size"])),
+            "fc1": float(arch["fc1_size"]),
+            "fc2": float(arch["fc2_size"]),
+        }
+
+
+def hptune_mode() -> str:
+    mode = os.environ.get("HPTUNE_MODE", "training").strip().lower()
+    if mode not in {"training", "architecture"}:
+        raise ValueError(f"HPTUNE_MODE must be 'training' or 'architecture', got {mode!r}")
+    return mode

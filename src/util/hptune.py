@@ -23,6 +23,55 @@ if TYPE_CHECKING:
     from model.dataset import IpDataset
     from model.hp_trial import HPTuneTrial
 
+# Training hyperparameters snapshotted into architecture trials (from project ``.env``).
+_FIXED_TRAINING_ENV_KEYS = (
+    "LEARNING_RATE",
+    "NUM_EPOCHS",
+    "LOG_INTERVAL",
+    "WEIGHT_DECAY",
+    "DROPOUT_RATE",
+    "BATCH_SIZE",
+    "LR_SCHEDULER",
+    "LR_SCHEDULER_FACTOR",
+    "LR_SCHEDULER_PATIENCE",
+    "EARLY_STOPPING_PATIENCE",
+    "GRADIENT_CLIP",
+    "DATALOADER_NUM_WORKERS",
+    "CLS_POS_WEIGHT",
+    "DECISION_THRESHOLD",
+    "MIN_PRECISION",
+    "FBETA",
+)
+
+
+def fixed_training_env_keys() -> dict[str, str]:
+    """Training env vars held fixed during ``HPTUNE_MODE=architecture`` runs."""
+    missing = [key for key in _FIXED_TRAINING_ENV_KEYS if key not in os.environ]
+    if missing:
+        raise KeyError(
+            "Missing training hyperparameters required for architecture HPTune: "
+            + ", ".join(missing)
+        )
+    return {key: os.environ[key] for key in _FIXED_TRAINING_ENV_KEYS}
+
+
+def fixed_training_trial_fields() -> dict[str, Any]:
+    """Map fixed project training env vars to :class:`HPTuneTrial` field names."""
+    env = fixed_training_env_keys()
+    return {
+        "lr": float(env["LEARNING_RATE"]),
+        "epochs": int(env["NUM_EPOCHS"]),
+        "dropout": float(env["DROPOUT_RATE"]),
+        "weight_decay": float(env["WEIGHT_DECAY"]),
+        "batch_size": int(env["BATCH_SIZE"]),
+        "gradient_clip": float(env["GRADIENT_CLIP"]),
+        "lr_scheduler": env["LR_SCHEDULER"].lower() in ("true", "1", "yes", "on"),
+        "lr_scheduler_factor": float(env["LR_SCHEDULER_FACTOR"]),
+        "lr_scheduler_patience": int(env["LR_SCHEDULER_PATIENCE"]),
+        "early_stopping_patience": int(env["EARLY_STOPPING_PATIENCE"]),
+        "cls_pos_weight": float(env["CLS_POS_WEIGHT"]),
+    }
+
 # Enumerated trial folders: trial_1, trial_2, ...
 _TRIAL_NUM_DIR_RE = re.compile(r"^trial_(\d+)$")
 
@@ -135,6 +184,14 @@ def sync_best_trial_artifacts(
     for existing in dest.glob("*_best_params.pt"):
         existing.unlink()
     shutil.copy2(checkpoint_src, dest / checkpoint_src.name)
+
+    threshold_src = checkpoint_src.with_name(
+        checkpoint_src.name.replace("_best_params.pt", "_best_threshold.txt")
+    )
+    if threshold_src.exists():
+        for existing in dest.glob("*_best_threshold.txt"):
+            existing.unlink()
+        shutil.copy2(threshold_src, dest / threshold_src.name)
 
     logger.info(
         "Best-trial snapshot updated: trial_id={} score={:.6f} -> {}",

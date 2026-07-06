@@ -11,17 +11,16 @@ import numpy as np
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
+from model.hyperparam_space import ArchitectureHyperparameterSpace, HyperparameterSpace
 from model.trial_status import TrialStatus
-from util.hptune import write_env
+from util.hptune import fixed_training_env_keys, write_env
 
-TrialSignature = tuple[str, int, str, str, int, str, int, str, int, int, str]
+TrainingTrialSignature = tuple[str, int, str, str, int, str, int, str, int, int, str]
+ArchitectureTrialSignature = tuple[int, int, int, int, int, int, int, int, int, int, int, int, int, int, int]
 
 
 class HPTuneTrial(BaseModel):
-    """One hyperparameter trial: training hparams, log status, identity.
-
-    ``trial_id`` is the primary key in ``trials.csv``.
-    """
+    """One HPTune trial: training hparams, optional architecture hparams, and status."""
 
     model_config = ConfigDict(from_attributes=True, validate_assignment=True)
 
@@ -40,6 +39,21 @@ class HPTuneTrial(BaseModel):
     lr_scheduler_patience: int
     early_stopping_patience: int
     cls_pos_weight: float = 1.0
+    conv1_filters: int | None = None
+    conv1_kernel: int | None = None
+    conv1_padding: int | None = None
+    conv2_filters: int | None = None
+    conv2_kernel: int | None = None
+    conv2_padding: int | None = None
+    conv3_filters: int | None = None
+    conv3_kernel: int | None = None
+    conv3_padding: int | None = None
+    conv4_filters: int | None = None
+    conv4_kernel: int | None = None
+    conv4_padding: int | None = None
+    pool_size: int | None = None
+    fc1_size: int | None = None
+    fc2_size: int | None = None
     score: float = -1.0
     recall: float = -1.0
     precision: float = -1.0
@@ -50,16 +64,37 @@ class HPTuneTrial(BaseModel):
 
     @property
     def dir_path(self) -> Path:
-        """Absolute path to this trial's directory"""
         return Path(os.environ["HPTUNE_DIR"]) / "trials" / self.trial_id
 
-    def signature(self) -> TrialSignature:
-        """Normalize this trial into a hashable signature for duplicate detection."""
+    @property
+    def is_architecture_trial(self) -> bool:
+        return self.conv1_filters is not None
+
+    def signature(self) -> TrainingTrialSignature | ArchitectureTrialSignature:
         return self.proposed_signature(self.model_dump())
 
     @classmethod
-    def proposed_signature(cls, d: Mapping[str, Any]) -> TrialSignature:
-        """Same tuple as :meth:`signature` for raw hyperparameter dicts."""
+    def proposed_signature(
+        cls, d: Mapping[str, Any]
+    ) -> TrainingTrialSignature | ArchitectureTrialSignature:
+        if d.get("conv1_filters") is not None:
+            return (
+                int(d["conv1_filters"]),
+                int(d["conv1_kernel"]),
+                int(d["conv1_padding"]),
+                int(d["conv2_filters"]),
+                int(d["conv2_kernel"]),
+                int(d["conv2_padding"]),
+                int(d["conv3_filters"]),
+                int(d["conv3_kernel"]),
+                int(d["conv3_padding"]),
+                int(d["conv4_filters"]),
+                int(d["conv4_kernel"]),
+                int(d["conv4_padding"]),
+                int(d["pool_size"]),
+                int(d["fc1_size"]),
+                int(d["fc2_size"]),
+            )
         return (
             f"{float(d['lr']):.12g}",
             int(d["epochs"]),
@@ -75,6 +110,32 @@ class HPTuneTrial(BaseModel):
         )
 
     def log_pass_hyperparameters(self, *, context: str) -> None:
+        if self.is_architecture_trial:
+            logger.opt(lazy=True).info(
+                "Architecture trial ({ctx}): trial_id={id} "
+                "conv1=({c1f},{c1k},{c1p}) conv2=({c2f},{c2k},{c2p}) "
+                "conv3=({c3f},{c3k},{c3p}) conv4=({c4f},{c4k},{c4p}) "
+                "pool={pool} fc1={fc1} fc2={fc2}",
+                ctx=lambda: context,
+                id=lambda: self.trial_id,
+                c1f=lambda: self.conv1_filters,
+                c1k=lambda: self.conv1_kernel,
+                c1p=lambda: self.conv1_padding,
+                c2f=lambda: self.conv2_filters,
+                c2k=lambda: self.conv2_kernel,
+                c2p=lambda: self.conv2_padding,
+                c3f=lambda: self.conv3_filters,
+                c3k=lambda: self.conv3_kernel,
+                c3p=lambda: self.conv3_padding,
+                c4f=lambda: self.conv4_filters,
+                c4k=lambda: self.conv4_kernel,
+                c4p=lambda: self.conv4_padding,
+                pool=lambda: self.pool_size,
+                fc1=lambda: self.fc1_size,
+                fc2=lambda: self.fc2_size,
+            )
+            return
+
         logger.opt(lazy=True).info(
             "Hyperparameters for this pass ({ctx}): trial_id={id} lr={lr:.2e} epochs={ep} "
             "dropout={do:.4f} weight_decay={wd:.2e} batch_size={bs} gradient_clip={gc:.3f} "
@@ -95,11 +156,30 @@ class HPTuneTrial(BaseModel):
             cpw=lambda: self.cls_pos_weight,
         )
 
-    def bayesian_params(self, batch_sizes: tuple[int, ...]) -> dict[str, float]:
-        """Float-only parameter dict aligned with BayesianOptimization ``pbounds``."""
+    def bayesian_params(
+        self, hp_space: HyperparameterSpace | ArchitectureHyperparameterSpace
+    ) -> dict[str, float]:
+        if isinstance(hp_space, ArchitectureHyperparameterSpace):
+            assert self.is_architecture_trial
+            return hp_space.bayesian_params(
+                {
+                    "conv1_filters": self.conv1_filters,
+                    "conv1_kernel": self.conv1_kernel,
+                    "conv2_filters": self.conv2_filters,
+                    "conv2_kernel": self.conv2_kernel,
+                    "conv3_filters": self.conv3_filters,
+                    "conv3_kernel": self.conv3_kernel,
+                    "conv4_filters": self.conv4_filters,
+                    "conv4_kernel": self.conv4_kernel,
+                    "pool_size": self.pool_size,
+                    "fc1_size": self.fc1_size,
+                    "fc2_size": self.fc2_size,
+                }
+            )
+
         batch_index = min(
-            range(len(batch_sizes)),
-            key=lambda i: abs(batch_sizes[i] - self.batch_size),
+            range(len(hp_space.batch_sizes)),
+            key=lambda i: abs(hp_space.batch_sizes[i] - self.batch_size),
         )
         return {
             "lr": self.lr,
@@ -115,10 +195,8 @@ class HPTuneTrial(BaseModel):
             "batch_idx": float(batch_index),
         }
 
-    def trial_env_keys(self) -> dict[str, Any]:
-        """Env vars written to ``<trial_dir>/.env`` — same mapping :meth:`create_scripts` persists."""
+    def _training_env_keys(self) -> dict[str, Any]:
         return {
-            "JOB_ID": self.trial_id,
             "LEARNING_RATE": str(self.lr),
             "NUM_EPOCHS": str(self.epochs),
             "BATCH_SIZE": str(self.batch_size),
@@ -130,8 +208,39 @@ class HPTuneTrial(BaseModel):
             "LR_SCHEDULER_PATIENCE": str(self.lr_scheduler_patience),
             "EARLY_STOPPING_PATIENCE": str(self.early_stopping_patience),
             "CLS_POS_WEIGHT": str(self.cls_pos_weight),
-            "PROG_DIR": self.dir_path,
         }
+
+    def _architecture_env_keys(self) -> dict[str, Any]:
+        assert self.is_architecture_trial
+        return {
+            "CONV1_FILTERS": str(self.conv1_filters),
+            "CONV1_KERNEL": str(self.conv1_kernel),
+            "CONV1_PADDING": str(self.conv1_padding),
+            "CONV2_FILTERS": str(self.conv2_filters),
+            "CONV2_KERNEL": str(self.conv2_kernel),
+            "CONV2_PADDING": str(self.conv2_padding),
+            "CONV3_FILTERS": str(self.conv3_filters),
+            "CONV3_KERNEL": str(self.conv3_kernel),
+            "CONV3_PADDING": str(self.conv3_padding),
+            "CONV4_FILTERS": str(self.conv4_filters),
+            "CONV4_KERNEL": str(self.conv4_kernel),
+            "CONV4_PADDING": str(self.conv4_padding),
+            "POOL_SIZE": str(self.pool_size),
+            "FC1_SIZE": str(self.fc1_size),
+            "FC2_SIZE": str(self.fc2_size),
+        }
+
+    def trial_env_keys(self) -> dict[str, Any]:
+        keys: dict[str, Any] = {
+            "JOB_ID": self.trial_id,
+            "PROG_DIR": str(self.dir_path),
+        }
+        if self.is_architecture_trial:
+            keys.update(fixed_training_env_keys())
+            keys.update(self._architecture_env_keys())
+        else:
+            keys.update(self._training_env_keys())
+        return keys
 
     def create_files(self, *, env_lines: list[str] | None = None) -> str:
         self.dir_path.mkdir(parents=True, exist_ok=True)

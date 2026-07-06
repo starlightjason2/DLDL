@@ -44,13 +44,13 @@ def _qsub(args: list[str]) -> str:
     return job_id
 
 
-def submit_hptune_step(
+def _submit_step(
     *,
     log_dir: Path,
     queue: str,
     walltime: str,
+    script_name: str,
 ) -> str:
-    """Submit the next HP-tune step job; returns its PBS job id."""
     return _qsub(
         [
             "-k",
@@ -64,6 +64,21 @@ def submit_hptune_step(
             "-l",
             _select(walltime),
             "-V",
-            f"{os.environ["PROJECT_ROOT"]}/scripts/run_hptune.sh",
+            f"{os.environ['PROJECT_ROOT']}/scripts/{script_name}",
         ]
+    )
+
+
+def submit_hptune_step(
+    *,
+    log_dir: Path,
+    queue: str,
+    walltime: str,
+) -> str:
+    """Submit the next HP-tune step job; returns its PBS job id."""
+    return _submit_step(
+        log_dir=log_dir,
+        queue=queue,
+        walltime=walltime,
+        script_name="run_hptune.sh",
     )

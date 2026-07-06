@@ -12,10 +12,16 @@ from typing import Any
 from bayes_opt import BayesianOptimization, acquisition
 from loguru import logger
 
-from model.hyperparam_space import HyperparameterSpace
-from model.hp_trial import HPTuneTrial, TrialStatus
+from model.hyperparam_space import (
+    ArchitectureHyperparameterSpace,
+    HyperparameterSpace,
+    hptune_mode,
+)
+from model.hp_trial import HPTuneTrial
+from model.trial_status import TrialStatus
 from service.trial_service import TrialService
 from util.hptune import (
+    fixed_training_trial_fields,
     next_trial_numbered_id,
     parse_trial_metrics,
     sync_best_trial_artifacts,
@@ -25,23 +31,18 @@ from util.pbs import submit_hptune_step
 
 
 class BayesianHPTuner:
-    """Bayesian search over non-architecture training hyperparameters."""
+    """Bayesian search over training or architecture hyperparameters."""
 
-    # Paths
     trials_dir: Path
     log_dir: Path
-
-    # Config
     max_retries: int
     max_trials: int
-    hp_space: HyperparameterSpace
-
-    # ------------------------------------------------------------------
-    # Construction
-    # ------------------------------------------------------------------
+    mode: str
+    hp_space: HyperparameterSpace | ArchitectureHyperparameterSpace
 
     def __init__(self) -> None:
         root = Path(os.environ["HPTUNE_DIR"])
+        self.mode = hptune_mode()
 
         self.trials_dir = root / "trials"
         self.trials_dir.mkdir(parents=True, exist_ok=True)
@@ -57,11 +58,12 @@ class BayesianHPTuner:
         if self.max_trials < 1:
             raise ValueError("HPTUNE_MAX_TRIALS must be >= 1")
 
-        self.hp_space = HyperparameterSpace.from_env()
+        if self.mode == "architecture":
+            self.hp_space = ArchitectureHyperparameterSpace.from_env()
+        else:
+            self.hp_space = HyperparameterSpace.from_env()
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
+        logger.info("HPTune mode={} dir={}", self.mode, root)
 
     def _seen_signatures(self, trials: list[HPTuneTrial]) -> set[tuple]:
         return {t.signature() for t in trials}
@@ -72,13 +74,11 @@ class BayesianHPTuner:
         seen = self._seen_signatures(trials)
         for attempt in range(1, 26):
             proposal = self.hp_space.sample_random()
+            if self.mode == "architecture":
+                proposal = {**fixed_training_trial_fields(), **proposal}
             if HPTuneTrial.proposed_signature(proposal) not in seen:
                 return proposal
         raise RuntimeError(f"Exhausted random sampling ({context})")
-
-    # ------------------------------------------------------------------
-    # Sampling
-    # ------------------------------------------------------------------
 
     def sample_bayesian(self, trials: list[HPTuneTrial]) -> dict[str, Any]:
         completed = [t for t in trials if t.status == TrialStatus.COMPLETED]
@@ -99,11 +99,13 @@ class BayesianHPTuner:
 
         for t in completed:
             optimizer.register(
-                params=t.bayesian_params(self.hp_space.batch_sizes),
+                params=t.bayesian_params(self.hp_space),
                 target=t.score,
             )
 
         proposal = self.hp_space.suggestion_to_trial(optimizer.suggest())  # type: ignore
+        if self.mode == "architecture":
+            proposal = {**fixed_training_trial_fields(), **proposal}
 
         if HPTuneTrial.proposed_signature(proposal) in self._seen_signatures(trials):
             return self._sample_random(
@@ -127,10 +129,6 @@ class BayesianHPTuner:
             return self._sample_random(trials, context="periodic")
 
         return self.sample_bayesian(trials)
-
-    # ------------------------------------------------------------------
-    # Lifecycle
-    # ------------------------------------------------------------------
 
     def update_trials(self, trials: list[HPTuneTrial]) -> list[HPTuneTrial]:
         timeout = int(os.environ["TRIAL_TIMEOUT"])
@@ -183,12 +181,7 @@ class BayesianHPTuner:
             return True
         return False
 
-    # ------------------------------------------------------------------
-    # Planning
-    # ------------------------------------------------------------------
-
     def _plan_next_trial(self, trials: list[HPTuneTrial]) -> list[HPTuneTrial]:
-        """Append one new QUEUED trial (and its files) if under ``max_trials``."""
         if len(trials) >= self.max_trials:
             return trials
 
@@ -231,20 +224,10 @@ class BayesianHPTuner:
                 return_code,
             )
 
-    # ------------------------------------------------------------------
-    # Serial Runner
-    # ------------------------------------------------------------------
-
     def _log_chain_complete(self) -> None:
-        logger.info("Chain complete.")
+        logger.info("HPTune chain complete (mode={}).", self.mode)
 
     def _train_trial(self, trial: HPTuneTrial) -> int:
-        """Train one trial in a subprocess; returns the training exit code.
-
-        The trial's hyperparameters (and ``PROG_DIR``/``JOB_ID``) are passed to
-        ``train.py`` through the environment; everything else is inherited from the
-        already-sourced project ``.env``.
-        """
         trial.log_pass_hyperparameters(context="train")
         env = {
             **os.environ,
@@ -263,15 +246,6 @@ class BayesianHPTuner:
         return result.returncode
 
     def run_step(self) -> None:
-        """One self-contained HP-tune step.
-
-        Ingest any finished trial, plan the next trial if none is queued, train it
-        in-process, record its score, then submit the next step and exit. Exactly
-        one trial runs per job and at most one job is ever pending (this running
-        job plus the queued next step), so it fits queues that allow only one
-        running + one queued job per user (e.g. Polaris ``debug``). Re-running
-        ``start_hptune.sh`` resumes from ``trials.csv`` if a step is ever lost.
-        """
         trials = self.update_trials(TrialService.get_trials())
 
         if self.is_complete(trials):
@@ -297,7 +271,8 @@ class BayesianHPTuner:
 
         counts = TrialService.get_status_counts(trials)
         logger.info(
-            "Step start -> trial={} done={} total={} max_trials={}",
+            "Step start (mode={}) -> trial={} done={} total={} max_trials={}",
+            self.mode,
             trial.trial_id,
             counts["done"],
             counts["total"],
@@ -306,7 +281,6 @@ class BayesianHPTuner:
 
         return_code = self._train_trial(trial)
 
-        # Record the result of the trial we just ran.
         done, metrics = parse_trial_metrics(trial.dir_path)
         if done:
             TrialService.save_trials(
@@ -334,7 +308,6 @@ class BayesianHPTuner:
         else:
             self.mark_trial_failed(trial.trial_id, return_code=return_code)
 
-        # Chain the next step unless the run is done.
         if self.is_complete(TrialService.get_trials()):
             self._log_chain_complete()
             return

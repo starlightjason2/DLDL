@@ -31,6 +31,21 @@ _CSV_COLUMNS = [
     "lr_scheduler_patience",
     "early_stopping_patience",
     "cls_pos_weight",
+    "conv1_filters",
+    "conv1_kernel",
+    "conv1_padding",
+    "conv2_filters",
+    "conv2_kernel",
+    "conv2_padding",
+    "conv3_filters",
+    "conv3_kernel",
+    "conv3_padding",
+    "conv4_filters",
+    "conv4_kernel",
+    "conv4_padding",
+    "pool_size",
+    "fc1_size",
+    "fc2_size",
     "score",
     "recall",
     "precision",
@@ -39,6 +54,24 @@ _CSV_COLUMNS = [
     "created_at",
     "updated_at",
 ]
+
+_ARCH_INT_COLUMNS = (
+    "conv1_filters",
+    "conv1_kernel",
+    "conv1_padding",
+    "conv2_filters",
+    "conv2_kernel",
+    "conv2_padding",
+    "conv3_filters",
+    "conv3_kernel",
+    "conv3_padding",
+    "conv4_filters",
+    "conv4_kernel",
+    "conv4_padding",
+    "pool_size",
+    "fc1_size",
+    "fc2_size",
+)
 
 
 class TrialService:
@@ -104,6 +137,11 @@ class TrialService:
             data[key] = ""
         if pd.isna(data.get("cls_pos_weight")):
             data["cls_pos_weight"] = 1.0
+        for key in _ARCH_INT_COLUMNS:
+            if pd.isna(data.get(key)):
+                data[key] = None
+            else:
+                data[key] = int(data[key])
         if pd.isna(data.get("score")):
             data["score"] = -1.0
         if pd.isna(data.get("recall")):
@@ -129,6 +167,21 @@ class TrialService:
             "lr_scheduler_patience": trial.lr_scheduler_patience,
             "early_stopping_patience": trial.early_stopping_patience,
             "cls_pos_weight": trial.cls_pos_weight,
+            "conv1_filters": trial.conv1_filters,
+            "conv1_kernel": trial.conv1_kernel,
+            "conv1_padding": trial.conv1_padding,
+            "conv2_filters": trial.conv2_filters,
+            "conv2_kernel": trial.conv2_kernel,
+            "conv2_padding": trial.conv2_padding,
+            "conv3_filters": trial.conv3_filters,
+            "conv3_kernel": trial.conv3_kernel,
+            "conv3_padding": trial.conv3_padding,
+            "conv4_filters": trial.conv4_filters,
+            "conv4_kernel": trial.conv4_kernel,
+            "conv4_padding": trial.conv4_padding,
+            "pool_size": trial.pool_size,
+            "fc1_size": trial.fc1_size,
+            "fc2_size": trial.fc2_size,
             "score": trial.score,
             "recall": trial.recall,
             "precision": trial.precision,

@@ -27,8 +27,9 @@ def apply_smoothing(current: np.ndarray):
     weights = np.ones(window_size) / window_size
     smoothed = np.convolve(current, weights, mode="same")
     # smoothing is rough around the edges, so flatten the curve
-    smoothed[:window_size] = smoothed[window_size]
-    smoothed[-window_size:] = smoothed[-window_size]
+    edge_value = smoothed[window_size]
+    smoothed[:window_size] = edge_value
+    smoothed[-window_size:] = edge_value
     return smoothed
 
 
@@ -38,5 +39,6 @@ def apply_filter(current):
 
 
 def predict_disruption_time(current, time) -> tuple[np.ndarray, np.ndarray]:
-    clean_current, clean_time = clean_zeros(current, time)
-    return float(clean_time[np.argmax(apply_filter(clean_current))])
+    clean_current, _ = clean_zeros(current, time)
+
+    return float(time[np.argmax(apply_filter(clean_current))])
