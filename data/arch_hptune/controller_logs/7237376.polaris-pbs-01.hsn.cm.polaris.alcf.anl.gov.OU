@@ -1,0 +1,1139 @@
+2026-07-06 02:33:27.087 | INFO     | model.bayesian_hptuner:__init__:66 - HPTune mode=architecture dir=data/arch_hptune
+2026-07-06 02:33:27.152 | INFO     | service.trial_service:get_trials:199 - Fetched 2 trial row(s) from CSV.
+2026-07-06 02:33:27.199 | INFO     | service.trial_service:save_trials:254 - Upserted 2 trial(s).
+2026-07-06 02:33:27.273 | INFO     | util.hptune:sync_best_trial_artifacts:188 - Best-trial snapshot updated: trial_id=trial_1 score=0.972346 -> data/arch_hptune/trials/best_trial
+2026-07-06 02:33:27.294 | INFO     | service.trial_service:save_trials:254 - Upserted 3 trial(s).
+2026-07-06 02:33:27.305 | INFO     | service.trial_service:save_trials:254 - Upserted 1 trial(s).
+2026-07-06 02:33:27.305 | INFO     | model.bayesian_hptuner:run_step:273 - Step start (mode=architecture) -> trial=trial_3 done=2 total=3 max_trials=30
+2026-07-06 02:33:27.305 | INFO     | model.hp_trial:log_pass_hyperparameters:114 - Architecture trial (train): trial_id=trial_3 conv1=(16,7,3) conv2=(32,7,3) conv3=(16,5,2) conv4=(64,7,3) pool=8 fc1=370 fc2=142
+2026-07-06 02:33:27.305 | INFO     | model.bayesian_hptuner:_train_trial:237 - Training trial_3 ...
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.dataset[0m:[36m__init__[0m:[36m83[0m - [1mLoading existing dataset from /lus/eagle/projects/fusiondl_aesp/starlightjason2/DLDL/data/processed_data/processed_dataset_meanvar-whole.pt[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.dataset[0m:[36m__init__[0m:[36m87[0m - [1mReady: 39428 shots[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m72[0m - [1m============================================================[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m73[0m - [1mCNN Architecture Hyperparameters:[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m74[0m - [1m  Conv1: filters=16, kernel=7, padding=3[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m77[0m - [1m  Conv2: filters=32, kernel=7, padding=3[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m80[0m - [1m  Conv3: filters=16, kernel=5, padding=2[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m83[0m - [1m  Conv4: filters=64, kernel=7, padding=3[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m86[0m - [1m  Pool size: 8[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m87[0m - [1m  FC1 size: 370[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m88[0m - [1m  FC2 size: 142[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m89[0m - [1m  Dropout rate: 0.6641600193527787[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m90[0m - [1m  Classification pos_weight: 1.427719386863257[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m91[0m - [1m  Decision threshold: 0.5[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m92[0m - [1m============================================================[0m
+[32m2026-07-06 02:33:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36m__init__[0m:[36m96[0m - [1mDataset: 39428 examples, max_length=60201[0m
+[32m2026-07-06 02:33:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m248[0m - [1mGPUs Available: 4[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m257[0m - [1m============================================================[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m258[0m - [1mTraining Hyperparameters:[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m259[0m - [1m  Learning rate: 0.0244755225090038[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m260[0m - [1m  Number of epochs: 200[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m261[0m - [1m  Batch size: 32[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m262[0m - [1m  Weight decay: 6.678279694104745e-07[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m263[0m - [1m  Log interval: 50[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m264[0m - [1m  LR scheduler: True[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m266[0m - [1m    Factor: 0.7170656196716738, Patience: 6[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m269[0m - [1m  Early stopping patience: 21[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m270[0m - [1m  Gradient clip: 9.852492430191496[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m271[0m - [1m  DataLoader num_workers: 4[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m272[0m - [1m  Selection objective: maximize recall with precision >= 0.9000 (per-epoch threshold tuning)[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m277[0m - [1m  F-beta (logged only): F2[0m
+[32m2026-07-06 02:33:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m278[0m - [1m============================================================[0m
+[32m2026-07-06 02:33:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 0, [0/31542] Loss 0.806569[0m
+[32m2026-07-06 02:33:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 50, [1600/31542] Loss 0.706997[0m
+[32m2026-07-06 02:34:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 100, [3200/31542] Loss 0.369722[0m
+[32m2026-07-06 02:34:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 150, [4800/31542] Loss 0.456604[0m
+[32m2026-07-06 02:34:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 200, [6400/31542] Loss 0.360823[0m
+[32m2026-07-06 02:35:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 250, [8000/31542] Loss 0.379200[0m
+[32m2026-07-06 02:35:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 300, [9600/31542] Loss 0.128715[0m
+[32m2026-07-06 02:35:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 350, [11200/31542] Loss 0.296083[0m
+[32m2026-07-06 02:35:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 400, [12800/31542] Loss 0.143908[0m
+[32m2026-07-06 02:36:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 450, [14400/31542] Loss 0.082867[0m
+[32m2026-07-06 02:36:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 500, [16000/31542] Loss 0.160458[0m
+[32m2026-07-06 02:36:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 550, [17600/31542] Loss 0.168300[0m
+[32m2026-07-06 02:36:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 600, [19200/31542] Loss 0.062713[0m
+[32m2026-07-06 02:37:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 650, [20800/31542] Loss 0.062525[0m
+[32m2026-07-06 02:37:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 700, [22400/31542] Loss 0.202727[0m
+[32m2026-07-06 02:37:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 750, [24000/31542] Loss 0.161669[0m
+[32m2026-07-06 02:37:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 800, [25600/31542] Loss 0.158966[0m
+[32m2026-07-06 02:38:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 850, [27200/31542] Loss 0.153766[0m
+[32m2026-07-06 02:38:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 900, [28800/31542] Loss 0.092600[0m
+[32m2026-07-06 02:38:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 0/200, Batch 950, [30400/31542] Loss 0.483824[0m
+[32m2026-07-06 02:38:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m357[0m - [1mNew best validation score 0.879572 (precision 0.921495, recall 0.879572, threshold 0.500000)[0m
+[32m2026-07-06 02:38:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:38:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 0, [0/31542] Loss 0.215940[0m
+[32m2026-07-06 02:38:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 50, [1600/31542] Loss 0.157509[0m
+[32m2026-07-06 02:38:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 100, [3200/31542] Loss 0.147223[0m
+[32m2026-07-06 02:38:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 150, [4800/31542] Loss 0.117588[0m
+[32m2026-07-06 02:38:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 200, [6400/31542] Loss 0.204120[0m
+[32m2026-07-06 02:38:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 250, [8000/31542] Loss 0.116410[0m
+[32m2026-07-06 02:38:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 300, [9600/31542] Loss 0.109352[0m
+[32m2026-07-06 02:38:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 350, [11200/31542] Loss 0.063041[0m
+[32m2026-07-06 02:38:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 400, [12800/31542] Loss 0.092912[0m
+[32m2026-07-06 02:38:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 450, [14400/31542] Loss 0.205259[0m
+[32m2026-07-06 02:38:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 500, [16000/31542] Loss 0.110616[0m
+[32m2026-07-06 02:38:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 550, [17600/31542] Loss 0.086705[0m
+[32m2026-07-06 02:39:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 600, [19200/31542] Loss 0.011987[0m
+[32m2026-07-06 02:39:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 650, [20800/31542] Loss 0.247632[0m
+[32m2026-07-06 02:39:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 700, [22400/31542] Loss 0.075528[0m
+[32m2026-07-06 02:39:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 750, [24000/31542] Loss 0.217549[0m
+[32m2026-07-06 02:39:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 800, [25600/31542] Loss 0.273183[0m
+[32m2026-07-06 02:39:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 850, [27200/31542] Loss 0.133584[0m
+[32m2026-07-06 02:39:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 900, [28800/31542] Loss 0.056786[0m
+[32m2026-07-06 02:39:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 1/200, Batch 950, [30400/31542] Loss 0.121316[0m
+[32m2026-07-06 02:39:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:39:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 0, [0/31542] Loss 0.117804[0m
+[32m2026-07-06 02:39:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 50, [1600/31542] Loss 0.125871[0m
+[32m2026-07-06 02:39:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 100, [3200/31542] Loss 0.203139[0m
+[32m2026-07-06 02:39:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 150, [4800/31542] Loss 0.230734[0m
+[32m2026-07-06 02:39:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 200, [6400/31542] Loss 0.063909[0m
+[32m2026-07-06 02:39:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 250, [8000/31542] Loss 0.044109[0m
+[32m2026-07-06 02:39:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 300, [9600/31542] Loss 0.262949[0m
+[32m2026-07-06 02:39:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 350, [11200/31542] Loss 0.127663[0m
+[32m2026-07-06 02:39:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 400, [12800/31542] Loss 0.095335[0m
+[32m2026-07-06 02:39:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 450, [14400/31542] Loss 0.085557[0m
+[32m2026-07-06 02:39:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 500, [16000/31542] Loss 0.123591[0m
+[32m2026-07-06 02:39:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 550, [17600/31542] Loss 0.233097[0m
+[32m2026-07-06 02:39:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 600, [19200/31542] Loss 0.087387[0m
+[32m2026-07-06 02:39:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 650, [20800/31542] Loss 0.113789[0m
+[32m2026-07-06 02:39:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 700, [22400/31542] Loss 0.234109[0m
+[32m2026-07-06 02:39:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 750, [24000/31542] Loss 0.090262[0m
+[32m2026-07-06 02:39:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 800, [25600/31542] Loss 0.109827[0m
+[32m2026-07-06 02:39:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 850, [27200/31542] Loss 0.269662[0m
+[32m2026-07-06 02:39:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 900, [28800/31542] Loss 0.011600[0m
+[32m2026-07-06 02:39:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 2/200, Batch 950, [30400/31542] Loss 0.059044[0m
+[32m2026-07-06 02:39:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:39:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 0, [0/31542] Loss 0.198008[0m
+[32m2026-07-06 02:39:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 50, [1600/31542] Loss 0.159802[0m
+[32m2026-07-06 02:39:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 100, [3200/31542] Loss 0.092384[0m
+[32m2026-07-06 02:39:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 150, [4800/31542] Loss 0.115077[0m
+[32m2026-07-06 02:39:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 200, [6400/31542] Loss 0.099935[0m
+[32m2026-07-06 02:39:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 250, [8000/31542] Loss 0.041811[0m
+[32m2026-07-06 02:39:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 300, [9600/31542] Loss 0.021552[0m
+[32m2026-07-06 02:39:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 350, [11200/31542] Loss 0.021673[0m
+[32m2026-07-06 02:39:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 400, [12800/31542] Loss 0.047847[0m
+[32m2026-07-06 02:39:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 450, [14400/31542] Loss 0.136439[0m
+[32m2026-07-06 02:39:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 500, [16000/31542] Loss 0.024765[0m
+[32m2026-07-06 02:39:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 550, [17600/31542] Loss 0.259502[0m
+[32m2026-07-06 02:39:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 600, [19200/31542] Loss 0.461947[0m
+[32m2026-07-06 02:39:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 650, [20800/31542] Loss 0.076761[0m
+[32m2026-07-06 02:39:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 700, [22400/31542] Loss 0.208946[0m
+[32m2026-07-06 02:39:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 750, [24000/31542] Loss 0.080043[0m
+[32m2026-07-06 02:39:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 800, [25600/31542] Loss 0.074252[0m
+[32m2026-07-06 02:39:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 850, [27200/31542] Loss 0.097426[0m
+[32m2026-07-06 02:39:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 900, [28800/31542] Loss 0.160836[0m
+[32m2026-07-06 02:39:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 3/200, Batch 950, [30400/31542] Loss 0.132864[0m
+[32m2026-07-06 02:39:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m357[0m - [1mNew best validation score 0.893845 (precision 0.926920, recall 0.893845, threshold 0.500000)[0m
+[32m2026-07-06 02:39:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:39:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 0, [0/31542] Loss 0.019515[0m
+[32m2026-07-06 02:39:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 50, [1600/31542] Loss 0.124941[0m
+[32m2026-07-06 02:39:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 100, [3200/31542] Loss 0.055407[0m
+[32m2026-07-06 02:39:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 150, [4800/31542] Loss 0.067124[0m
+[32m2026-07-06 02:39:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 200, [6400/31542] Loss 0.045573[0m
+[32m2026-07-06 02:39:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 250, [8000/31542] Loss 0.112029[0m
+[32m2026-07-06 02:39:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 300, [9600/31542] Loss 0.118390[0m
+[32m2026-07-06 02:39:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 350, [11200/31542] Loss 0.048476[0m
+[32m2026-07-06 02:39:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 400, [12800/31542] Loss 0.091072[0m
+[32m2026-07-06 02:39:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 450, [14400/31542] Loss 0.103594[0m
+[32m2026-07-06 02:39:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 500, [16000/31542] Loss 0.098288[0m
+[32m2026-07-06 02:39:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 550, [17600/31542] Loss 0.050879[0m
+[32m2026-07-06 02:39:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 600, [19200/31542] Loss 0.071018[0m
+[32m2026-07-06 02:39:42[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 650, [20800/31542] Loss 0.084261[0m
+[32m2026-07-06 02:39:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 700, [22400/31542] Loss 0.517142[0m
+[32m2026-07-06 02:39:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 750, [24000/31542] Loss 0.220268[0m
+[32m2026-07-06 02:39:44[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 800, [25600/31542] Loss 0.143813[0m
+[32m2026-07-06 02:39:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 850, [27200/31542] Loss 0.087347[0m
+[32m2026-07-06 02:39:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 900, [28800/31542] Loss 0.212348[0m
+[32m2026-07-06 02:39:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 4/200, Batch 950, [30400/31542] Loss 0.153680[0m
+[32m2026-07-06 02:39:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:39:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 0, [0/31542] Loss 0.066668[0m
+[32m2026-07-06 02:39:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 50, [1600/31542] Loss 0.046555[0m
+[32m2026-07-06 02:39:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 100, [3200/31542] Loss 0.100293[0m
+[32m2026-07-06 02:39:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 150, [4800/31542] Loss 0.142984[0m
+[32m2026-07-06 02:39:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 200, [6400/31542] Loss 0.119632[0m
+[32m2026-07-06 02:39:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 250, [8000/31542] Loss 0.172171[0m
+[32m2026-07-06 02:39:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 300, [9600/31542] Loss 0.026250[0m
+[32m2026-07-06 02:39:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 350, [11200/31542] Loss 0.233772[0m
+[32m2026-07-06 02:39:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 400, [12800/31542] Loss 0.235795[0m
+[32m2026-07-06 02:39:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 450, [14400/31542] Loss 0.230498[0m
+[32m2026-07-06 02:39:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 500, [16000/31542] Loss 0.064455[0m
+[32m2026-07-06 02:39:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 550, [17600/31542] Loss 0.354272[0m
+[32m2026-07-06 02:39:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 600, [19200/31542] Loss 0.160587[0m
+[32m2026-07-06 02:39:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 650, [20800/31542] Loss 0.054290[0m
+[32m2026-07-06 02:39:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 700, [22400/31542] Loss 0.339471[0m
+[32m2026-07-06 02:39:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 750, [24000/31542] Loss 0.171349[0m
+[32m2026-07-06 02:39:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 800, [25600/31542] Loss 0.133364[0m
+[32m2026-07-06 02:39:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 850, [27200/31542] Loss 0.113800[0m
+[32m2026-07-06 02:39:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 900, [28800/31542] Loss 0.119172[0m
+[32m2026-07-06 02:40:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 5/200, Batch 950, [30400/31542] Loss 0.038023[0m
+[32m2026-07-06 02:40:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m357[0m - [1mNew best validation score 0.925959 (precision 0.913732, recall 0.925959, threshold 0.500000)[0m
+[32m2026-07-06 02:40:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:40:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 0, [0/31542] Loss 0.393357[0m
+[32m2026-07-06 02:40:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 50, [1600/31542] Loss 0.142286[0m
+[32m2026-07-06 02:40:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 100, [3200/31542] Loss 0.434635[0m
+[32m2026-07-06 02:40:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 150, [4800/31542] Loss 0.201607[0m
+[32m2026-07-06 02:40:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 200, [6400/31542] Loss 0.129410[0m
+[32m2026-07-06 02:40:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 250, [8000/31542] Loss 0.195339[0m
+[32m2026-07-06 02:40:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 300, [9600/31542] Loss 0.065432[0m
+[32m2026-07-06 02:40:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 350, [11200/31542] Loss 0.076258[0m
+[32m2026-07-06 02:40:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 400, [12800/31542] Loss 0.095422[0m
+[32m2026-07-06 02:40:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 450, [14400/31542] Loss 0.122316[0m
+[32m2026-07-06 02:40:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 500, [16000/31542] Loss 0.104494[0m
+[32m2026-07-06 02:40:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 550, [17600/31542] Loss 0.446496[0m
+[32m2026-07-06 02:40:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 600, [19200/31542] Loss 0.049098[0m
+[32m2026-07-06 02:40:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 650, [20800/31542] Loss 0.105288[0m
+[32m2026-07-06 02:40:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 700, [22400/31542] Loss 0.144836[0m
+[32m2026-07-06 02:40:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 750, [24000/31542] Loss 0.108522[0m
+[32m2026-07-06 02:40:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 800, [25600/31542] Loss 0.107015[0m
+[32m2026-07-06 02:40:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 850, [27200/31542] Loss 0.018832[0m
+[32m2026-07-06 02:40:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 900, [28800/31542] Loss 0.080531[0m
+[32m2026-07-06 02:40:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 6/200, Batch 950, [30400/31542] Loss 0.060502[0m
+[32m2026-07-06 02:40:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:40:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 0, [0/31542] Loss 0.064705[0m
+[32m2026-07-06 02:40:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 50, [1600/31542] Loss 0.143338[0m
+[32m2026-07-06 02:40:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 100, [3200/31542] Loss 0.300691[0m
+[32m2026-07-06 02:40:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 150, [4800/31542] Loss 0.070676[0m
+[32m2026-07-06 02:40:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 200, [6400/31542] Loss 0.130846[0m
+[32m2026-07-06 02:40:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 250, [8000/31542] Loss 0.035442[0m
+[32m2026-07-06 02:40:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 300, [9600/31542] Loss 0.206331[0m
+[32m2026-07-06 02:40:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 350, [11200/31542] Loss 0.070568[0m
+[32m2026-07-06 02:40:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 400, [12800/31542] Loss 0.086569[0m
+[32m2026-07-06 02:40:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 450, [14400/31542] Loss 0.032991[0m
+[32m2026-07-06 02:40:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 500, [16000/31542] Loss 0.090348[0m
+[32m2026-07-06 02:40:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 550, [17600/31542] Loss 0.138595[0m
+[32m2026-07-06 02:40:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 600, [19200/31542] Loss 0.218042[0m
+[32m2026-07-06 02:40:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 650, [20800/31542] Loss 0.061005[0m
+[32m2026-07-06 02:40:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 700, [22400/31542] Loss 0.198100[0m
+[32m2026-07-06 02:40:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 750, [24000/31542] Loss 0.337592[0m
+[32m2026-07-06 02:40:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 800, [25600/31542] Loss 0.160327[0m
+[32m2026-07-06 02:40:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 850, [27200/31542] Loss 0.123284[0m
+[32m2026-07-06 02:40:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 900, [28800/31542] Loss 0.038714[0m
+[32m2026-07-06 02:40:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 7/200, Batch 950, [30400/31542] Loss 0.105135[0m
+[32m2026-07-06 02:40:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:40:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 0, [0/31542] Loss 0.051939[0m
+[32m2026-07-06 02:40:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 50, [1600/31542] Loss 0.123350[0m
+[32m2026-07-06 02:40:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 100, [3200/31542] Loss 0.088424[0m
+[32m2026-07-06 02:40:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 150, [4800/31542] Loss 0.095053[0m
+[32m2026-07-06 02:40:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 200, [6400/31542] Loss 0.059052[0m
+[32m2026-07-06 02:40:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 250, [8000/31542] Loss 0.050512[0m
+[32m2026-07-06 02:40:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 300, [9600/31542] Loss 0.050162[0m
+[32m2026-07-06 02:40:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 350, [11200/31542] Loss 0.035591[0m
+[32m2026-07-06 02:40:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 400, [12800/31542] Loss 0.195397[0m
+[32m2026-07-06 02:40:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 450, [14400/31542] Loss 0.027223[0m
+[32m2026-07-06 02:40:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 500, [16000/31542] Loss 0.080507[0m
+[32m2026-07-06 02:40:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 550, [17600/31542] Loss 0.191545[0m
+[32m2026-07-06 02:40:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 600, [19200/31542] Loss 0.138375[0m
+[32m2026-07-06 02:40:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 650, [20800/31542] Loss 0.088554[0m
+[32m2026-07-06 02:40:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 700, [22400/31542] Loss 0.102622[0m
+[32m2026-07-06 02:40:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 750, [24000/31542] Loss 0.124037[0m
+[32m2026-07-06 02:40:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 800, [25600/31542] Loss 0.158122[0m
+[32m2026-07-06 02:40:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 850, [27200/31542] Loss 0.086694[0m
+[32m2026-07-06 02:40:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 900, [28800/31542] Loss 0.021415[0m
+[32m2026-07-06 02:40:42[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 8/200, Batch 950, [30400/31542] Loss 0.078600[0m
+[32m2026-07-06 02:40:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:40:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 0, [0/31542] Loss 0.084215[0m
+[32m2026-07-06 02:40:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 50, [1600/31542] Loss 0.052477[0m
+[32m2026-07-06 02:40:44[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 100, [3200/31542] Loss 0.261125[0m
+[32m2026-07-06 02:40:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 150, [4800/31542] Loss 0.132650[0m
+[32m2026-07-06 02:40:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 200, [6400/31542] Loss 0.043221[0m
+[32m2026-07-06 02:40:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 250, [8000/31542] Loss 0.110492[0m
+[32m2026-07-06 02:40:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 300, [9600/31542] Loss 0.137224[0m
+[32m2026-07-06 02:40:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 350, [11200/31542] Loss 0.272638[0m
+[32m2026-07-06 02:40:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 400, [12800/31542] Loss 0.129318[0m
+[32m2026-07-06 02:40:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 450, [14400/31542] Loss 0.099261[0m
+[32m2026-07-06 02:40:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 500, [16000/31542] Loss 0.122188[0m
+[32m2026-07-06 02:40:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 550, [17600/31542] Loss 0.101402[0m
+[32m2026-07-06 02:40:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 600, [19200/31542] Loss 0.084929[0m
+[32m2026-07-06 02:40:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 650, [20800/31542] Loss 0.052329[0m
+[32m2026-07-06 02:40:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 700, [22400/31542] Loss 0.210323[0m
+[32m2026-07-06 02:40:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 750, [24000/31542] Loss 0.139142[0m
+[32m2026-07-06 02:40:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 800, [25600/31542] Loss 0.050769[0m
+[32m2026-07-06 02:40:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 850, [27200/31542] Loss 0.225000[0m
+[32m2026-07-06 02:40:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 900, [28800/31542] Loss 0.083083[0m
+[32m2026-07-06 02:40:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 9/200, Batch 950, [30400/31542] Loss 0.067543[0m
+[32m2026-07-06 02:40:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:40:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 0, [0/31542] Loss 0.039322[0m
+[32m2026-07-06 02:40:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 50, [1600/31542] Loss 0.596398[0m
+[32m2026-07-06 02:40:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 100, [3200/31542] Loss 0.221073[0m
+[32m2026-07-06 02:40:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 150, [4800/31542] Loss 0.191916[0m
+[32m2026-07-06 02:40:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 200, [6400/31542] Loss 0.264123[0m
+[32m2026-07-06 02:41:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 250, [8000/31542] Loss 0.142357[0m
+[32m2026-07-06 02:41:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 300, [9600/31542] Loss 0.087392[0m
+[32m2026-07-06 02:41:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 350, [11200/31542] Loss 0.062476[0m
+[32m2026-07-06 02:41:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 400, [12800/31542] Loss 0.418370[0m
+[32m2026-07-06 02:41:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 450, [14400/31542] Loss 0.570285[0m
+[32m2026-07-06 02:41:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 500, [16000/31542] Loss 0.143791[0m
+[32m2026-07-06 02:41:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 550, [17600/31542] Loss 0.524682[0m
+[32m2026-07-06 02:41:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 600, [19200/31542] Loss 0.112929[0m
+[32m2026-07-06 02:41:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 650, [20800/31542] Loss 0.143682[0m
+[32m2026-07-06 02:41:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 700, [22400/31542] Loss 0.456708[0m
+[32m2026-07-06 02:41:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 750, [24000/31542] Loss 0.271785[0m
+[32m2026-07-06 02:41:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 800, [25600/31542] Loss 0.231858[0m
+[32m2026-07-06 02:41:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 850, [27200/31542] Loss 0.291308[0m
+[32m2026-07-06 02:41:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 900, [28800/31542] Loss 0.088046[0m
+[32m2026-07-06 02:41:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 10/200, Batch 950, [30400/31542] Loss 0.430193[0m
+[32m2026-07-06 02:41:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m357[0m - [1mNew best validation score 0.934880 (precision 0.906574, recall 0.934880, threshold 0.500000)[0m
+[32m2026-07-06 02:41:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:41:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 0, [0/31542] Loss 0.246043[0m
+[32m2026-07-06 02:41:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 50, [1600/31542] Loss 0.367475[0m
+[32m2026-07-06 02:41:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 100, [3200/31542] Loss 0.052995[0m
+[32m2026-07-06 02:41:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 150, [4800/31542] Loss 0.153404[0m
+[32m2026-07-06 02:41:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 200, [6400/31542] Loss 0.083730[0m
+[32m2026-07-06 02:41:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 250, [8000/31542] Loss 0.019121[0m
+[32m2026-07-06 02:41:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 300, [9600/31542] Loss 0.080328[0m
+[32m2026-07-06 02:41:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 350, [11200/31542] Loss 0.038334[0m
+[32m2026-07-06 02:41:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 400, [12800/31542] Loss 0.024106[0m
+[32m2026-07-06 02:41:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 450, [14400/31542] Loss 0.172197[0m
+[32m2026-07-06 02:41:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 500, [16000/31542] Loss 0.228727[0m
+[32m2026-07-06 02:41:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 550, [17600/31542] Loss 0.238257[0m
+[32m2026-07-06 02:41:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 600, [19200/31542] Loss 0.476109[0m
+[32m2026-07-06 02:41:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 650, [20800/31542] Loss 0.156477[0m
+[32m2026-07-06 02:41:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 700, [22400/31542] Loss 0.117625[0m
+[32m2026-07-06 02:41:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 750, [24000/31542] Loss 0.127233[0m
+[32m2026-07-06 02:41:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 800, [25600/31542] Loss 0.274147[0m
+[32m2026-07-06 02:41:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 850, [27200/31542] Loss 0.348884[0m
+[32m2026-07-06 02:41:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 900, [28800/31542] Loss 0.056439[0m
+[32m2026-07-06 02:41:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 11/200, Batch 950, [30400/31542] Loss 0.127870[0m
+[32m2026-07-06 02:41:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:41:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 0, [0/31542] Loss 0.066904[0m
+[32m2026-07-06 02:41:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 50, [1600/31542] Loss 0.300924[0m
+[32m2026-07-06 02:41:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 100, [3200/31542] Loss 0.263079[0m
+[32m2026-07-06 02:41:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 150, [4800/31542] Loss 0.114613[0m
+[32m2026-07-06 02:41:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 200, [6400/31542] Loss 0.205998[0m
+[32m2026-07-06 02:41:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 250, [8000/31542] Loss 0.055513[0m
+[32m2026-07-06 02:41:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 300, [9600/31542] Loss 0.071997[0m
+[32m2026-07-06 02:41:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 350, [11200/31542] Loss 0.070976[0m
+[32m2026-07-06 02:41:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 400, [12800/31542] Loss 0.108608[0m
+[32m2026-07-06 02:41:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 450, [14400/31542] Loss 0.093499[0m
+[32m2026-07-06 02:41:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 500, [16000/31542] Loss 0.076434[0m
+[32m2026-07-06 02:41:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 550, [17600/31542] Loss 0.081553[0m
+[32m2026-07-06 02:41:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 600, [19200/31542] Loss 0.220753[0m
+[32m2026-07-06 02:41:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 650, [20800/31542] Loss 0.036667[0m
+[32m2026-07-06 02:41:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 700, [22400/31542] Loss 0.100619[0m
+[32m2026-07-06 02:41:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 750, [24000/31542] Loss 0.093988[0m
+[32m2026-07-06 02:41:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 800, [25600/31542] Loss 0.033376[0m
+[32m2026-07-06 02:41:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 850, [27200/31542] Loss 0.390743[0m
+[32m2026-07-06 02:41:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 900, [28800/31542] Loss 0.020154[0m
+[32m2026-07-06 02:41:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 12/200, Batch 950, [30400/31542] Loss 0.041899[0m
+[32m2026-07-06 02:41:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:41:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 0, [0/31542] Loss 0.536499[0m
+[32m2026-07-06 02:41:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 50, [1600/31542] Loss 0.126166[0m
+[32m2026-07-06 02:41:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 100, [3200/31542] Loss 0.084614[0m
+[32m2026-07-06 02:41:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 150, [4800/31542] Loss 0.043166[0m
+[32m2026-07-06 02:41:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 200, [6400/31542] Loss 0.051648[0m
+[32m2026-07-06 02:41:42[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 250, [8000/31542] Loss 0.107461[0m
+[32m2026-07-06 02:41:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 300, [9600/31542] Loss 0.104016[0m
+[32m2026-07-06 02:41:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 350, [11200/31542] Loss 0.045021[0m
+[32m2026-07-06 02:41:44[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 400, [12800/31542] Loss 0.176669[0m
+[32m2026-07-06 02:41:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 450, [14400/31542] Loss 0.028235[0m
+[32m2026-07-06 02:41:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 500, [16000/31542] Loss 0.131284[0m
+[32m2026-07-06 02:41:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 550, [17600/31542] Loss 0.155473[0m
+[32m2026-07-06 02:41:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 600, [19200/31542] Loss 0.076646[0m
+[32m2026-07-06 02:41:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 650, [20800/31542] Loss 0.064634[0m
+[32m2026-07-06 02:41:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 700, [22400/31542] Loss 0.056023[0m
+[32m2026-07-06 02:41:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 750, [24000/31542] Loss 0.137058[0m
+[32m2026-07-06 02:41:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 800, [25600/31542] Loss 0.354458[0m
+[32m2026-07-06 02:41:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 850, [27200/31542] Loss 0.184456[0m
+[32m2026-07-06 02:41:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 900, [28800/31542] Loss 0.040228[0m
+[32m2026-07-06 02:41:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 13/200, Batch 950, [30400/31542] Loss 0.151479[0m
+[32m2026-07-06 02:41:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:41:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 0, [0/31542] Loss 0.213595[0m
+[32m2026-07-06 02:41:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 50, [1600/31542] Loss 0.182711[0m
+[32m2026-07-06 02:41:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 100, [3200/31542] Loss 0.181023[0m
+[32m2026-07-06 02:41:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 150, [4800/31542] Loss 0.046061[0m
+[32m2026-07-06 02:41:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 200, [6400/31542] Loss 0.024077[0m
+[32m2026-07-06 02:41:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 250, [8000/31542] Loss 0.159811[0m
+[32m2026-07-06 02:41:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 300, [9600/31542] Loss 0.199544[0m
+[32m2026-07-06 02:41:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 350, [11200/31542] Loss 0.015321[0m
+[32m2026-07-06 02:41:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 400, [12800/31542] Loss 0.053155[0m
+[32m2026-07-06 02:41:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 450, [14400/31542] Loss 0.044391[0m
+[32m2026-07-06 02:41:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 500, [16000/31542] Loss 0.098928[0m
+[32m2026-07-06 02:42:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 550, [17600/31542] Loss 0.245313[0m
+[32m2026-07-06 02:42:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 600, [19200/31542] Loss 0.235708[0m
+[32m2026-07-06 02:42:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 650, [20800/31542] Loss 0.063374[0m
+[32m2026-07-06 02:42:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 700, [22400/31542] Loss 0.121445[0m
+[32m2026-07-06 02:42:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 750, [24000/31542] Loss 0.061303[0m
+[32m2026-07-06 02:42:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 800, [25600/31542] Loss 0.026998[0m
+[32m2026-07-06 02:42:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 850, [27200/31542] Loss 0.060752[0m
+[32m2026-07-06 02:42:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 900, [28800/31542] Loss 0.031335[0m
+[32m2026-07-06 02:42:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 14/200, Batch 950, [30400/31542] Loss 0.045183[0m
+[32m2026-07-06 02:42:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:42:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 0, [0/31542] Loss 0.029854[0m
+[32m2026-07-06 02:42:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 50, [1600/31542] Loss 0.150879[0m
+[32m2026-07-06 02:42:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 100, [3200/31542] Loss 0.065258[0m
+[32m2026-07-06 02:42:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 150, [4800/31542] Loss 0.712545[0m
+[32m2026-07-06 02:42:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 200, [6400/31542] Loss 0.034213[0m
+[32m2026-07-06 02:42:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 250, [8000/31542] Loss 0.077525[0m
+[32m2026-07-06 02:42:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 300, [9600/31542] Loss 0.037780[0m
+[32m2026-07-06 02:42:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 350, [11200/31542] Loss 0.075988[0m
+[32m2026-07-06 02:42:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 400, [12800/31542] Loss 0.121718[0m
+[32m2026-07-06 02:42:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 450, [14400/31542] Loss 0.084767[0m
+[32m2026-07-06 02:42:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 500, [16000/31542] Loss 0.098000[0m
+[32m2026-07-06 02:42:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 550, [17600/31542] Loss 0.065866[0m
+[32m2026-07-06 02:42:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 600, [19200/31542] Loss 0.035078[0m
+[32m2026-07-06 02:42:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 650, [20800/31542] Loss 0.076195[0m
+[32m2026-07-06 02:42:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 700, [22400/31542] Loss 0.066605[0m
+[32m2026-07-06 02:42:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 750, [24000/31542] Loss 0.070605[0m
+[32m2026-07-06 02:42:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 800, [25600/31542] Loss 0.034487[0m
+[32m2026-07-06 02:42:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 850, [27200/31542] Loss 0.155471[0m
+[32m2026-07-06 02:42:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 900, [28800/31542] Loss 0.119869[0m
+[32m2026-07-06 02:42:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 15/200, Batch 950, [30400/31542] Loss 0.144257[0m
+[32m2026-07-06 02:42:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m357[0m - [1mNew best validation score 0.939340 (precision 0.923684, recall 0.939340, threshold 0.500000)[0m
+[32m2026-07-06 02:42:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:42:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 0, [0/31542] Loss 0.275544[0m
+[32m2026-07-06 02:42:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 50, [1600/31542] Loss 0.046209[0m
+[32m2026-07-06 02:42:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 100, [3200/31542] Loss 0.110053[0m
+[32m2026-07-06 02:42:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 150, [4800/31542] Loss 0.011771[0m
+[32m2026-07-06 02:42:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 200, [6400/31542] Loss 0.016975[0m
+[32m2026-07-06 02:42:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 250, [8000/31542] Loss 0.060853[0m
+[32m2026-07-06 02:42:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 300, [9600/31542] Loss 0.012896[0m
+[32m2026-07-06 02:42:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 350, [11200/31542] Loss 0.092726[0m
+[32m2026-07-06 02:42:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 400, [12800/31542] Loss 0.042608[0m
+[32m2026-07-06 02:42:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 450, [14400/31542] Loss 0.021279[0m
+[32m2026-07-06 02:42:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 500, [16000/31542] Loss 0.075965[0m
+[32m2026-07-06 02:42:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 550, [17600/31542] Loss 0.118424[0m
+[32m2026-07-06 02:42:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 600, [19200/31542] Loss 0.040820[0m
+[32m2026-07-06 02:42:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 650, [20800/31542] Loss 0.480329[0m
+[32m2026-07-06 02:42:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 700, [22400/31542] Loss 0.124189[0m
+[32m2026-07-06 02:42:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 750, [24000/31542] Loss 0.091835[0m
+[32m2026-07-06 02:42:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 800, [25600/31542] Loss 0.811964[0m
+[32m2026-07-06 02:42:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 850, [27200/31542] Loss 0.175469[0m
+[32m2026-07-06 02:42:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 900, [28800/31542] Loss 0.060663[0m
+[32m2026-07-06 02:42:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 16/200, Batch 950, [30400/31542] Loss 0.139487[0m
+[32m2026-07-06 02:42:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:42:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 0, [0/31542] Loss 0.121554[0m
+[32m2026-07-06 02:42:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 50, [1600/31542] Loss 0.115347[0m
+[32m2026-07-06 02:42:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 100, [3200/31542] Loss 0.024795[0m
+[32m2026-07-06 02:42:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 150, [4800/31542] Loss 0.089287[0m
+[32m2026-07-06 02:42:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 200, [6400/31542] Loss 0.043880[0m
+[32m2026-07-06 02:42:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 250, [8000/31542] Loss 0.084549[0m
+[32m2026-07-06 02:42:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 300, [9600/31542] Loss 0.105604[0m
+[32m2026-07-06 02:42:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 350, [11200/31542] Loss 0.132814[0m
+[32m2026-07-06 02:42:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 400, [12800/31542] Loss 0.283138[0m
+[32m2026-07-06 02:42:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 450, [14400/31542] Loss 0.029326[0m
+[32m2026-07-06 02:42:42[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 500, [16000/31542] Loss 0.041890[0m
+[32m2026-07-06 02:42:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 550, [17600/31542] Loss 0.126685[0m
+[32m2026-07-06 02:42:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 600, [19200/31542] Loss 0.162927[0m
+[32m2026-07-06 02:42:44[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 650, [20800/31542] Loss 0.032613[0m
+[32m2026-07-06 02:42:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 700, [22400/31542] Loss 0.065561[0m
+[32m2026-07-06 02:42:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 750, [24000/31542] Loss 0.114258[0m
+[32m2026-07-06 02:42:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 800, [25600/31542] Loss 0.095274[0m
+[32m2026-07-06 02:42:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 850, [27200/31542] Loss 0.184072[0m
+[32m2026-07-06 02:42:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 900, [28800/31542] Loss 0.084867[0m
+[32m2026-07-06 02:42:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 17/200, Batch 950, [30400/31542] Loss 0.087738[0m
+[32m2026-07-06 02:42:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m357[0m - [1mNew best validation score 0.941124 (precision 0.916594, recall 0.941124, threshold 0.500000)[0m
+[32m2026-07-06 02:42:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:42:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 0, [0/31542] Loss 0.018264[0m
+[32m2026-07-06 02:42:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 50, [1600/31542] Loss 0.033080[0m
+[32m2026-07-06 02:42:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 100, [3200/31542] Loss 0.047445[0m
+[32m2026-07-06 02:42:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 150, [4800/31542] Loss 0.276131[0m
+[32m2026-07-06 02:42:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 200, [6400/31542] Loss 0.098769[0m
+[32m2026-07-06 02:42:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 250, [8000/31542] Loss 0.084742[0m
+[32m2026-07-06 02:42:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 300, [9600/31542] Loss 0.038460[0m
+[32m2026-07-06 02:42:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 350, [11200/31542] Loss 0.140795[0m
+[32m2026-07-06 02:42:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 400, [12800/31542] Loss 0.052265[0m
+[32m2026-07-06 02:42:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 450, [14400/31542] Loss 0.073951[0m
+[32m2026-07-06 02:42:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 500, [16000/31542] Loss 0.231084[0m
+[32m2026-07-06 02:42:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 550, [17600/31542] Loss 0.279582[0m
+[32m2026-07-06 02:42:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 600, [19200/31542] Loss 0.064010[0m
+[32m2026-07-06 02:42:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 650, [20800/31542] Loss 0.200770[0m
+[32m2026-07-06 02:42:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 700, [22400/31542] Loss 0.139621[0m
+[32m2026-07-06 02:42:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 750, [24000/31542] Loss 0.117371[0m
+[32m2026-07-06 02:43:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 800, [25600/31542] Loss 0.073519[0m
+[32m2026-07-06 02:43:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 850, [27200/31542] Loss 0.138562[0m
+[32m2026-07-06 02:43:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 900, [28800/31542] Loss 0.030663[0m
+[32m2026-07-06 02:43:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 18/200, Batch 950, [30400/31542] Loss 0.060487[0m
+[32m2026-07-06 02:43:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:43:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 0, [0/31542] Loss 0.071518[0m
+[32m2026-07-06 02:43:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 50, [1600/31542] Loss 0.021830[0m
+[32m2026-07-06 02:43:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 100, [3200/31542] Loss 0.037567[0m
+[32m2026-07-06 02:43:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 150, [4800/31542] Loss 0.156195[0m
+[32m2026-07-06 02:43:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 200, [6400/31542] Loss 0.053918[0m
+[32m2026-07-06 02:43:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 250, [8000/31542] Loss 0.023137[0m
+[32m2026-07-06 02:43:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 300, [9600/31542] Loss 0.045526[0m
+[32m2026-07-06 02:43:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 350, [11200/31542] Loss 0.062474[0m
+[32m2026-07-06 02:43:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 400, [12800/31542] Loss 0.063374[0m
+[32m2026-07-06 02:43:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 450, [14400/31542] Loss 0.493239[0m
+[32m2026-07-06 02:43:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 500, [16000/31542] Loss 0.153477[0m
+[32m2026-07-06 02:43:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 550, [17600/31542] Loss 0.075150[0m
+[32m2026-07-06 02:43:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 600, [19200/31542] Loss 0.125566[0m
+[32m2026-07-06 02:43:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 650, [20800/31542] Loss 0.089718[0m
+[32m2026-07-06 02:43:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 700, [22400/31542] Loss 0.060116[0m
+[32m2026-07-06 02:43:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 750, [24000/31542] Loss 0.039526[0m
+[32m2026-07-06 02:43:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 800, [25600/31542] Loss 0.063071[0m
+[32m2026-07-06 02:43:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 850, [27200/31542] Loss 0.170691[0m
+[32m2026-07-06 02:43:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 900, [28800/31542] Loss 0.018133[0m
+[32m2026-07-06 02:43:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 19/200, Batch 950, [30400/31542] Loss 0.160675[0m
+[32m2026-07-06 02:43:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:43:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 0, [0/31542] Loss 0.085834[0m
+[32m2026-07-06 02:43:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 50, [1600/31542] Loss 0.022669[0m
+[32m2026-07-06 02:43:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 100, [3200/31542] Loss 0.081367[0m
+[32m2026-07-06 02:43:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 150, [4800/31542] Loss 0.121343[0m
+[32m2026-07-06 02:43:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 200, [6400/31542] Loss 0.010678[0m
+[32m2026-07-06 02:43:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 250, [8000/31542] Loss 0.059890[0m
+[32m2026-07-06 02:43:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 300, [9600/31542] Loss 0.093231[0m
+[32m2026-07-06 02:43:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 350, [11200/31542] Loss 0.139855[0m
+[32m2026-07-06 02:43:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 400, [12800/31542] Loss 0.354905[0m
+[32m2026-07-06 02:43:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 450, [14400/31542] Loss 0.042417[0m
+[32m2026-07-06 02:43:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 500, [16000/31542] Loss 0.044307[0m
+[32m2026-07-06 02:43:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 550, [17600/31542] Loss 0.149527[0m
+[32m2026-07-06 02:43:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 600, [19200/31542] Loss 0.128454[0m
+[32m2026-07-06 02:43:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 650, [20800/31542] Loss 0.044576[0m
+[32m2026-07-06 02:43:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 700, [22400/31542] Loss 0.181318[0m
+[32m2026-07-06 02:43:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 750, [24000/31542] Loss 0.071819[0m
+[32m2026-07-06 02:43:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 800, [25600/31542] Loss 0.338020[0m
+[32m2026-07-06 02:43:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 850, [27200/31542] Loss 0.201022[0m
+[32m2026-07-06 02:43:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 900, [28800/31542] Loss 0.065061[0m
+[32m2026-07-06 02:43:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 20/200, Batch 950, [30400/31542] Loss 0.023314[0m
+[32m2026-07-06 02:43:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:43:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 0, [0/31542] Loss 0.340121[0m
+[32m2026-07-06 02:43:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 50, [1600/31542] Loss 0.217130[0m
+[32m2026-07-06 02:43:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 100, [3200/31542] Loss 0.158413[0m
+[32m2026-07-06 02:43:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 150, [4800/31542] Loss 0.124251[0m
+[32m2026-07-06 02:43:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 200, [6400/31542] Loss 0.142606[0m
+[32m2026-07-06 02:43:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 250, [8000/31542] Loss 0.046728[0m
+[32m2026-07-06 02:43:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 300, [9600/31542] Loss 0.135280[0m
+[32m2026-07-06 02:43:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 350, [11200/31542] Loss 0.239651[0m
+[32m2026-07-06 02:43:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 400, [12800/31542] Loss 0.098934[0m
+[32m2026-07-06 02:43:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 450, [14400/31542] Loss 0.211317[0m
+[32m2026-07-06 02:43:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 500, [16000/31542] Loss 0.087451[0m
+[32m2026-07-06 02:43:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 550, [17600/31542] Loss 0.112970[0m
+[32m2026-07-06 02:43:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 600, [19200/31542] Loss 0.138399[0m
+[32m2026-07-06 02:43:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 650, [20800/31542] Loss 0.014797[0m
+[32m2026-07-06 02:43:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 700, [22400/31542] Loss 0.281218[0m
+[32m2026-07-06 02:43:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 750, [24000/31542] Loss 0.110245[0m
+[32m2026-07-06 02:43:42[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 800, [25600/31542] Loss 0.136172[0m
+[32m2026-07-06 02:43:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 850, [27200/31542] Loss 0.270865[0m
+[32m2026-07-06 02:43:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 900, [28800/31542] Loss 0.068067[0m
+[32m2026-07-06 02:43:44[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 21/200, Batch 950, [30400/31542] Loss 0.140145[0m
+[32m2026-07-06 02:43:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:43:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 0, [0/31542] Loss 0.242737[0m
+[32m2026-07-06 02:43:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 50, [1600/31542] Loss 0.078449[0m
+[32m2026-07-06 02:43:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 100, [3200/31542] Loss 0.085237[0m
+[32m2026-07-06 02:43:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 150, [4800/31542] Loss 0.044508[0m
+[32m2026-07-06 02:43:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 200, [6400/31542] Loss 0.242525[0m
+[32m2026-07-06 02:43:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 250, [8000/31542] Loss 0.270635[0m
+[32m2026-07-06 02:43:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 300, [9600/31542] Loss 0.035792[0m
+[32m2026-07-06 02:43:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 350, [11200/31542] Loss 0.257633[0m
+[32m2026-07-06 02:43:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 400, [12800/31542] Loss 0.093200[0m
+[32m2026-07-06 02:43:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 450, [14400/31542] Loss 0.187838[0m
+[32m2026-07-06 02:43:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 500, [16000/31542] Loss 0.021631[0m
+[32m2026-07-06 02:43:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 550, [17600/31542] Loss 0.034680[0m
+[32m2026-07-06 02:43:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 600, [19200/31542] Loss 0.046268[0m
+[32m2026-07-06 02:43:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 650, [20800/31542] Loss 0.070185[0m
+[32m2026-07-06 02:43:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 700, [22400/31542] Loss 0.094909[0m
+[32m2026-07-06 02:43:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 750, [24000/31542] Loss 0.045088[0m
+[32m2026-07-06 02:43:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 800, [25600/31542] Loss 0.028531[0m
+[32m2026-07-06 02:43:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 850, [27200/31542] Loss 0.046297[0m
+[32m2026-07-06 02:43:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 900, [28800/31542] Loss 0.168886[0m
+[32m2026-07-06 02:43:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 22/200, Batch 950, [30400/31542] Loss 0.039485[0m
+[32m2026-07-06 02:43:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m357[0m - [1mNew best validation score 0.949153 (precision 0.914875, recall 0.949153, threshold 0.500000)[0m
+[32m2026-07-06 02:43:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:43:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 0, [0/31542] Loss 0.010545[0m
+[32m2026-07-06 02:44:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 50, [1600/31542] Loss 0.401787[0m
+[32m2026-07-06 02:44:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 100, [3200/31542] Loss 0.085177[0m
+[32m2026-07-06 02:44:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 150, [4800/31542] Loss 0.053949[0m
+[32m2026-07-06 02:44:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 200, [6400/31542] Loss 0.083547[0m
+[32m2026-07-06 02:44:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 250, [8000/31542] Loss 0.040381[0m
+[32m2026-07-06 02:44:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 300, [9600/31542] Loss 0.017107[0m
+[32m2026-07-06 02:44:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 350, [11200/31542] Loss 0.446442[0m
+[32m2026-07-06 02:44:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 400, [12800/31542] Loss 0.014102[0m
+[32m2026-07-06 02:44:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 450, [14400/31542] Loss 0.426592[0m
+[32m2026-07-06 02:44:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 500, [16000/31542] Loss 0.077058[0m
+[32m2026-07-06 02:44:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 550, [17600/31542] Loss 0.275374[0m
+[32m2026-07-06 02:44:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 600, [19200/31542] Loss 0.162092[0m
+[32m2026-07-06 02:44:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 650, [20800/31542] Loss 0.084765[0m
+[32m2026-07-06 02:44:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 700, [22400/31542] Loss 0.086297[0m
+[32m2026-07-06 02:44:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 750, [24000/31542] Loss 0.225112[0m
+[32m2026-07-06 02:44:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 800, [25600/31542] Loss 0.164937[0m
+[32m2026-07-06 02:44:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 850, [27200/31542] Loss 0.083003[0m
+[32m2026-07-06 02:44:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 900, [28800/31542] Loss 0.110172[0m
+[32m2026-07-06 02:44:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 23/200, Batch 950, [30400/31542] Loss 0.014369[0m
+[32m2026-07-06 02:44:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:44:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 0, [0/31542] Loss 0.076077[0m
+[32m2026-07-06 02:44:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 50, [1600/31542] Loss 0.052041[0m
+[32m2026-07-06 02:44:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 100, [3200/31542] Loss 0.083452[0m
+[32m2026-07-06 02:44:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 150, [4800/31542] Loss 0.186159[0m
+[32m2026-07-06 02:44:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 200, [6400/31542] Loss 0.065157[0m
+[32m2026-07-06 02:44:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 250, [8000/31542] Loss 0.030435[0m
+[32m2026-07-06 02:44:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 300, [9600/31542] Loss 0.099901[0m
+[32m2026-07-06 02:44:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 350, [11200/31542] Loss 0.219158[0m
+[32m2026-07-06 02:44:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 400, [12800/31542] Loss 0.213631[0m
+[32m2026-07-06 02:44:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 450, [14400/31542] Loss 0.058868[0m
+[32m2026-07-06 02:44:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 500, [16000/31542] Loss 0.052438[0m
+[32m2026-07-06 02:44:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 550, [17600/31542] Loss 0.029061[0m
+[32m2026-07-06 02:44:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 600, [19200/31542] Loss 0.031984[0m
+[32m2026-07-06 02:44:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 650, [20800/31542] Loss 0.087315[0m
+[32m2026-07-06 02:44:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 700, [22400/31542] Loss 0.062530[0m
+[32m2026-07-06 02:44:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 750, [24000/31542] Loss 0.250629[0m
+[32m2026-07-06 02:44:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 800, [25600/31542] Loss 0.074990[0m
+[32m2026-07-06 02:44:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 850, [27200/31542] Loss 0.017278[0m
+[32m2026-07-06 02:44:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 900, [28800/31542] Loss 0.162321[0m
+[32m2026-07-06 02:44:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 24/200, Batch 950, [30400/31542] Loss 0.072898[0m
+[32m2026-07-06 02:44:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:44:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 0, [0/31542] Loss 0.294649[0m
+[32m2026-07-06 02:44:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 50, [1600/31542] Loss 0.057251[0m
+[32m2026-07-06 02:44:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 100, [3200/31542] Loss 0.030179[0m
+[32m2026-07-06 02:44:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 150, [4800/31542] Loss 0.074107[0m
+[32m2026-07-06 02:44:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 200, [6400/31542] Loss 0.105113[0m
+[32m2026-07-06 02:44:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 250, [8000/31542] Loss 0.020104[0m
+[32m2026-07-06 02:44:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 300, [9600/31542] Loss 0.018604[0m
+[32m2026-07-06 02:44:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 350, [11200/31542] Loss 0.106608[0m
+[32m2026-07-06 02:44:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 400, [12800/31542] Loss 0.126402[0m
+[32m2026-07-06 02:44:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 450, [14400/31542] Loss 0.134488[0m
+[32m2026-07-06 02:44:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 500, [16000/31542] Loss 0.084398[0m
+[32m2026-07-06 02:44:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 550, [17600/31542] Loss 0.039681[0m
+[32m2026-07-06 02:44:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 600, [19200/31542] Loss 0.081581[0m
+[32m2026-07-06 02:44:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 650, [20800/31542] Loss 0.004819[0m
+[32m2026-07-06 02:44:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 700, [22400/31542] Loss 0.466462[0m
+[32m2026-07-06 02:44:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 750, [24000/31542] Loss 0.044526[0m
+[32m2026-07-06 02:44:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 800, [25600/31542] Loss 0.106636[0m
+[32m2026-07-06 02:44:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 850, [27200/31542] Loss 0.059277[0m
+[32m2026-07-06 02:44:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 900, [28800/31542] Loss 0.046625[0m
+[32m2026-07-06 02:44:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 25/200, Batch 950, [30400/31542] Loss 0.087600[0m
+[32m2026-07-06 02:44:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:44:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 0, [0/31542] Loss 0.071957[0m
+[32m2026-07-06 02:44:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 50, [1600/31542] Loss 0.022920[0m
+[32m2026-07-06 02:44:42[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 100, [3200/31542] Loss 0.046901[0m
+[32m2026-07-06 02:44:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 150, [4800/31542] Loss 0.067137[0m
+[32m2026-07-06 02:44:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 200, [6400/31542] Loss 0.025784[0m
+[32m2026-07-06 02:44:44[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 250, [8000/31542] Loss 0.102773[0m
+[32m2026-07-06 02:44:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 300, [9600/31542] Loss 0.072992[0m
+[32m2026-07-06 02:44:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 350, [11200/31542] Loss 0.024986[0m
+[32m2026-07-06 02:44:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 400, [12800/31542] Loss 0.110812[0m
+[32m2026-07-06 02:44:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 450, [14400/31542] Loss 0.070661[0m
+[32m2026-07-06 02:44:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 500, [16000/31542] Loss 0.115000[0m
+[32m2026-07-06 02:44:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 550, [17600/31542] Loss 0.046580[0m
+[32m2026-07-06 02:44:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 600, [19200/31542] Loss 0.090776[0m
+[32m2026-07-06 02:44:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 650, [20800/31542] Loss 0.020340[0m
+[32m2026-07-06 02:44:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 700, [22400/31542] Loss 0.070133[0m
+[32m2026-07-06 02:44:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 750, [24000/31542] Loss 0.139784[0m
+[32m2026-07-06 02:44:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 800, [25600/31542] Loss 0.178713[0m
+[32m2026-07-06 02:44:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 850, [27200/31542] Loss 0.073904[0m
+[32m2026-07-06 02:44:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 900, [28800/31542] Loss 0.044406[0m
+[32m2026-07-06 02:44:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 26/200, Batch 950, [30400/31542] Loss 0.246564[0m
+[32m2026-07-06 02:44:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m357[0m - [1mNew best validation score 0.967886 (precision 0.905676, recall 0.967886, threshold 0.500000)[0m
+[32m2026-07-06 02:44:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:44:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 0, [0/31542] Loss 0.161700[0m
+[32m2026-07-06 02:44:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 50, [1600/31542] Loss 0.019978[0m
+[32m2026-07-06 02:44:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 100, [3200/31542] Loss 0.037245[0m
+[32m2026-07-06 02:44:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 150, [4800/31542] Loss 0.059873[0m
+[32m2026-07-06 02:44:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 200, [6400/31542] Loss 0.016130[0m
+[32m2026-07-06 02:44:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 250, [8000/31542] Loss 0.021309[0m
+[32m2026-07-06 02:44:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 300, [9600/31542] Loss 0.041634[0m
+[32m2026-07-06 02:44:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 350, [11200/31542] Loss 0.243886[0m
+[32m2026-07-06 02:45:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 400, [12800/31542] Loss 0.232765[0m
+[32m2026-07-06 02:45:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 450, [14400/31542] Loss 0.046182[0m
+[32m2026-07-06 02:45:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 500, [16000/31542] Loss 0.425900[0m
+[32m2026-07-06 02:45:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 550, [17600/31542] Loss 0.145108[0m
+[32m2026-07-06 02:45:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 600, [19200/31542] Loss 0.158298[0m
+[32m2026-07-06 02:45:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 650, [20800/31542] Loss 0.054129[0m
+[32m2026-07-06 02:45:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 700, [22400/31542] Loss 0.082379[0m
+[32m2026-07-06 02:45:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 750, [24000/31542] Loss 0.096979[0m
+[32m2026-07-06 02:45:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 800, [25600/31542] Loss 0.259530[0m
+[32m2026-07-06 02:45:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 850, [27200/31542] Loss 0.060872[0m
+[32m2026-07-06 02:45:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 900, [28800/31542] Loss 0.089129[0m
+[32m2026-07-06 02:45:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 27/200, Batch 950, [30400/31542] Loss 0.071042[0m
+[32m2026-07-06 02:45:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:45:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 0, [0/31542] Loss 0.089038[0m
+[32m2026-07-06 02:45:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 50, [1600/31542] Loss 0.094865[0m
+[32m2026-07-06 02:45:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 100, [3200/31542] Loss 0.015714[0m
+[32m2026-07-06 02:45:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 150, [4800/31542] Loss 0.091567[0m
+[32m2026-07-06 02:45:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 200, [6400/31542] Loss 0.020481[0m
+[32m2026-07-06 02:45:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 250, [8000/31542] Loss 0.064305[0m
+[32m2026-07-06 02:45:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 300, [9600/31542] Loss 0.008710[0m
+[32m2026-07-06 02:45:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 350, [11200/31542] Loss 0.027949[0m
+[32m2026-07-06 02:45:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 400, [12800/31542] Loss 0.123768[0m
+[32m2026-07-06 02:45:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 450, [14400/31542] Loss 0.045519[0m
+[32m2026-07-06 02:45:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 500, [16000/31542] Loss 0.253907[0m
+[32m2026-07-06 02:45:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 550, [17600/31542] Loss 0.053018[0m
+[32m2026-07-06 02:45:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 600, [19200/31542] Loss 0.163255[0m
+[32m2026-07-06 02:45:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 650, [20800/31542] Loss 0.152985[0m
+[32m2026-07-06 02:45:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 700, [22400/31542] Loss 0.231412[0m
+[32m2026-07-06 02:45:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 750, [24000/31542] Loss 0.072917[0m
+[32m2026-07-06 02:45:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 800, [25600/31542] Loss 0.012473[0m
+[32m2026-07-06 02:45:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 850, [27200/31542] Loss 0.136312[0m
+[32m2026-07-06 02:45:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 900, [28800/31542] Loss 0.028666[0m
+[32m2026-07-06 02:45:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 28/200, Batch 950, [30400/31542] Loss 0.152330[0m
+[32m2026-07-06 02:45:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:45:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 0, [0/31542] Loss 0.429464[0m
+[32m2026-07-06 02:45:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 50, [1600/31542] Loss 0.060774[0m
+[32m2026-07-06 02:45:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 100, [3200/31542] Loss 0.338848[0m
+[32m2026-07-06 02:45:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 150, [4800/31542] Loss 0.404050[0m
+[32m2026-07-06 02:45:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 200, [6400/31542] Loss 0.156492[0m
+[32m2026-07-06 02:45:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 250, [8000/31542] Loss 0.036029[0m
+[32m2026-07-06 02:45:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 300, [9600/31542] Loss 0.141977[0m
+[32m2026-07-06 02:45:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 350, [11200/31542] Loss 0.115114[0m
+[32m2026-07-06 02:45:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 400, [12800/31542] Loss 0.165198[0m
+[32m2026-07-06 02:45:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 450, [14400/31542] Loss 0.017674[0m
+[32m2026-07-06 02:45:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 500, [16000/31542] Loss 0.101895[0m
+[32m2026-07-06 02:45:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 550, [17600/31542] Loss 0.059960[0m
+[32m2026-07-06 02:45:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 600, [19200/31542] Loss 0.052024[0m
+[32m2026-07-06 02:45:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 650, [20800/31542] Loss 0.060133[0m
+[32m2026-07-06 02:45:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 700, [22400/31542] Loss 0.166408[0m
+[32m2026-07-06 02:45:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 750, [24000/31542] Loss 0.103301[0m
+[32m2026-07-06 02:45:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 800, [25600/31542] Loss 0.027853[0m
+[32m2026-07-06 02:45:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 850, [27200/31542] Loss 0.055036[0m
+[32m2026-07-06 02:45:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 900, [28800/31542] Loss 0.051877[0m
+[32m2026-07-06 02:45:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 29/200, Batch 950, [30400/31542] Loss 0.063068[0m
+[32m2026-07-06 02:45:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m357[0m - [1mNew best validation score 0.976806 (precision 0.901977, recall 0.976806, threshold 0.500000)[0m
+[32m2026-07-06 02:45:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:45:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 0, [0/31542] Loss 0.018552[0m
+[32m2026-07-06 02:45:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 50, [1600/31542] Loss 0.005484[0m
+[32m2026-07-06 02:45:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 100, [3200/31542] Loss 0.097279[0m
+[32m2026-07-06 02:45:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 150, [4800/31542] Loss 0.219597[0m
+[32m2026-07-06 02:45:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 200, [6400/31542] Loss 0.072690[0m
+[32m2026-07-06 02:45:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 250, [8000/31542] Loss 0.109230[0m
+[32m2026-07-06 02:45:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 300, [9600/31542] Loss 0.091752[0m
+[32m2026-07-06 02:45:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 350, [11200/31542] Loss 0.041694[0m
+[32m2026-07-06 02:45:42[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 400, [12800/31542] Loss 0.058522[0m
+[32m2026-07-06 02:45:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 450, [14400/31542] Loss 0.052031[0m
+[32m2026-07-06 02:45:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 500, [16000/31542] Loss 0.023040[0m
+[32m2026-07-06 02:45:44[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 550, [17600/31542] Loss 0.063546[0m
+[32m2026-07-06 02:45:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 600, [19200/31542] Loss 0.056016[0m
+[32m2026-07-06 02:45:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 650, [20800/31542] Loss 0.077786[0m
+[32m2026-07-06 02:45:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 700, [22400/31542] Loss 0.212155[0m
+[32m2026-07-06 02:45:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 750, [24000/31542] Loss 0.045377[0m
+[32m2026-07-06 02:45:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 800, [25600/31542] Loss 0.106591[0m
+[32m2026-07-06 02:45:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 850, [27200/31542] Loss 0.030385[0m
+[32m2026-07-06 02:45:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 900, [28800/31542] Loss 0.017523[0m
+[32m2026-07-06 02:45:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 30/200, Batch 950, [30400/31542] Loss 0.067997[0m
+[32m2026-07-06 02:45:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:45:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 0, [0/31542] Loss 0.279467[0m
+[32m2026-07-06 02:45:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 50, [1600/31542] Loss 0.164406[0m
+[32m2026-07-06 02:45:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 100, [3200/31542] Loss 0.060715[0m
+[32m2026-07-06 02:45:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 150, [4800/31542] Loss 0.086494[0m
+[32m2026-07-06 02:45:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 200, [6400/31542] Loss 0.149682[0m
+[32m2026-07-06 02:45:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 250, [8000/31542] Loss 0.131393[0m
+[32m2026-07-06 02:45:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 300, [9600/31542] Loss 0.028342[0m
+[32m2026-07-06 02:45:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 350, [11200/31542] Loss 0.092728[0m
+[32m2026-07-06 02:45:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 400, [12800/31542] Loss 0.172723[0m
+[32m2026-07-06 02:45:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 450, [14400/31542] Loss 0.145826[0m
+[32m2026-07-06 02:45:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 500, [16000/31542] Loss 0.026717[0m
+[32m2026-07-06 02:45:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 550, [17600/31542] Loss 0.032982[0m
+[32m2026-07-06 02:45:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 600, [19200/31542] Loss 0.129696[0m
+[32m2026-07-06 02:45:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 650, [20800/31542] Loss 0.090098[0m
+[32m2026-07-06 02:46:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 700, [22400/31542] Loss 0.072486[0m
+[32m2026-07-06 02:46:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 750, [24000/31542] Loss 0.093054[0m
+[32m2026-07-06 02:46:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 800, [25600/31542] Loss 0.071133[0m
+[32m2026-07-06 02:46:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 850, [27200/31542] Loss 0.038739[0m
+[32m2026-07-06 02:46:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 900, [28800/31542] Loss 0.113823[0m
+[32m2026-07-06 02:46:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 31/200, Batch 950, [30400/31542] Loss 0.073709[0m
+[32m2026-07-06 02:46:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:46:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 0, [0/31542] Loss 0.012578[0m
+[32m2026-07-06 02:46:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 50, [1600/31542] Loss 0.016168[0m
+[32m2026-07-06 02:46:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 100, [3200/31542] Loss 0.016442[0m
+[32m2026-07-06 02:46:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 150, [4800/31542] Loss 0.020278[0m
+[32m2026-07-06 02:46:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 200, [6400/31542] Loss 0.109686[0m
+[32m2026-07-06 02:46:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 250, [8000/31542] Loss 0.093476[0m
+[32m2026-07-06 02:46:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 300, [9600/31542] Loss 0.045109[0m
+[32m2026-07-06 02:46:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 350, [11200/31542] Loss 0.142260[0m
+[32m2026-07-06 02:46:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 400, [12800/31542] Loss 0.410217[0m
+[32m2026-07-06 02:46:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 450, [14400/31542] Loss 0.065126[0m
+[32m2026-07-06 02:46:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 500, [16000/31542] Loss 0.153860[0m
+[32m2026-07-06 02:46:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 550, [17600/31542] Loss 0.186122[0m
+[32m2026-07-06 02:46:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 600, [19200/31542] Loss 0.048827[0m
+[32m2026-07-06 02:46:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 650, [20800/31542] Loss 0.117522[0m
+[32m2026-07-06 02:46:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 700, [22400/31542] Loss 0.177072[0m
+[32m2026-07-06 02:46:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 750, [24000/31542] Loss 0.162056[0m
+[32m2026-07-06 02:46:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 800, [25600/31542] Loss 0.207661[0m
+[32m2026-07-06 02:46:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 850, [27200/31542] Loss 0.068861[0m
+[32m2026-07-06 02:46:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 900, [28800/31542] Loss 0.101005[0m
+[32m2026-07-06 02:46:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 32/200, Batch 950, [30400/31542] Loss 0.364282[0m
+[32m2026-07-06 02:46:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:46:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 0, [0/31542] Loss 0.039818[0m
+[32m2026-07-06 02:46:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 50, [1600/31542] Loss 0.048987[0m
+[32m2026-07-06 02:46:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 100, [3200/31542] Loss 0.084367[0m
+[32m2026-07-06 02:46:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 150, [4800/31542] Loss 0.032294[0m
+[32m2026-07-06 02:46:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 200, [6400/31542] Loss 0.052066[0m
+[32m2026-07-06 02:46:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 250, [8000/31542] Loss 0.042821[0m
+[32m2026-07-06 02:46:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 300, [9600/31542] Loss 0.070626[0m
+[32m2026-07-06 02:46:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 350, [11200/31542] Loss 0.019441[0m
+[32m2026-07-06 02:46:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 400, [12800/31542] Loss 0.040719[0m
+[32m2026-07-06 02:46:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 450, [14400/31542] Loss 0.153288[0m
+[32m2026-07-06 02:46:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 500, [16000/31542] Loss 0.299870[0m
+[32m2026-07-06 02:46:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 550, [17600/31542] Loss 0.041459[0m
+[32m2026-07-06 02:46:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 600, [19200/31542] Loss 0.095041[0m
+[32m2026-07-06 02:46:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 650, [20800/31542] Loss 0.112114[0m
+[32m2026-07-06 02:46:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 700, [22400/31542] Loss 0.033022[0m
+[32m2026-07-06 02:46:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 750, [24000/31542] Loss 0.013857[0m
+[32m2026-07-06 02:46:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 800, [25600/31542] Loss 0.053626[0m
+[32m2026-07-06 02:46:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 850, [27200/31542] Loss 0.074505[0m
+[32m2026-07-06 02:46:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 900, [28800/31542] Loss 0.078699[0m
+[32m2026-07-06 02:46:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 33/200, Batch 950, [30400/31542] Loss 0.021596[0m
+[32m2026-07-06 02:46:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:46:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 0, [0/31542] Loss 0.030854[0m
+[32m2026-07-06 02:46:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 50, [1600/31542] Loss 0.050921[0m
+[32m2026-07-06 02:46:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 100, [3200/31542] Loss 0.069639[0m
+[32m2026-07-06 02:46:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 150, [4800/31542] Loss 0.125992[0m
+[32m2026-07-06 02:46:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 200, [6400/31542] Loss 0.067655[0m
+[32m2026-07-06 02:46:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 250, [8000/31542] Loss 0.026952[0m
+[32m2026-07-06 02:46:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 300, [9600/31542] Loss 0.174573[0m
+[32m2026-07-06 02:46:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 350, [11200/31542] Loss 0.039992[0m
+[32m2026-07-06 02:46:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 400, [12800/31542] Loss 0.118451[0m
+[32m2026-07-06 02:46:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 450, [14400/31542] Loss 0.023837[0m
+[32m2026-07-06 02:46:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 500, [16000/31542] Loss 0.028122[0m
+[32m2026-07-06 02:46:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 550, [17600/31542] Loss 0.072143[0m
+[32m2026-07-06 02:46:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 600, [19200/31542] Loss 0.008388[0m
+[32m2026-07-06 02:46:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 650, [20800/31542] Loss 0.209236[0m
+[32m2026-07-06 02:46:42[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 700, [22400/31542] Loss 0.119907[0m
+[32m2026-07-06 02:46:42[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 750, [24000/31542] Loss 0.146944[0m
+[32m2026-07-06 02:46:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 800, [25600/31542] Loss 0.029028[0m
+[32m2026-07-06 02:46:44[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 850, [27200/31542] Loss 0.177912[0m
+[32m2026-07-06 02:46:44[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 900, [28800/31542] Loss 0.230987[0m
+[32m2026-07-06 02:46:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 34/200, Batch 950, [30400/31542] Loss 0.045109[0m
+[32m2026-07-06 02:46:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:46:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 0, [0/31542] Loss 0.013529[0m
+[32m2026-07-06 02:46:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 50, [1600/31542] Loss 0.036013[0m
+[32m2026-07-06 02:46:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 100, [3200/31542] Loss 0.036681[0m
+[32m2026-07-06 02:46:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 150, [4800/31542] Loss 0.088729[0m
+[32m2026-07-06 02:46:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 200, [6400/31542] Loss 0.135770[0m
+[32m2026-07-06 02:46:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 250, [8000/31542] Loss 0.057269[0m
+[32m2026-07-06 02:46:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 300, [9600/31542] Loss 0.073365[0m
+[32m2026-07-06 02:46:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 350, [11200/31542] Loss 0.133149[0m
+[32m2026-07-06 02:46:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 400, [12800/31542] Loss 0.119908[0m
+[32m2026-07-06 02:46:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 450, [14400/31542] Loss 0.029168[0m
+[32m2026-07-06 02:46:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 500, [16000/31542] Loss 0.103437[0m
+[32m2026-07-06 02:46:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 550, [17600/31542] Loss 0.011927[0m
+[32m2026-07-06 02:46:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 600, [19200/31542] Loss 0.087053[0m
+[32m2026-07-06 02:46:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 650, [20800/31542] Loss 0.038030[0m
+[32m2026-07-06 02:46:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 700, [22400/31542] Loss 0.032799[0m
+[32m2026-07-06 02:46:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 750, [24000/31542] Loss 0.098736[0m
+[32m2026-07-06 02:46:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 800, [25600/31542] Loss 0.168609[0m
+[32m2026-07-06 02:46:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 850, [27200/31542] Loss 0.211224[0m
+[32m2026-07-06 02:46:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 900, [28800/31542] Loss 0.045534[0m
+[32m2026-07-06 02:46:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 35/200, Batch 950, [30400/31542] Loss 0.086858[0m
+[32m2026-07-06 02:47:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:47:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 0, [0/31542] Loss 0.158780[0m
+[32m2026-07-06 02:47:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 50, [1600/31542] Loss 0.156876[0m
+[32m2026-07-06 02:47:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 100, [3200/31542] Loss 0.297256[0m
+[32m2026-07-06 02:47:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 150, [4800/31542] Loss 0.043006[0m
+[32m2026-07-06 02:47:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 200, [6400/31542] Loss 0.148597[0m
+[32m2026-07-06 02:47:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 250, [8000/31542] Loss 0.113847[0m
+[32m2026-07-06 02:47:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 300, [9600/31542] Loss 0.074040[0m
+[32m2026-07-06 02:47:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 350, [11200/31542] Loss 0.201702[0m
+[32m2026-07-06 02:47:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 400, [12800/31542] Loss 0.044539[0m
+[32m2026-07-06 02:47:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 450, [14400/31542] Loss 0.030349[0m
+[32m2026-07-06 02:47:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 500, [16000/31542] Loss 0.006315[0m
+[32m2026-07-06 02:47:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 550, [17600/31542] Loss 0.027020[0m
+[32m2026-07-06 02:47:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 600, [19200/31542] Loss 0.223290[0m
+[32m2026-07-06 02:47:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 650, [20800/31542] Loss 0.040068[0m
+[32m2026-07-06 02:47:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 700, [22400/31542] Loss 0.025442[0m
+[32m2026-07-06 02:47:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 750, [24000/31542] Loss 0.150430[0m
+[32m2026-07-06 02:47:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 800, [25600/31542] Loss 0.071201[0m
+[32m2026-07-06 02:47:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 850, [27200/31542] Loss 0.089392[0m
+[32m2026-07-06 02:47:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 900, [28800/31542] Loss 0.176661[0m
+[32m2026-07-06 02:47:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 36/200, Batch 950, [30400/31542] Loss 0.009248[0m
+[32m2026-07-06 02:47:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:47:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 0, [0/31542] Loss 0.042261[0m
+[32m2026-07-06 02:47:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 50, [1600/31542] Loss 0.079898[0m
+[32m2026-07-06 02:47:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 100, [3200/31542] Loss 0.018550[0m
+[32m2026-07-06 02:47:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 150, [4800/31542] Loss 0.117614[0m
+[32m2026-07-06 02:47:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 200, [6400/31542] Loss 0.050314[0m
+[32m2026-07-06 02:47:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 250, [8000/31542] Loss 0.022268[0m
+[32m2026-07-06 02:47:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 300, [9600/31542] Loss 0.045329[0m
+[32m2026-07-06 02:47:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 350, [11200/31542] Loss 0.158556[0m
+[32m2026-07-06 02:47:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 400, [12800/31542] Loss 0.015150[0m
+[32m2026-07-06 02:47:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 450, [14400/31542] Loss 0.011311[0m
+[32m2026-07-06 02:47:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 500, [16000/31542] Loss 0.179329[0m
+[32m2026-07-06 02:47:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 550, [17600/31542] Loss 0.041769[0m
+[32m2026-07-06 02:47:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 600, [19200/31542] Loss 0.072795[0m
+[32m2026-07-06 02:47:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 650, [20800/31542] Loss 0.039726[0m
+[32m2026-07-06 02:47:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 700, [22400/31542] Loss 0.046412[0m
+[32m2026-07-06 02:47:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 750, [24000/31542] Loss 0.074332[0m
+[32m2026-07-06 02:47:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 800, [25600/31542] Loss 0.040091[0m
+[32m2026-07-06 02:47:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 850, [27200/31542] Loss 0.406298[0m
+[32m2026-07-06 02:47:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 900, [28800/31542] Loss 0.253931[0m
+[32m2026-07-06 02:47:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 37/200, Batch 950, [30400/31542] Loss 0.005642[0m
+[32m2026-07-06 02:47:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:47:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 0, [0/31542] Loss 0.014678[0m
+[32m2026-07-06 02:47:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 50, [1600/31542] Loss 0.074060[0m
+[32m2026-07-06 02:47:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 100, [3200/31542] Loss 0.023070[0m
+[32m2026-07-06 02:47:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 150, [4800/31542] Loss 0.039421[0m
+[32m2026-07-06 02:47:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 200, [6400/31542] Loss 0.200272[0m
+[32m2026-07-06 02:47:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 250, [8000/31542] Loss 0.116832[0m
+[32m2026-07-06 02:47:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 300, [9600/31542] Loss 0.058363[0m
+[32m2026-07-06 02:47:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 350, [11200/31542] Loss 0.112781[0m
+[32m2026-07-06 02:47:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 400, [12800/31542] Loss 0.011898[0m
+[32m2026-07-06 02:47:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 450, [14400/31542] Loss 0.103718[0m
+[32m2026-07-06 02:47:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 500, [16000/31542] Loss 0.096218[0m
+[32m2026-07-06 02:47:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 550, [17600/31542] Loss 0.048974[0m
+[32m2026-07-06 02:47:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 600, [19200/31542] Loss 0.092249[0m
+[32m2026-07-06 02:47:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 650, [20800/31542] Loss 0.136098[0m
+[32m2026-07-06 02:47:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 700, [22400/31542] Loss 0.010163[0m
+[32m2026-07-06 02:47:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 750, [24000/31542] Loss 0.043890[0m
+[32m2026-07-06 02:47:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 800, [25600/31542] Loss 0.101688[0m
+[32m2026-07-06 02:47:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 850, [27200/31542] Loss 0.077936[0m
+[32m2026-07-06 02:47:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 900, [28800/31542] Loss 0.011647[0m
+[32m2026-07-06 02:47:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 38/200, Batch 950, [30400/31542] Loss 0.050785[0m
+[32m2026-07-06 02:47:42[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:47:42[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 0, [0/31542] Loss 0.013809[0m
+[32m2026-07-06 02:47:42[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 50, [1600/31542] Loss 0.106994[0m
+[32m2026-07-06 02:47:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 100, [3200/31542] Loss 0.431542[0m
+[32m2026-07-06 02:47:44[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 150, [4800/31542] Loss 0.053413[0m
+[32m2026-07-06 02:47:44[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 200, [6400/31542] Loss 0.050098[0m
+[32m2026-07-06 02:47:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 250, [8000/31542] Loss 0.022072[0m
+[32m2026-07-06 02:47:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 300, [9600/31542] Loss 0.153780[0m
+[32m2026-07-06 02:47:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 350, [11200/31542] Loss 0.048743[0m
+[32m2026-07-06 02:47:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 400, [12800/31542] Loss 0.058008[0m
+[32m2026-07-06 02:47:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 450, [14400/31542] Loss 0.048263[0m
+[32m2026-07-06 02:47:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 500, [16000/31542] Loss 0.109259[0m
+[32m2026-07-06 02:47:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 550, [17600/31542] Loss 0.047128[0m
+[32m2026-07-06 02:47:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 600, [19200/31542] Loss 0.126661[0m
+[32m2026-07-06 02:47:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 650, [20800/31542] Loss 0.020893[0m
+[32m2026-07-06 02:47:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 700, [22400/31542] Loss 0.078935[0m
+[32m2026-07-06 02:47:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 750, [24000/31542] Loss 0.035049[0m
+[32m2026-07-06 02:47:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 800, [25600/31542] Loss 0.085315[0m
+[32m2026-07-06 02:47:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 850, [27200/31542] Loss 0.127579[0m
+[32m2026-07-06 02:47:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 900, [28800/31542] Loss 0.092221[0m
+[32m2026-07-06 02:47:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 39/200, Batch 950, [30400/31542] Loss 0.076485[0m
+[32m2026-07-06 02:47:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:47:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 0, [0/31542] Loss 0.152330[0m
+[32m2026-07-06 02:47:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 50, [1600/31542] Loss 0.017317[0m
+[32m2026-07-06 02:47:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 100, [3200/31542] Loss 0.088426[0m
+[32m2026-07-06 02:47:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 150, [4800/31542] Loss 0.106917[0m
+[32m2026-07-06 02:47:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 200, [6400/31542] Loss 0.082179[0m
+[32m2026-07-06 02:47:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 250, [8000/31542] Loss 0.107154[0m
+[32m2026-07-06 02:48:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 300, [9600/31542] Loss 0.066529[0m
+[32m2026-07-06 02:48:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 350, [11200/31542] Loss 0.063706[0m
+[32m2026-07-06 02:48:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 400, [12800/31542] Loss 0.193554[0m
+[32m2026-07-06 02:48:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 450, [14400/31542] Loss 0.058582[0m
+[32m2026-07-06 02:48:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 500, [16000/31542] Loss 0.147861[0m
+[32m2026-07-06 02:48:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 550, [17600/31542] Loss 0.160217[0m
+[32m2026-07-06 02:48:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 600, [19200/31542] Loss 0.137052[0m
+[32m2026-07-06 02:48:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 650, [20800/31542] Loss 0.102532[0m
+[32m2026-07-06 02:48:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 700, [22400/31542] Loss 0.018871[0m
+[32m2026-07-06 02:48:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 750, [24000/31542] Loss 0.171312[0m
+[32m2026-07-06 02:48:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 800, [25600/31542] Loss 0.020668[0m
+[32m2026-07-06 02:48:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 850, [27200/31542] Loss 0.034582[0m
+[32m2026-07-06 02:48:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 900, [28800/31542] Loss 0.753538[0m
+[32m2026-07-06 02:48:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 40/200, Batch 950, [30400/31542] Loss 0.145465[0m
+[32m2026-07-06 02:48:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:48:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 0, [0/31542] Loss 0.226846[0m
+[32m2026-07-06 02:48:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 50, [1600/31542] Loss 0.056443[0m
+[32m2026-07-06 02:48:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 100, [3200/31542] Loss 0.060667[0m
+[32m2026-07-06 02:48:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 150, [4800/31542] Loss 0.182495[0m
+[32m2026-07-06 02:48:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 200, [6400/31542] Loss 0.012653[0m
+[32m2026-07-06 02:48:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 250, [8000/31542] Loss 0.062360[0m
+[32m2026-07-06 02:48:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 300, [9600/31542] Loss 0.090438[0m
+[32m2026-07-06 02:48:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 350, [11200/31542] Loss 0.012486[0m
+[32m2026-07-06 02:48:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 400, [12800/31542] Loss 0.182376[0m
+[32m2026-07-06 02:48:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 450, [14400/31542] Loss 0.010107[0m
+[32m2026-07-06 02:48:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 500, [16000/31542] Loss 0.022308[0m
+[32m2026-07-06 02:48:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 550, [17600/31542] Loss 0.142997[0m
+[32m2026-07-06 02:48:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 600, [19200/31542] Loss 0.019216[0m
+[32m2026-07-06 02:48:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 650, [20800/31542] Loss 0.079062[0m
+[32m2026-07-06 02:48:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 700, [22400/31542] Loss 0.059415[0m
+[32m2026-07-06 02:48:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 750, [24000/31542] Loss 0.083670[0m
+[32m2026-07-06 02:48:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 800, [25600/31542] Loss 0.010928[0m
+[32m2026-07-06 02:48:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 850, [27200/31542] Loss 0.018087[0m
+[32m2026-07-06 02:48:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 900, [28800/31542] Loss 0.098279[0m
+[32m2026-07-06 02:48:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 41/200, Batch 950, [30400/31542] Loss 0.161421[0m
+[32m2026-07-06 02:48:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:48:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 0, [0/31542] Loss 0.047053[0m
+[32m2026-07-06 02:48:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 50, [1600/31542] Loss 0.009135[0m
+[32m2026-07-06 02:48:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 100, [3200/31542] Loss 0.106544[0m
+[32m2026-07-06 02:48:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 150, [4800/31542] Loss 0.072402[0m
+[32m2026-07-06 02:48:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 200, [6400/31542] Loss 0.014885[0m
+[32m2026-07-06 02:48:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 250, [8000/31542] Loss 0.056579[0m
+[32m2026-07-06 02:48:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 300, [9600/31542] Loss 0.199107[0m
+[32m2026-07-06 02:48:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 350, [11200/31542] Loss 0.217871[0m
+[32m2026-07-06 02:48:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 400, [12800/31542] Loss 0.007012[0m
+[32m2026-07-06 02:48:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 450, [14400/31542] Loss 0.020882[0m
+[32m2026-07-06 02:48:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 500, [16000/31542] Loss 0.017069[0m
+[32m2026-07-06 02:48:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 550, [17600/31542] Loss 0.088785[0m
+[32m2026-07-06 02:48:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 600, [19200/31542] Loss 0.125940[0m
+[32m2026-07-06 02:48:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 650, [20800/31542] Loss 0.041321[0m
+[32m2026-07-06 02:48:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 700, [22400/31542] Loss 0.062105[0m
+[32m2026-07-06 02:48:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 750, [24000/31542] Loss 0.350845[0m
+[32m2026-07-06 02:48:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 800, [25600/31542] Loss 0.185173[0m
+[32m2026-07-06 02:48:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 850, [27200/31542] Loss 0.029619[0m
+[32m2026-07-06 02:48:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 900, [28800/31542] Loss 0.230616[0m
+[32m2026-07-06 02:48:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 42/200, Batch 950, [30400/31542] Loss 0.161716[0m
+[32m2026-07-06 02:48:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:48:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 0, [0/31542] Loss 0.284774[0m
+[32m2026-07-06 02:48:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 50, [1600/31542] Loss 0.024904[0m
+[32m2026-07-06 02:48:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 100, [3200/31542] Loss 0.075904[0m
+[32m2026-07-06 02:48:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 150, [4800/31542] Loss 0.538678[0m
+[32m2026-07-06 02:48:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 200, [6400/31542] Loss 0.064632[0m
+[32m2026-07-06 02:48:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 250, [8000/31542] Loss 0.097110[0m
+[32m2026-07-06 02:48:42[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 300, [9600/31542] Loss 0.112665[0m
+[32m2026-07-06 02:48:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 350, [11200/31542] Loss 0.015768[0m
+[32m2026-07-06 02:48:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 400, [12800/31542] Loss 0.158275[0m
+[32m2026-07-06 02:48:44[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 450, [14400/31542] Loss 0.025059[0m
+[32m2026-07-06 02:48:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 500, [16000/31542] Loss 0.038454[0m
+[32m2026-07-06 02:48:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 550, [17600/31542] Loss 0.087313[0m
+[32m2026-07-06 02:48:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 600, [19200/31542] Loss 0.027326[0m
+[32m2026-07-06 02:48:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 650, [20800/31542] Loss 0.103225[0m
+[32m2026-07-06 02:48:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 700, [22400/31542] Loss 0.093087[0m
+[32m2026-07-06 02:48:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 750, [24000/31542] Loss 0.042564[0m
+[32m2026-07-06 02:48:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 800, [25600/31542] Loss 0.367379[0m
+[32m2026-07-06 02:48:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 850, [27200/31542] Loss 0.018917[0m
+[32m2026-07-06 02:48:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 900, [28800/31542] Loss 0.040286[0m
+[32m2026-07-06 02:48:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 43/200, Batch 950, [30400/31542] Loss 0.053985[0m
+[32m2026-07-06 02:48:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:48:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 0, [0/31542] Loss 0.041617[0m
+[32m2026-07-06 02:48:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 50, [1600/31542] Loss 0.020675[0m
+[32m2026-07-06 02:48:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 100, [3200/31542] Loss 0.378480[0m
+[32m2026-07-06 02:48:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 150, [4800/31542] Loss 0.095441[0m
+[32m2026-07-06 02:48:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 200, [6400/31542] Loss 0.017635[0m
+[32m2026-07-06 02:48:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 250, [8000/31542] Loss 0.035604[0m
+[32m2026-07-06 02:48:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 300, [9600/31542] Loss 0.015819[0m
+[32m2026-07-06 02:48:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 350, [11200/31542] Loss 0.227095[0m
+[32m2026-07-06 02:48:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 400, [12800/31542] Loss 0.044444[0m
+[32m2026-07-06 02:48:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 450, [14400/31542] Loss 0.096829[0m
+[32m2026-07-06 02:48:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 500, [16000/31542] Loss 0.089362[0m
+[32m2026-07-06 02:49:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 550, [17600/31542] Loss 0.051583[0m
+[32m2026-07-06 02:49:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 600, [19200/31542] Loss 0.013531[0m
+[32m2026-07-06 02:49:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 650, [20800/31542] Loss 0.037853[0m
+[32m2026-07-06 02:49:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 700, [22400/31542] Loss 0.017323[0m
+[32m2026-07-06 02:49:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 750, [24000/31542] Loss 0.055592[0m
+[32m2026-07-06 02:49:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 800, [25600/31542] Loss 0.006171[0m
+[32m2026-07-06 02:49:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 850, [27200/31542] Loss 0.109072[0m
+[32m2026-07-06 02:49:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 900, [28800/31542] Loss 0.072388[0m
+[32m2026-07-06 02:49:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 44/200, Batch 950, [30400/31542] Loss 0.055359[0m
+[32m2026-07-06 02:49:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:49:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 0, [0/31542] Loss 0.021064[0m
+[32m2026-07-06 02:49:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 50, [1600/31542] Loss 0.046728[0m
+[32m2026-07-06 02:49:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 100, [3200/31542] Loss 0.038128[0m
+[32m2026-07-06 02:49:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 150, [4800/31542] Loss 0.067594[0m
+[32m2026-07-06 02:49:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 200, [6400/31542] Loss 0.014031[0m
+[32m2026-07-06 02:49:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 250, [8000/31542] Loss 0.150921[0m
+[32m2026-07-06 02:49:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 300, [9600/31542] Loss 0.014066[0m
+[32m2026-07-06 02:49:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 350, [11200/31542] Loss 0.044809[0m
+[32m2026-07-06 02:49:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 400, [12800/31542] Loss 0.147914[0m
+[32m2026-07-06 02:49:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 450, [14400/31542] Loss 0.281556[0m
+[32m2026-07-06 02:49:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 500, [16000/31542] Loss 0.102616[0m
+[32m2026-07-06 02:49:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 550, [17600/31542] Loss 0.152627[0m
+[32m2026-07-06 02:49:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 600, [19200/31542] Loss 0.102500[0m
+[32m2026-07-06 02:49:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 650, [20800/31542] Loss 0.319216[0m
+[32m2026-07-06 02:49:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 700, [22400/31542] Loss 0.054281[0m
+[32m2026-07-06 02:49:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 750, [24000/31542] Loss 0.045139[0m
+[32m2026-07-06 02:49:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 800, [25600/31542] Loss 0.099574[0m
+[32m2026-07-06 02:49:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 850, [27200/31542] Loss 0.070624[0m
+[32m2026-07-06 02:49:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 900, [28800/31542] Loss 0.019433[0m
+[32m2026-07-06 02:49:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 45/200, Batch 950, [30400/31542] Loss 0.011445[0m
+[32m2026-07-06 02:49:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:49:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 0, [0/31542] Loss 0.043451[0m
+[32m2026-07-06 02:49:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 50, [1600/31542] Loss 0.044455[0m
+[32m2026-07-06 02:49:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 100, [3200/31542] Loss 0.295697[0m
+[32m2026-07-06 02:49:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 150, [4800/31542] Loss 0.046117[0m
+[32m2026-07-06 02:49:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 200, [6400/31542] Loss 0.063614[0m
+[32m2026-07-06 02:49:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 250, [8000/31542] Loss 0.024137[0m
+[32m2026-07-06 02:49:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 300, [9600/31542] Loss 0.011758[0m
+[32m2026-07-06 02:49:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 350, [11200/31542] Loss 0.074172[0m
+[32m2026-07-06 02:49:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 400, [12800/31542] Loss 0.013758[0m
+[32m2026-07-06 02:49:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 450, [14400/31542] Loss 0.143411[0m
+[32m2026-07-06 02:49:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 500, [16000/31542] Loss 0.103954[0m
+[32m2026-07-06 02:49:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 550, [17600/31542] Loss 0.044790[0m
+[32m2026-07-06 02:49:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 600, [19200/31542] Loss 0.094773[0m
+[32m2026-07-06 02:49:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 650, [20800/31542] Loss 0.173624[0m
+[32m2026-07-06 02:49:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 700, [22400/31542] Loss 0.041208[0m
+[32m2026-07-06 02:49:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 750, [24000/31542] Loss 0.005957[0m
+[32m2026-07-06 02:49:31[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 800, [25600/31542] Loss 0.115517[0m
+[32m2026-07-06 02:49:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 850, [27200/31542] Loss 0.149228[0m
+[32m2026-07-06 02:49:32[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 900, [28800/31542] Loss 0.014301[0m
+[32m2026-07-06 02:49:33[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 46/200, Batch 950, [30400/31542] Loss 0.025348[0m
+[32m2026-07-06 02:49:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:49:34[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 0, [0/31542] Loss 0.040641[0m
+[32m2026-07-06 02:49:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 50, [1600/31542] Loss 0.020964[0m
+[32m2026-07-06 02:49:35[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 100, [3200/31542] Loss 0.020759[0m
+[32m2026-07-06 02:49:36[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 150, [4800/31542] Loss 0.006159[0m
+[32m2026-07-06 02:49:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 200, [6400/31542] Loss 0.053064[0m
+[32m2026-07-06 02:49:37[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 250, [8000/31542] Loss 0.025712[0m
+[32m2026-07-06 02:49:38[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 300, [9600/31542] Loss 0.019781[0m
+[32m2026-07-06 02:49:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 350, [11200/31542] Loss 0.027401[0m
+[32m2026-07-06 02:49:39[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 400, [12800/31542] Loss 0.020645[0m
+[32m2026-07-06 02:49:40[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 450, [14400/31542] Loss 0.077485[0m
+[32m2026-07-06 02:49:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 500, [16000/31542] Loss 0.044982[0m
+[32m2026-07-06 02:49:41[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 550, [17600/31542] Loss 0.092073[0m
+[32m2026-07-06 02:49:42[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 600, [19200/31542] Loss 0.019649[0m
+[32m2026-07-06 02:49:43[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 650, [20800/31542] Loss 0.009848[0m
+[32m2026-07-06 02:49:44[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 700, [22400/31542] Loss 0.444272[0m
+[32m2026-07-06 02:49:44[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 750, [24000/31542] Loss 0.013166[0m
+[32m2026-07-06 02:49:45[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 800, [25600/31542] Loss 0.026235[0m
+[32m2026-07-06 02:49:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 850, [27200/31542] Loss 0.052944[0m
+[32m2026-07-06 02:49:46[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 900, [28800/31542] Loss 0.157156[0m
+[32m2026-07-06 02:49:47[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 47/200, Batch 950, [30400/31542] Loss 0.128304[0m
+[32m2026-07-06 02:49:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:49:48[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 0, [0/31542] Loss 0.087613[0m
+[32m2026-07-06 02:49:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 50, [1600/31542] Loss 0.017921[0m
+[32m2026-07-06 02:49:49[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 100, [3200/31542] Loss 0.069698[0m
+[32m2026-07-06 02:49:50[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 150, [4800/31542] Loss 0.270649[0m
+[32m2026-07-06 02:49:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 200, [6400/31542] Loss 0.101860[0m
+[32m2026-07-06 02:49:51[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 250, [8000/31542] Loss 0.078182[0m
+[32m2026-07-06 02:49:52[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 300, [9600/31542] Loss 0.052187[0m
+[32m2026-07-06 02:49:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 350, [11200/31542] Loss 0.048067[0m
+[32m2026-07-06 02:49:53[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 400, [12800/31542] Loss 0.152754[0m
+[32m2026-07-06 02:49:54[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 450, [14400/31542] Loss 0.179346[0m
+[32m2026-07-06 02:49:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 500, [16000/31542] Loss 0.061955[0m
+[32m2026-07-06 02:49:55[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 550, [17600/31542] Loss 0.158727[0m
+[32m2026-07-06 02:49:56[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 600, [19200/31542] Loss 0.017515[0m
+[32m2026-07-06 02:49:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 650, [20800/31542] Loss 0.432770[0m
+[32m2026-07-06 02:49:57[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 700, [22400/31542] Loss 0.042258[0m
+[32m2026-07-06 02:49:58[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 750, [24000/31542] Loss 0.014206[0m
+[32m2026-07-06 02:49:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 800, [25600/31542] Loss 0.052112[0m
+[32m2026-07-06 02:49:59[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 850, [27200/31542] Loss 0.164060[0m
+[32m2026-07-06 02:50:00[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 900, [28800/31542] Loss 0.014471[0m
+[32m2026-07-06 02:50:01[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 48/200, Batch 950, [30400/31542] Loss 0.057322[0m
+[32m2026-07-06 02:50:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:50:02[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 0, [0/31542] Loss 0.010249[0m
+[32m2026-07-06 02:50:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 50, [1600/31542] Loss 0.098208[0m
+[32m2026-07-06 02:50:03[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 100, [3200/31542] Loss 0.021113[0m
+[32m2026-07-06 02:50:04[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 150, [4800/31542] Loss 0.045167[0m
+[32m2026-07-06 02:50:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 200, [6400/31542] Loss 0.252260[0m
+[32m2026-07-06 02:50:05[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 250, [8000/31542] Loss 0.099147[0m
+[32m2026-07-06 02:50:06[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 300, [9600/31542] Loss 0.049811[0m
+[32m2026-07-06 02:50:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 350, [11200/31542] Loss 0.077459[0m
+[32m2026-07-06 02:50:07[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 400, [12800/31542] Loss 0.080025[0m
+[32m2026-07-06 02:50:08[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 450, [14400/31542] Loss 0.020912[0m
+[32m2026-07-06 02:50:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 500, [16000/31542] Loss 0.019426[0m
+[32m2026-07-06 02:50:09[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 550, [17600/31542] Loss 0.010630[0m
+[32m2026-07-06 02:50:10[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 600, [19200/31542] Loss 0.134918[0m
+[32m2026-07-06 02:50:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 650, [20800/31542] Loss 0.173398[0m
+[32m2026-07-06 02:50:11[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 700, [22400/31542] Loss 0.103293[0m
+[32m2026-07-06 02:50:12[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 750, [24000/31542] Loss 0.066256[0m
+[32m2026-07-06 02:50:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 800, [25600/31542] Loss 0.183353[0m
+[32m2026-07-06 02:50:13[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 850, [27200/31542] Loss 0.042328[0m
+[32m2026-07-06 02:50:14[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 900, [28800/31542] Loss 0.031588[0m
+[32m2026-07-06 02:50:15[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 49/200, Batch 950, [30400/31542] Loss 0.032047[0m
+[32m2026-07-06 02:50:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m308[0m - [1m--------------------------------[0m
+[32m2026-07-06 02:50:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 0, [0/31542] Loss 0.011213[0m
+[32m2026-07-06 02:50:16[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 50, [1600/31542] Loss 0.031127[0m
+[32m2026-07-06 02:50:17[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 100, [3200/31542] Loss 0.068107[0m
+[32m2026-07-06 02:50:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 150, [4800/31542] Loss 0.121172[0m
+[32m2026-07-06 02:50:18[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 200, [6400/31542] Loss 0.078327[0m
+[32m2026-07-06 02:50:19[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 250, [8000/31542] Loss 0.191873[0m
+[32m2026-07-06 02:50:20[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 300, [9600/31542] Loss 0.209848[0m
+[32m2026-07-06 02:50:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 350, [11200/31542] Loss 0.032495[0m
+[32m2026-07-06 02:50:21[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 400, [12800/31542] Loss 0.118085[0m
+[32m2026-07-06 02:50:22[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 450, [14400/31542] Loss 0.015759[0m
+[32m2026-07-06 02:50:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 500, [16000/31542] Loss 0.285375[0m
+[32m2026-07-06 02:50:23[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 550, [17600/31542] Loss 0.239546[0m
+[32m2026-07-06 02:50:24[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 600, [19200/31542] Loss 0.100146[0m
+[32m2026-07-06 02:50:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 650, [20800/31542] Loss 0.006904[0m
+[32m2026-07-06 02:50:25[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 700, [22400/31542] Loss 0.014669[0m
+[32m2026-07-06 02:50:26[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 750, [24000/31542] Loss 0.043331[0m
+[32m2026-07-06 02:50:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 800, [25600/31542] Loss 0.401569[0m
+[32m2026-07-06 02:50:27[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 850, [27200/31542] Loss 0.036172[0m
+[32m2026-07-06 02:50:28[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 900, [28800/31542] Loss 0.072783[0m
+[32m2026-07-06 02:50:29[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m328[0m - [1mEpoch 50/200, Batch 950, [30400/31542] Loss 0.009922[0m
+[32m2026-07-06 02:50:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m372[0m - [1mEarly stopping triggered after 51 epochs (no improvement for 21 epochs)[0m
+[32m2026-07-06 02:50:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m390[0m - [1m============================================================[0m
+[32m2026-07-06 02:50:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m391[0m - [1mTraining complete — best epoch 29 (precision 0.901977, recall 0.976806, precision floor 0.9000):[0m
+[32m2026-07-06 02:50:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m399[0m - [1m  Validation Threshold: 0.500000[0m
+[32m2026-07-06 02:50:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m402[0m - [1m  Validation Recall:    0.976806[0m
+[32m2026-07-06 02:50:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m403[0m - [1m  Validation Precision: 0.901977[0m
+[32m2026-07-06 02:50:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m404[0m - [1m  Validation F1:        0.937901[0m
+[32m2026-07-06 02:50:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m407[0m - [1m  Validation F2:        0.960863[0m
+[32m2026-07-06 02:50:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m410[0m - [1m  Selection score:      0.976806[0m
+[32m2026-07-06 02:50:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m414[0m - [1m  Validation Loss:      0.119467[0m
+[32m2026-07-06 02:50:30[0m | [1mINFO    [0m | [36mmodel.cnn[0m:[36mtrain_model[0m:[36m415[0m - [1m============================================================[0m
+2026-07-06 02:50:32.973 | INFO     | model.bayesian_hptuner:_train_trial:243 - Training trial_3 exited with code 0
+2026-07-06 02:50:33.005 | INFO     | service.trial_service:save_trials:254 - Upserted 1 trial(s).
+2026-07-06 02:50:33.010 | INFO     | service.trial_service:get_trials:199 - Fetched 3 trial row(s) from CSV.
+2026-07-06 02:50:33.023 | INFO     | util.hptune:sync_best_trial_artifacts:188 - Best-trial snapshot updated: trial_id=trial_3 score=0.976806 -> data/arch_hptune/trials/best_trial
+2026-07-06 02:50:33.023 | INFO     | model.bayesian_hptuner:run_step:301 - Trial trial_3 completed: score=0.976806 recall=0.976806 precision=0.901977
+2026-07-06 02:50:33.028 | INFO     | service.trial_service:get_trials:199 - Fetched 3 trial row(s) from CSV.
+2026-07-06 02:50:33.029 | DEBUG    | util.pbs:_qsub:35 - qsub: qsub -k doe -q debug -o data/arch_hptune/controller_logs/ -e data/arch_hptune/controller_logs/ -l select=1:system=polaris,place=scatter,walltime=1:00:00,filesystems=home:eagle -V /eagle/fusiondl_aesp/starlightjason2/DLDL/scripts/run_hptune.sh
+2026-07-06 02:50:33.822 | INFO     | model.bayesian_hptuner:run_step:320 - Submitted next step as 7237386.polaris-pbs-01.hsn.cm.polaris.alcf.anl.gov

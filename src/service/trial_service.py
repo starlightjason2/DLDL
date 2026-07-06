@@ -49,6 +49,7 @@ _CSV_COLUMNS = [
     "score",
     "recall",
     "precision",
+    "f1",
     "status",
     "retries",
     "created_at",
@@ -148,6 +149,8 @@ class TrialService:
             data["recall"] = -1.0
         if pd.isna(data.get("precision")):
             data["precision"] = -1.0
+        if pd.isna(data.get("f1")):
+            data["f1"] = -1.0
         data["status"] = int(data["status"])
         return HPTuneTrial.model_validate(data)
 
@@ -185,6 +188,7 @@ class TrialService:
             "score": trial.score,
             "recall": trial.recall,
             "precision": trial.precision,
+            "f1": trial.f1,
             "status": int(trial.status),
             "retries": trial.retries,
         }

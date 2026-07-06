@@ -147,6 +147,7 @@ class BayesianHPTuner:
                         "score": metrics["score"],
                         "recall": metrics["recall"],
                         "precision": metrics["precision"],
+                        "f1": metrics["f1"],
                         "status": TrialStatus.COMPLETED,
                     }
                 )
@@ -290,6 +291,7 @@ class BayesianHPTuner:
                             "score": metrics["score"],
                             "recall": metrics["recall"],
                             "precision": metrics["precision"],
+                            "f1": metrics["f1"],
                             "status": TrialStatus.COMPLETED,
                         }
                     )
@@ -299,11 +301,12 @@ class BayesianHPTuner:
                 TrialService.get_trials(), self.trials_dir / "best_trial"
             )
             logger.info(
-                "Trial {} completed: score={:.6f} recall={:.6f} precision={:.6f}",
+                "Trial {} completed: score={:.6f} recall={:.6f} precision={:.6f} f1={:.6f}",
                 trial.trial_id,
                 metrics["score"],
                 metrics["recall"],
                 metrics["precision"],
+                metrics["f1"],
             )
         else:
             self.mark_trial_failed(trial.trial_id, return_code=return_code)

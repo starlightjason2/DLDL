@@ -123,8 +123,8 @@ def next_trial_numbered_id(
 def parse_trial_metrics(trial_dir: str | Path) -> tuple[bool, dict[str, float]]:
     """Parse trial metrics from the best validation epoch per ``util.objective``.
 
-    The best epoch maximizes recall among rows with precision at or above
-    ``MIN_PRECISION``. Returns ``(True, {"score", "recall", "precision"})`` on
+    The best epoch maximizes F-beta among rows with precision at or above
+    ``MIN_PRECISION``. Returns ``(True, {"score", "recall", "precision", "f1"})`` on
     success, ``(False, {})`` if no valid log is found.
     """
     candidates = sorted(

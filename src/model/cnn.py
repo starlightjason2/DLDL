@@ -165,7 +165,7 @@ class IpCNN(nn.Module):
     ) -> None:
         """Run validation for a single epoch and update logs.
 
-        Metrics use the fixed ``DECISION_THRESHOLD`` (default 0.5). F-beta is logged only.
+        Metrics use the fixed ``DECISION_THRESHOLD`` (default 0.5).
         """
         model.eval()
         total_val_loss = 0.0
@@ -242,8 +242,8 @@ class IpCNN(nn.Module):
         """Train this model on a single device.
 
         Model selection (best checkpoint + early stopping) maximizes validation
-        recall among epochs with precision at or above ``MIN_PRECISION``
-        (default 0.90) at the fixed decision threshold. F-beta is logged only.
+        F-beta among epochs with precision at or above ``MIN_PRECISION``
+        (default 0.90) at the fixed decision threshold.
         """
         self.logger.info(f"GPUs Available: {torch.cuda.device_count()}")
         if torch.cuda.is_available():
@@ -270,11 +270,10 @@ class IpCNN(nn.Module):
         self.logger.info(f"  Gradient clip: {gradient_clip}")
         self.logger.info(f"  DataLoader num_workers: {num_workers}")
         self.logger.info(
-            "  Selection objective: maximize recall with precision >= {:.4f} "
-            "(per-epoch threshold tuning)",
+            "  Selection objective: maximize F{:g} with precision >= {:.4f}",
+            fbeta,
             min_precision(),
         )
-        self.logger.info(f"  F-beta (logged only): F{fbeta:g}")
         self.logger.info("=" * 60)
 
         train, dev, _ = self.dataset.split()
@@ -341,7 +340,9 @@ class IpCNN(nn.Module):
             avg_val_loss = logs[-1]["validation_loss"] if logs else float("inf")
             last = logs[-1]
             current_score = score(
-                float(last[RECALL_COL]), float(last[PRECISION_COL])
+                float(last[RECALL_COL]),
+                float(last[PRECISION_COL]),
+                beta=fbeta,
             )
 
             if lr_scheduler_enabled:
@@ -409,7 +410,11 @@ class IpCNN(nn.Module):
             )
             self.logger.info(
                 "  Selection score:      {:.6f}",
-                score(float(best[RECALL_COL]), float(best[PRECISION_COL])),
+                score(
+                    float(best[RECALL_COL]),
+                    float(best[PRECISION_COL]),
+                    beta=fbeta,
+                ),
             )
             self.logger.info("  Validation Loss:      {:.6f}", best["validation_loss"])
             self.logger.info("=" * 60)
