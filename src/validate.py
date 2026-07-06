@@ -95,8 +95,7 @@ def _evaluate_dev(
             for i, (pred, actual) in enumerate(zip(preds, actuals)):
                 idx = dev_indices[offset + i]
                 if pred != actual:
-                    shot_no = dataset.shot_number(idx)
-                    (fp_shot_ids if pred else fn_shot_ids).append(shot_no)
+                    (fp_shot_ids if pred else fn_shot_ids).append(idx)
                 if actual:
                     shot = dataset.load_shot_view(idx)
                     pred_time = predict_disruption_time(shot.current, shot.time)
