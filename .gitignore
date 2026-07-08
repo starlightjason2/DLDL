@@ -153,10 +153,10 @@ core.*
 *.pth
 *.ckpt
 !**/best_trial/*_best_params.pt
-!**/best_epoch/*_best_params.pt
+!best_model/*_best_params.pt
 !trials.csv
+!best_model/predictions.csv
 
-wandb/
 *.csv
 *.pkl
 *.pickle

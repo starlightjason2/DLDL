@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from model.dataset import ShotView
-
 import numpy as np
-from matplotlib.axes import Axes
 
 DEFAULT_SMOOTHING = 200
 

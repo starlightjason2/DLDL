@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import torch
-from dotenv import load_dotenv
 from loguru import logger
 from sklearn.metrics import (
     accuracy_score,
@@ -23,10 +22,9 @@ from torch.utils.data import DataLoader, Subset
 
 from model.dataset import IpDataset
 from util.disruption_predict import predict_disruption_time
-from util.training import load_best_epoch_cnn
+from util.best_model import best_model_dir, load_best_model_cnn, load_best_model_env
 
 _REPO = Path(__file__).resolve().parents[1]
-load_dotenv(_REPO / ".env", encoding="utf-8")
 
 
 def _abs(path: str) -> Path:
@@ -162,8 +160,10 @@ def _write_artifacts(prog_dir: Path, result: EvalResult) -> None:
     )
 
 
-def evaluate_best_model(prog_dir: Path, batch_size: int = 256) -> None:
-    """Run the best checkpoint on the dev holdout used during training."""
+def evaluate_best_model(batch_size: int = 256) -> None:
+    """Run the best_model checkpoint on the dev holdout used during training."""
+    load_best_model_env()
+    model_dir = best_model_dir()
     dataset = IpDataset(
         data_file=str(_abs(os.environ["DATA_PATH"])),
         labels_file=str(_abs(os.environ["TRAIN_LABELS_PATH"])),
@@ -176,11 +176,10 @@ def evaluate_best_model(prog_dir: Path, batch_size: int = 256) -> None:
 
     _, dev, _ = dataset.split()
 
-    model = load_best_epoch_cnn(dataset)
+    model = load_best_model_cnn(dataset)
     if model is None:
         logger.warning(
-            "No best checkpoint found (HPTUNE_DIR/trials/best_trial or "
-            "PROG_DIR/best_epoch); skipping model evaluation."
+            "No checkpoint found in best_model/*_best_params.pt; skipping model evaluation."
         )
         return
 
@@ -197,7 +196,7 @@ def evaluate_best_model(prog_dir: Path, batch_size: int = 256) -> None:
 
     result = _evaluate_dev(dataset, model, dev, batch_size=batch_size, device=device)
     _log_metrics(result, fbeta=fbeta)
-    _write_artifacts(prog_dir, result)
+    _write_artifacts(model_dir, result)
 
 
 def main() -> None:
@@ -217,18 +216,19 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    prog_dir = _abs(os.environ["PROG_DIR"])
+    load_best_model_env()
+    model_dir = best_model_dir()
     data_path = _abs(os.environ["DATA_PATH"])
     labels_path = _abs(os.environ["TRAIN_LABELS_PATH"])
-    for path in (prog_dir, data_path.parent, labels_path.parent):
+    for path in (model_dir, data_path.parent, labels_path.parent):
         path.mkdir(parents=True, exist_ok=True)
 
-    _configure_logging(prog_dir)
+    _configure_logging(model_dir)
     logger.info("Running validation...")
     _require_preprocessed(data_path, labels_path)
 
     if not args.skip_model_eval:
-        evaluate_best_model(prog_dir, batch_size=args.eval_batch_size)
+        evaluate_best_model(batch_size=args.eval_batch_size)
 
     logger.info("Validation complete.")
 

@@ -1,6 +1,8 @@
-"""Scatter plot of predicted vs true disruption times from ``best_model/predictions.csv``."""
+"""Histogram of predicted minus true disruption time from ``best_model/predictions.csv``."""
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -18,20 +20,18 @@ def main() -> None:
         )
 
     df = pd.read_csv(csv_path)
+    diff = df["predicted_time"] - df["true_time"]
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.scatter(df["predicted_time"], df["true_time"], alpha=0.85)
-    lo = min(df["predicted_time"].min(), df["true_time"].min())
-    hi = max(df["predicted_time"].max(), df["true_time"].max())
-    ax.plot([lo, hi], [lo, hi], "r--", linewidth=1, label="y = x")
-    ax.set_xlabel("Predicted disruption time (s)")
-    ax.set_ylabel("True disruption time (s)")
-    ax.set_title("Disruption time predictions")
-    ax.legend()
+    ax.hist(diff, bins=30, edgecolor="black", alpha=0.85)
+    ax.axvline(0.0, color="red", linestyle="--", linewidth=1)
+    ax.set_xlabel("Predicted - true disruption time (s)")
+    ax.set_ylabel("Count")
+    ax.set_title("Disruption time prediction error")
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
-    out_path = model_dir / "predictions_scatter.png"
+    out_path = model_dir / "disruption_time_diff.png"
     fig.savefig(out_path, dpi=200)
     plt.close(fig)
     print(f"Wrote {out_path}")

@@ -12,16 +12,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
-import torch
 from loguru import logger
 
-from model.cnn import IpCNN
 from model.trial_status import TrialStatus
 from util.objective import PRECISION_COL, RECALL_COL, best_row, trial_metrics
 
 if TYPE_CHECKING:
-    from model.dataset import IpDataset
-    from model.hp_trial import HPTuneTrial
+    from model.hp_trial import HpTuneTrial
 
 # Training hyperparameters snapshotted into architecture trials (from project ``.env``).
 _FIXED_TRAINING_ENV_KEYS = (
@@ -45,18 +42,18 @@ _FIXED_TRAINING_ENV_KEYS = (
 
 
 def fixed_training_env_keys() -> dict[str, str]:
-    """Training env vars held fixed during ``HPTUNE_MODE=architecture`` runs."""
+    """Training env vars held fixed during ``HP_TUNE_MODE=architecture`` runs."""
     missing = [key for key in _FIXED_TRAINING_ENV_KEYS if key not in os.environ]
     if missing:
         raise KeyError(
-            "Missing training hyperparameters required for architecture HPTune: "
+            "Missing training hyperparameters required for architecture HP tune: "
             + ", ".join(missing)
         )
     return {key: os.environ[key] for key in _FIXED_TRAINING_ENV_KEYS}
 
 
 def fixed_training_trial_fields() -> dict[str, Any]:
-    """Map fixed project training env vars to :class:`HPTuneTrial` field names."""
+    """Map fixed project training env vars to :class:`HpTuneTrial` field names."""
     env = fixed_training_env_keys()
     return {
         "lr": float(env["LEARNING_RATE"]),
@@ -149,7 +146,7 @@ def parse_trial_metrics(trial_dir: str | Path) -> tuple[bool, dict[str, float]]:
 
 
 def sync_best_trial_artifacts(
-    trials: Sequence[HPTuneTrial],
+    trials: Sequence[HpTuneTrial],
     best_trial_dir: Path,
 ) -> None:
     """Refresh ``best_trial/`` with the current overall best trial's ``.env`` and checkpoint.
@@ -193,52 +190,6 @@ def sync_best_trial_artifacts(
     )
 
 
-def load_best_trial_cnn(dataset: "IpDataset") -> "IpCNN | None":
-    """Build an ``IpCNN`` initialized with the global-best trial's weights.
-
-    The network architecture is read from the environment (the same vars
-    ``train.py`` uses) and the weights come from ``best_trial/*_best_params.pt``.
-    Returns an eval-mode model on CPU, or ``None`` if no best checkpoint exists.
-    """
-    repo = Path(__file__).resolve().parents[2]
-    hptune_dir = Path(os.environ["HPTUNE_DIR"])
-    if not hptune_dir.is_absolute():
-        hptune_dir = repo / hptune_dir
-
-    best_dir = hptune_dir / "trials" / "best_trial"
-    checkpoints = sorted(best_dir.glob("*_best_params.pt"))
-    if not checkpoints:
-        return None
-
-    def _conv(prefix: str) -> tuple[int, int, int]:
-        return (
-            int(os.environ[f"{prefix}_FILTERS"]),
-            int(os.environ[f"{prefix}_KERNEL"]),
-            int(os.environ[f"{prefix}_PADDING"]),
-        )
-
-    model = IpCNN(
-        dataset,
-        prog_dir=str(best_dir),
-        conv1=_conv("CONV1"),
-        conv2=_conv("CONV2"),
-        conv3=_conv("CONV3"),
-        conv4=_conv("CONV4"),
-        pool_size=int(os.environ["POOL_SIZE"]),
-        fc1_size=int(os.environ["FC1_SIZE"]),
-        fc2_size=int(os.environ["FC2_SIZE"]),
-        dropout_rate=float(os.environ["DROPOUT_RATE"]),
-        cls_pos_weight=float(os.environ["CLS_POS_WEIGHT"]),
-        decision_threshold=float(os.environ["DECISION_THRESHOLD"]),
-    )
-    ckpt = torch.load(checkpoints[0], map_location="cpu")
-    # Checkpoints are plain weight state_dicts; tolerate older full-state dicts too.
-    state = ckpt["model"] if isinstance(ckpt, dict) and "model" in ckpt else ckpt
-    model.load_state_dict(state)
-    model.eval()
-    return model
-
-
 def write_env(
     env_path: str | Path,
     env_keys: dict[str, Any],
@@ -257,7 +208,7 @@ def write_env(
 
     lines = (
         list(env_lines or [])
-        + ["# HP-tune trial overrides (see ``HPTuneTrial.trial_env_keys``)"]
+        + ["# HP-tune trial overrides (see ``HpTuneTrial.trial_env_keys``)"]
         + [f"{k}={_shell_value(v)}" for k, v in env_keys.items()]
     )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

@@ -1,6 +1,6 @@
 """Thin ``qsub`` submission helper for the serial HP-tune chain.
 
-The chain is one self-resubmitting job (see ``BayesianHPTuner.run_step``): each job
+The chain is one self-resubmitting job (see ``BayesianHpTuner.run_step``): each job
 trains one trial in-process and then submits the next step. There are never two
 jobs pending at once, so it fits queues that allow only one running + one queued
 job per user (e.g. Polaris ``debug``). The job id is read straight from ``qsub``
@@ -69,7 +69,7 @@ def _submit_step(
     )
 
 
-def submit_hptune_step(
+def submit_hp_tune_step(
     *,
     log_dir: Path,
     queue: str,
@@ -80,5 +80,5 @@ def submit_hptune_step(
         log_dir=log_dir,
         queue=queue,
         walltime=walltime,
-        script_name="run_hptune.sh",
+        script_name="run_hp_tune.sh",
     )

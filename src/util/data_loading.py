@@ -1,7 +1,7 @@
 """Data loading utilities for plasma disruption datasets."""
 
 import os
-from typing import Tuple, List, Optional
+from typing import Tuple, List
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
@@ -31,20 +31,6 @@ def _read_signal_file(filepath: str, col: int = 1) -> np.ndarray:
         filepath, sep=r"\s+", header=None, usecols=[col], dtype=np.float32, engine="c"
     )
     return df.iloc[:, 0].values
-
-
-def load_shot_signal(data_dir: str, shot_no: int) -> Tuple[NDArray, NDArray]:
-    """Load time (col 0) and plasma current (col 1) for one shot."""
-    filepath = os.path.join(data_dir, f"{int(shot_no)}.txt")
-    df = pd.read_csv(
-        filepath,
-        sep=r"\s+",
-        header=None,
-        usecols=[0, 1],
-        dtype=np.float64,
-        engine="c",
-    )
-    return df.iloc[:, 0].values, df.iloc[:, 1].values
 
 
 def get_length(filename: str, data_dir: str) -> int:

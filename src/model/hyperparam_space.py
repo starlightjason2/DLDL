@@ -26,40 +26,40 @@ class HyperparameterSpace(BaseModel):
 
     @staticmethod
     def from_env() -> HyperparameterSpace:
-        allowed_epochs = env_tuple("HPTUNE_ALLOWED_EPOCHS")
-        batch_sizes = env_tuple("HPTUNE_ALLOWED_BATCH_SIZES")
-        num_initial_trials = env_int("HPTUNE_NUM_INITIAL_TRIALS")
-        random_insert_every = env_int("HPTUNE_RANDOM_INSERT_EVERY")
-        expected_improvement_xi = float(os.environ["HPTUNE_EI_XI"])
+        allowed_epochs = env_tuple("HP_TUNE_ALLOWED_EPOCHS")
+        batch_sizes = env_tuple("HP_TUNE_ALLOWED_BATCH_SIZES")
+        num_initial_trials = env_int("HP_TUNE_NUM_INITIAL_TRIALS")
+        random_insert_every = env_int("HP_TUNE_RANDOM_INSERT_EVERY")
+        expected_improvement_xi = float(os.environ["HP_TUNE_EI_XI"])
         bounds = {
-            "lr": (env_float("HPTUNE_LR_MIN"), env_float("HPTUNE_LR_MAX")),
+            "lr": (env_float("HP_TUNE_LR_MIN"), env_float("HP_TUNE_LR_MAX")),
             "dropout": (
-                env_float("HPTUNE_DROPOUT_MIN"),
-                env_float("HPTUNE_DROPOUT_MAX"),
+                env_float("HP_TUNE_DROPOUT_MIN"),
+                env_float("HP_TUNE_DROPOUT_MAX"),
             ),
             "log_wd": (
-                env_float("HPTUNE_WEIGHT_DECAY_LOG_MIN"),
-                env_float("HPTUNE_WEIGHT_DECAY_LOG_MAX"),
+                env_float("HP_TUNE_WEIGHT_DECAY_LOG_MIN"),
+                env_float("HP_TUNE_WEIGHT_DECAY_LOG_MAX"),
             ),
             "gradient_clip": (
-                env_float("HPTUNE_GRADIENT_CLIP_MIN"),
-                env_float("HPTUNE_GRADIENT_CLIP_MAX"),
+                env_float("HP_TUNE_GRADIENT_CLIP_MIN"),
+                env_float("HP_TUNE_GRADIENT_CLIP_MAX"),
             ),
             "lr_scheduler_factor": (
-                env_float("HPTUNE_LR_SCHEDULER_FACTOR_MIN"),
-                env_float("HPTUNE_LR_SCHEDULER_FACTOR_MAX"),
+                env_float("HP_TUNE_LR_SCHEDULER_FACTOR_MIN"),
+                env_float("HP_TUNE_LR_SCHEDULER_FACTOR_MAX"),
             ),
             "lr_sched_patience": (
-                env_float("HPTUNE_LR_SCHEDULER_PATIENCE_MIN"),
-                env_float("HPTUNE_LR_SCHEDULER_PATIENCE_MAX"),
+                env_float("HP_TUNE_LR_SCHEDULER_PATIENCE_MIN"),
+                env_float("HP_TUNE_LR_SCHEDULER_PATIENCE_MAX"),
             ),
             "early_stop_patience": (
-                env_float("HPTUNE_EARLY_STOPPING_PATIENCE_MIN"),
-                env_float("HPTUNE_EARLY_STOPPING_PATIENCE_MAX"),
+                env_float("HP_TUNE_EARLY_STOPPING_PATIENCE_MIN"),
+                env_float("HP_TUNE_EARLY_STOPPING_PATIENCE_MAX"),
             ),
             "cls_pos_weight": (
-                env_float("HPTUNE_CLS_POS_WEIGHT_MIN"),
-                env_float("HPTUNE_CLS_POS_WEIGHT_MAX"),
+                env_float("HP_TUNE_CLS_POS_WEIGHT_MIN"),
+                env_float("HP_TUNE_CLS_POS_WEIGHT_MAX"),
             ),
             "epochs": (float(min(allowed_epochs)), float(max(allowed_epochs))),
             "batch_idx": (0.0, float(len(batch_sizes) - 1)),
@@ -132,17 +132,17 @@ class ArchitectureHyperparameterSpace(BaseModel):
 
     @staticmethod
     def from_env() -> ArchitectureHyperparameterSpace:
-        conv_filters = env_tuple("ARCH_HPTUNE_CONV_FILTERS")
-        kernels = env_tuple("ARCH_HPTUNE_KERNELS")
-        pool_sizes = env_tuple("ARCH_HPTUNE_POOL_SIZES")
-        fc1_min = env_int("ARCH_HPTUNE_FC1_MIN")
-        fc1_max = env_int("ARCH_HPTUNE_FC1_MAX")
-        fc2_min = env_int("ARCH_HPTUNE_FC2_MIN")
-        fc2_max = env_int("ARCH_HPTUNE_FC2_MAX")
+        conv_filters = env_tuple("ARCH_TUNE_CONV_FILTERS")
+        kernels = env_tuple("ARCH_TUNE_KERNELS")
+        pool_sizes = env_tuple("ARCH_TUNE_POOL_SIZES")
+        fc1_min = env_int("ARCH_TUNE_FC1_MIN")
+        fc1_max = env_int("ARCH_TUNE_FC1_MAX")
+        fc2_min = env_int("ARCH_TUNE_FC2_MIN")
+        fc2_max = env_int("ARCH_TUNE_FC2_MAX")
         if fc1_min > fc1_max:
-            raise ValueError("ARCH_HPTUNE_FC1_MIN must be <= ARCH_HPTUNE_FC1_MAX")
+            raise ValueError("ARCH_TUNE_FC1_MIN must be <= ARCH_TUNE_FC1_MAX")
         if fc2_min > fc2_max:
-            raise ValueError("ARCH_HPTUNE_FC2_MIN must be <= ARCH_HPTUNE_FC2_MAX")
+            raise ValueError("ARCH_TUNE_FC2_MIN must be <= ARCH_TUNE_FC2_MAX")
 
         def _idx_bounds(count: int) -> tuple[float, float]:
             return (0.0, float(max(count - 1, 0)))
@@ -165,9 +165,9 @@ class ArchitectureHyperparameterSpace(BaseModel):
             conv_filters=conv_filters,
             kernels=kernels,
             pool_sizes=pool_sizes,
-            num_initial_trials=env_int("ARCH_HPTUNE_NUM_INITIAL_TRIALS"),
-            random_insert_every=env_int("ARCH_HPTUNE_RANDOM_INSERT_EVERY"),
-            expected_improvement_xi=env_float("ARCH_HPTUNE_EI_XI"),
+            num_initial_trials=env_int("ARCH_TUNE_NUM_INITIAL_TRIALS"),
+            random_insert_every=env_int("ARCH_TUNE_RANDOM_INSERT_EVERY"),
+            expected_improvement_xi=env_float("ARCH_TUNE_EI_XI"),
             fc1_min=fc1_min,
             fc1_max=fc1_max,
             fc2_min=fc2_min,
@@ -249,8 +249,8 @@ class ArchitectureHyperparameterSpace(BaseModel):
         }
 
 
-def hptune_mode() -> str:
-    mode = os.environ.get("HPTUNE_MODE", "training").strip().lower()
+def hp_tune_mode() -> str:
+    mode = os.environ.get("HP_TUNE_MODE", "training").strip().lower()
     if mode not in {"training", "architecture"}:
-        raise ValueError(f"HPTUNE_MODE must be 'training' or 'architecture', got {mode!r}")
+        raise ValueError(f"HP_TUNE_MODE must be 'training' or 'architecture', got {mode!r}")
     return mode

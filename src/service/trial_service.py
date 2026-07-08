@@ -15,7 +15,7 @@ import pandas as pd
 from loguru import logger
 from pydantic import TypeAdapter
 
-from model.hp_trial import HPTuneTrial, TrialStatus
+from model.hp_trial import HpTuneTrial, TrialStatus
 
 _CSV_COLUMNS = [
     "trial_id",
@@ -80,7 +80,7 @@ class TrialService:
 
     @staticmethod
     def _csv_path() -> Path:
-        return Path(os.environ["HPTUNE_DIR"]) / "trials" / "trials.csv"
+        return Path(os.environ["HP_TUNE_DIR"]) / "trials" / "trials.csv"
 
     @staticmethod
     @contextmanager
@@ -129,7 +129,7 @@ class TrialService:
         tmp_path.replace(path)
 
     @staticmethod
-    def _row_to_trial(row: pd.Series) -> HPTuneTrial:
+    def _row_to_trial(row: pd.Series) -> HpTuneTrial:
         data = row.to_dict()
         for key in ("created_at", "updated_at"):
             if pd.isna(data.get(key)):
@@ -152,10 +152,10 @@ class TrialService:
         if pd.isna(data.get("f1")):
             data["f1"] = -1.0
         data["status"] = int(data["status"])
-        return HPTuneTrial.model_validate(data)
+        return HpTuneTrial.model_validate(data)
 
     @staticmethod
-    def _trial_to_row(trial: HPTuneTrial) -> dict[str, Any]:
+    def _trial_to_row(trial: HpTuneTrial) -> dict[str, Any]:
         return {
             "trial_id": trial.trial_id,
             "job_id": trial.job_id,
@@ -195,7 +195,7 @@ class TrialService:
 
     @staticmethod
     @logger.catch
-    def get_trials() -> list[HPTuneTrial]:
+    def get_trials() -> list[HpTuneTrial]:
         """Return all trials ordered by ``trial_id``."""
         with TrialService._locked_csv() as path:
             df = TrialService._read_df(path)
@@ -205,7 +205,7 @@ class TrialService:
 
     @staticmethod
     @logger.catch
-    def get_trial(trial_id: str) -> HPTuneTrial:
+    def get_trial(trial_id: str) -> HpTuneTrial:
         """Return one trial by primary key."""
         with TrialService._locked_csv() as path:
             df = TrialService._read_df(path)
@@ -234,7 +234,7 @@ class TrialService:
 
     @staticmethod
     @logger.catch
-    def save_trials(trials: Sequence[HPTuneTrial]) -> None:
+    def save_trials(trials: Sequence[HpTuneTrial]) -> None:
         """Upsert each trial row (merge by ``trial_id``)."""
         now = datetime.now(timezone.utc).isoformat()
 
@@ -258,11 +258,11 @@ class TrialService:
         logger.info(f"Upserted {len(trials)} trial(s).")
 
     @staticmethod
-    def get_status_counts(trials: list[HPTuneTrial]) -> dict[str, int]:
+    def get_status_counts(trials: list[HpTuneTrial]) -> dict[str, int]:
         """Aggregate counts by :class:`TrialStatus`.
 
         ``active`` is running plus queued (work still in the pipeline); used by
-        :meth:`model.bayesian_hptuner.BayesianHPTuner.run` dispatch logging.
+        :meth:`model.bayesian_hp_tuner.BayesianHpTuner.run` dispatch logging.
         """
         by_status = Counter(t.status for t in trials)
         running = by_status.get(TrialStatus.RUNNING, 0)

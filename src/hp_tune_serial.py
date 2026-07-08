@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
-from model.bayesian_hptuner import BayesianHPTuner
+from model.bayesian_hp_tuner import BayesianHpTuner
 
 
 def main() -> None:
-    tuner = BayesianHPTuner()
+    tuner = BayesianHpTuner()
     tuner.run_step()
 
 

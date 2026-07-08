@@ -2,43 +2,32 @@
 
 # DLDL: Disruption Labeling with Deep Learning
 
-A 1D CNN that uses plasma current to predict whether a shot disrupts (binary disruption classification). For labeling D-IIID shots with the 'ipspr15V' plasma current PTDATA signal.
-
-Interactive polaris shell
-
-```
-qsub -I -A fusiondl_aesp -q debug \
-  -l select=1:system=polaris:ngpus=4 \
-  -l place=scatter \
-  -l walltime=0:30:00 \
-  -l filesystems=home:eagle
-```
+A 1D CNN that uses plasma current to predict whether a DIII-D shot disrupts (binary classification on the `ipspr15V` PTDATA signal).
 
 ## Environment Setup
 
-1. **Create `.env`** from a template. Each example file lists the **full** variable set required by the code (71+ keys); do not use a paths-only snippet as your only `.env`:
+1. **Create `.env`** from a template. Each example file lists the full variable set required by the code; do not use a paths-only snippet as your only `.env`:
 
    ```bash
    cp .env.example .env              # generic template; edit paths
-   cp .env.local.example .env        # local dev (relative paths, smaller HPTUNE_MAX_TRIALS)
+   cp .env.local.example .env        # local dev (relative paths, smaller HP_TUNE_MAX_TRIALS)
    cp .env.polaris.example .env      # Polaris / Eagle paths
    # or symlink: ln -sf .env.polaris .env
    ```
 
-   See [Environment Variables](#environment-variables) for descriptions.
-
 2. **Install:**
+
    ```bash
    pip install -e .
    ```
 
-`.env` is loaded by entry scripts (`load_dotenv`) before training or HPTune step jobs read `os.environ`.
+Entry scripts call `load_dotenv` on the project-root `.env` before reading `os.environ`. PBS shell scripts `source` the same file.
 
-**Hyperparameter tuning:** Trial state is stored in **`{HPTUNE_DIR}/trials/trials.csv`** (see `service.trial_service`) with **Pydantic** models (`model.hp_trial.HPTuneTrial`). Trial directories live under `{HPTUNE_DIR}/trials/trial_*`.
+**HP tune:** Trial state lives in `{HP_TUNE_DIR}/trials/trials.csv` (see `service.trial_service`) using Pydantic models (`model.hp_trial.HpTuneTrial`). Trial directories are `{HP_TUNE_DIR}/trials/trial_*`.
 
 ### Environment Variables
 
-Everything is read from the process environment (typically via a project-root `.env` loaded by `load_dotenv` in Python entry scripts, or `source`d by PBS shell scripts). There is no JSON config file. **Required** means the key must be set for that workflow.
+Everything is read from the process environment. There is no JSON config file. **Required** means the key must be set for that workflow.
 
 #### Paths and run identity
 
@@ -49,7 +38,7 @@ Everything is read from the process environment (typically via a project-root `.
 | `LABELS_PATH`       | ✓        | Shot list with disruption times.                                  |
 | `DATA_PATH`         | ✓        | Full path to preprocessed dataset tensor (`.pt`).                 |
 | `TRAIN_LABELS_PATH` | ✓        | Full path to preprocessed labels tensor (`.pt`).                  |
-| `PROG_DIR`          | ✓        | Training logs, checkpoints, and `graph.py` outputs.               |
+| `PROG_DIR`          | ✓        | Training logs, checkpoints, and validation outputs.             |
 | `JOB_ID`            | ✓        | Run identifier (filenames / logs).                                |
 
 \*Set `PROJECT_ROOT` in `.env` for local and PBS runs. PBS scripts `source` the project `.env` and `cd` to `PROJECT_ROOT`.
@@ -77,9 +66,10 @@ Everything is read from the process environment (typically via a project-root `.
 | `LR_SCHEDULER_PATIENCE`   | ✓                        | Integer ≥ 1.                                                                                                                                                                                                                                           |
 | `GRADIENT_CLIP`           | ✓                        | Float ≥ 0.                                                                                                                                                                                                                                             |
 | `DATALOADER_NUM_WORKERS`  | ✓                        | DataLoader workers (forced to `0` when no GPU).                                                                                                                                                                                                        |
-| `CLS_POS_WEIGHT`          | ✓                        | Positive-class (disruptive) weight in BCE loss (float ≥ 0). `>1` favors recall over precision. Tunable via `HPTUNE_CLS_POS_WEIGHT_*`.                                                                                                                  |
+| `CLS_POS_WEIGHT`          | ✓                        | Positive-class (disruptive) weight in BCE loss (float ≥ 0). `>1` favors recall over precision. Tunable via `HP_TUNE_CLS_POS_WEIGHT_*`.                                                                                                                  |
 | `DECISION_THRESHOLD`      | ✓                        | Sigmoid probability cutoff for the disruptive class (float in [0, 1]). Fixed (not tuned); typically `0.5`.                                                                                                                                             |
-| `FBETA`                   | optional (default `1.8`) | Beta for the F-beta score used for model selection (best checkpoint + early stopping) and as the HPTune objective, which is **maximized**. `beta>1` weights recall over precision (default `1.8`). This defines the objective and is not itself tuned. |
+| `MIN_PRECISION`           | optional (default `0.90`) | Precision floor for checkpoint selection and the HP tune objective. Best epoch must meet this floor to be eligible.                                                                                                                                   |
+| `FBETA`                   | optional (default `1.8`) | Beta for the F-beta score used for model selection (best checkpoint + early stopping) and as the HP tune objective, which is **maximized**. `beta>1` weights recall over precision. This defines the objective and is not itself tuned. |
 
 #### Architecture (`train.py` → `IpCNN`)
 
@@ -92,38 +82,54 @@ Everything is read from the process environment (typically via a project-root `.
 | `POOL_SIZE`                                      | ✓        | Integer ≥ 1.                                 |
 | `FC1_SIZE`, `FC2_SIZE`                           | ✓        | Integer ≥ 1.                                 |
 
-#### Bayesian HPTune search space (`BayesianHPTuner`)
+#### Bayesian HP tune search space (`BayesianHpTuner`)
 
-Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`). All keys below are required when running `hptune_serial`.
+Comma-separated lists must not be empty (e.g. `HP_TUNE_ALLOWED_EPOCHS=25,50,100`). All keys below are required when running `hp_tune_serial`.
 
 | Variable                                                                   | Required | Description                                                                                                                                                     |
 | -------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `HPTUNE_DIR`                                                               | ✓        | Absolute path to HPTune run root. Trials: `HPTUNE_DIR/trials/trial_*`. Log CSV: `HPTUNE_DIR/trials/trials.csv`. Controller logs: `HPTUNE_DIR/controller_logs/`. |
-| `HPTUNE_LR_MIN`, `HPTUNE_LR_MAX`                                           | ✓        | Learning-rate search bounds (float; min must be less than max).                                                                                                 |
-| `HPTUNE_DROPOUT_MIN`, `HPTUNE_DROPOUT_MAX`                                 | ✓        | Dropout bounds (0–1; min must be less than max).                                                                                                                |
-| `HPTUNE_ALLOWED_EPOCHS`                                                    | ✓        | Comma-separated positive integers.                                                                                                                              |
-| `HPTUNE_NUM_INITIAL_TRIALS`                                                | ✓        | Integer ≥ 1.                                                                                                                                                    |
-| `HPTUNE_WEIGHT_DECAY_LOG_MIN`, `HPTUNE_WEIGHT_DECAY_LOG_MAX`               | ✓        | Log10 weight-decay bounds (min must be less than max).                                                                                                          |
-| `HPTUNE_ALLOWED_BATCH_SIZES`                                               | ✓        | Comma-separated positive integers.                                                                                                                              |
-| `HPTUNE_GRADIENT_CLIP_MIN`, `HPTUNE_GRADIENT_CLIP_MAX`                     | ✓        | `min` ≤ `max`.                                                                                                                                                  |
-| `HPTUNE_LR_SCHEDULER_FACTOR_MIN`, `HPTUNE_LR_SCHEDULER_FACTOR_MAX`         | ✓        | In (0, 1); min must be less than max.                                                                                                                           |
-| `HPTUNE_LR_SCHEDULER_PATIENCE_MIN`, `HPTUNE_LR_SCHEDULER_PATIENCE_MAX`     | ✓        | Integers ≥ 1, `min` ≤ `max`.                                                                                                                                    |
-| `HPTUNE_EARLY_STOPPING_PATIENCE_MIN`, `HPTUNE_EARLY_STOPPING_PATIENCE_MAX` | ✓        | Integers ≥ 1, `min` ≤ `max`.                                                                                                                                    |
-| `HPTUNE_CLS_POS_WEIGHT_MIN`, `HPTUNE_CLS_POS_WEIGHT_MAX`                   | ✓        | BCE positive-class weight bounds (float ≥ 0; `min` ≤ `max`). Higher values push toward recall.                                                                  |
-| `HPTUNE_RANDOM_INSERT_EVERY`                                               | ✓        | Insert a random trial every N completed trials after warmup (integer ≥ 0).                                                                                      |
-| `HPTUNE_EI_XI`                                                             | ✓        | Expected-improvement ξ for Bayesian optimization (float ≥ 0).                                                                                                   |
+| `HP_TUNE_DIR`                                                               | ✓        | Absolute path to HP tune run root. Trials: `HP_TUNE_DIR/trials/trial_*`. Log CSV: `HP_TUNE_DIR/trials/trials.csv`. Controller logs: `HP_TUNE_DIR/controller_logs/`. |
+| `HP_TUNE_LR_MIN`, `HP_TUNE_LR_MAX`                                           | ✓        | Learning-rate search bounds (float; min must be less than max).                                                                                                 |
+| `HP_TUNE_DROPOUT_MIN`, `HP_TUNE_DROPOUT_MAX`                                 | ✓        | Dropout bounds (0–1; min must be less than max).                                                                                                                |
+| `HP_TUNE_ALLOWED_EPOCHS`                                                    | ✓        | Comma-separated positive integers.                                                                                                                              |
+| `HP_TUNE_NUM_INITIAL_TRIALS`                                                | ✓        | Integer ≥ 1.                                                                                                                                                    |
+| `HP_TUNE_WEIGHT_DECAY_LOG_MIN`, `HP_TUNE_WEIGHT_DECAY_LOG_MAX`               | ✓        | Log10 weight-decay bounds (min must be less than max).                                                                                                          |
+| `HP_TUNE_ALLOWED_BATCH_SIZES`                                               | ✓        | Comma-separated positive integers.                                                                                                                              |
+| `HP_TUNE_GRADIENT_CLIP_MIN`, `HP_TUNE_GRADIENT_CLIP_MAX`                     | ✓        | `min` ≤ `max`.                                                                                                                                                  |
+| `HP_TUNE_LR_SCHEDULER_FACTOR_MIN`, `HP_TUNE_LR_SCHEDULER_FACTOR_MAX`         | ✓        | In (0, 1); min must be less than max.                                                                                                                           |
+| `HP_TUNE_LR_SCHEDULER_PATIENCE_MIN`, `HP_TUNE_LR_SCHEDULER_PATIENCE_MAX`     | ✓        | Integers ≥ 1, `min` ≤ `max`.                                                                                                                                    |
+| `HP_TUNE_EARLY_STOPPING_PATIENCE_MIN`, `HP_TUNE_EARLY_STOPPING_PATIENCE_MAX` | ✓        | Integers ≥ 1, `min` ≤ `max`.                                                                                                                                    |
+| `HP_TUNE_CLS_POS_WEIGHT_MIN`, `HP_TUNE_CLS_POS_WEIGHT_MAX`                   | ✓        | BCE positive-class weight bounds (float ≥ 0; `min` ≤ `max`). Higher values push toward recall.                                                                  |
+| `HP_TUNE_RANDOM_INSERT_EVERY`                                               | ✓        | Insert a random trial every N completed trials after warmup (integer ≥ 0).                                                                                      |
+| `HP_TUNE_EI_XI`                                                             | ✓        | Expected-improvement ξ for Bayesian optimization (float ≥ 0).                                                                                                   |
 
-#### HPTune step jobs and PBS
+#### HP tune step jobs and PBS
 
 | Variable                | Required | Description                                                                                                         |
 | ----------------------- | -------- | ------------------------------------------------------------------------------------------------------------------- |
-| `HPTUNE_MAX_TRIALS`     | ✓        | Stop when this many trials exist and none are running or queued.                                                    |
-| `HPTUNE_MAX_RETRIES`    | ✓        | Requeue failed trials up to this many times.                                                                        |
+| `HP_TUNE_MAX_TRIALS`     | ✓        | Stop when this many trials exist and none are running or queued.                                                    |
+| `HP_TUNE_MAX_RETRIES`    | ✓        | Requeue failed trials up to this many times.                                                                        |
 | `TRIAL_TIMEOUT`         | ✓        | Seconds without log activity before a stale `RUNNING` trial (e.g. from a lost step) is requeued or failed.          |
-| `HPTUNE_QUEUE`          | ✓†       | PBS queue for the step jobs. Use `debug` (allows 1 running + 1 queued per user), not `debug-scaling` (1 job total). |
-| `HPTUNE_TRAIN_WALLTIME` | ✓†       | Walltime for each step job (passed to `qsub`).                                                                      |
+| `HP_TUNE_QUEUE`          | ✓†       | PBS queue for the step jobs. Use `debug` (allows 1 running + 1 queued per user), not `debug-scaling` (1 job total). |
+| `HP_TUNE_TRAIN_WALLTIME` | ✓†       | Walltime for each step job (passed to `qsub`).                                                                      |
 
-†Required for the serial PBS chain (`scripts/start_hptune.sh`, `scripts/run_hptune.sh`).
+†Required for the serial PBS chain (`scripts/start_hp_tune.sh`, `scripts/run_hp_tune.sh`, `scripts/start_arch_tune.sh`).
+
+#### Architecture HP tune search space (`HP_TUNE_MODE=architecture`)
+
+Set by `scripts/start_arch_tune.sh`, which points `HP_TUNE_DIR` at `ARCH_TUNE_DIR` and keeps training hyperparameters fixed from `.env`. All `ARCH_TUNE_*` keys below are required for architecture tuning.
+
+| Variable | Required | Description |
+| -------- | -------- | ----------- |
+| `ARCH_TUNE_DIR` | ✓ | Root for architecture tune trials (default `data/arch_tune`). |
+| `ARCH_TUNE_CONV_FILTERS` | ✓ | Comma-separated conv filter sizes. |
+| `ARCH_TUNE_KERNELS` | ✓ | Comma-separated kernel sizes (same padding derived automatically). |
+| `ARCH_TUNE_POOL_SIZES` | ✓ | Comma-separated pool sizes. |
+| `ARCH_TUNE_FC1_MIN`, `ARCH_TUNE_FC1_MAX` | ✓ | FC1 size bounds (integers, min ≤ max). |
+| `ARCH_TUNE_FC2_MIN`, `ARCH_TUNE_FC2_MAX` | ✓ | FC2 size bounds (integers, min ≤ max). |
+| `ARCH_TUNE_NUM_INITIAL_TRIALS` | ✓ | Random warmup trials before Bayesian suggestions. |
+| `ARCH_TUNE_RANDOM_INSERT_EVERY` | ✓ | Insert a random trial every N completed trials after warmup. |
+| `ARCH_TUNE_EI_XI` | ✓ | Expected-improvement ξ for Bayesian optimization. |
 
 #### Shell, conda, and runtime
 
@@ -132,16 +138,17 @@ Comma-separated lists must not be empty (e.g. `HPTUNE_ALLOWED_EPOCHS=25,50,100`)
 | `DLDL_CONDASH` | ✓‡       | Path to `conda.sh` (sourced by PBS scripts).                                        |
 | `CONDA_ENV`    | ✓‡       | Conda environment name.                                                             |
 | `TMPDIR`       |          | Temp directory (recommended on HPC).                                                |
-| `RESET`        |          | Set to `1` when calling `scripts/start_hptune.sh` to wipe files under `HPTUNE_DIR`. |
+| `RESET`        |          | Set to `1` when calling `scripts/start_hp_tune.sh` or `scripts/start_arch_tune.sh` to wipe files under the active tune directory. |
 
-‡Required by PBS training/preprocess/HPTune scripts.
+‡Required by PBS training/preprocess/HP tune scripts.
 
 #### Set by PBS or the tuner (not in `.env`)
 
-| Variable    | Description                                                                                                                                                                                                                                                              |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `PBS_JOBID` | PBS job id (set on compute nodes).                                                                                                                                                                                                                                       |
-| `TRIAL_DIR` | Optional override path `HPTUNE_DIR/trials/<trial_id>` whose `.env` `scripts/run_train.sh` sources for a manual single-trial run. The HP-tune chain does **not** use it — `run_step` trains each trial in-process and passes its hyperparameters through the environment. |
+| Variable       | Description                                                                                                                                                                                                                                                              |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PBS_JOBID`    | PBS job id (set on compute nodes).                                                                                                                                                                                                                                       |
+| `HP_TUNE_MODE` | `training` (default) or `architecture`. Set by `start_arch_tune.sh`.                                                                                                                                                                                                     |
+| `TRIAL_DIR`    | Optional override path `HP_TUNE_DIR/trials/<trial_id>` whose `.env` `scripts/run_train.sh` sources for a manual single-trial run. The HP-tune chain does **not** use it — `run_step` trains each trial in-process and passes hyperparameters through the environment. |
 
 #### Thread caps (recommended on HPC)
 
@@ -150,10 +157,10 @@ Set to `1` on crowded PBS nodes to avoid BLAS oversubscription (`OPENBLAS_NUM_TH
 ## Workflow
 
 ```
-Raw .txt → preprocess_data.py → .pt files → train.py → Model + logs → graph.py → Visualizations
+Raw .txt → preprocess_data.py → .pt files → train.py → checkpoints + logs → validate.py / graph.py
 ```
 
-**Config:** Set paths and every variable in the [Environment Variables](#environment-variables) tables in your project-root `.env`. Point `DATA_PATH` / `TRAIN_LABELS_PATH` at the `.pt` files
+Set paths and every variable in the [Environment Variables](#environment-variables) tables in your project-root `.env`. Point `DATA_PATH` and `TRAIN_LABELS_PATH` at the preprocessed `.pt` files.
 
 ### 1. Preprocessing
 
@@ -161,182 +168,150 @@ Raw .txt → preprocess_data.py → .pt files → train.py → Model + logs → 
 python src/preprocess_data.py
 ```
 
-- Deletes the preprocessed files at `DATA_PATH` and `TRAIN_LABELS_PATH` (so the next build is fresh)
-- Loads raw files from `DATA_DIR`, computes stats (max length, mean, std)
-- Applies normalization, pads to uniform length, builds labels
+- Deletes existing files at `DATA_PATH` and `TRAIN_LABELS_PATH`, then rebuilds them
+- Loads raw signals from `DATA_DIR`, computes stats (max length, mean, std)
+- Applies mean-var normalization over the whole signal, pads to uniform length, builds labels
 - Writes tensors to `DATA_PATH` and `TRAIN_LABELS_PATH`
-- Runs integrity check
+- Runs a dataset integrity check (`check_dataset`)
 
-**Normalization** Normalized by `meanvar-whole`
+Logs to `{PROG_DIR}/preprocess.log`.
 
-### 2. Validation (optional)
-
-```bash
-python src/validate.py
-```
-
-- Verifies preprocessed files exist
-- Runs dataset integrity check (samples examples and compares to raw data)
-- Options: `--num-checks N`, `--skip-integrity`, `--verbose`
-
-### 3. Training
+### 2. Training
 
 ```bash
 python src/train.py
 ```
 
-- Loads preprocessed tensors at `DATA_PATH` and `TRAIN_LABELS_PATH` (must match preprocessing / `NORMALIZATION_TYPE`)
-- Validates files exist, splits 80/10/10 train/dev/test
+- Loads preprocessed tensors at `DATA_PATH` and `TRAIN_LABELS_PATH`
+- Splits 80/10/10 train/dev/test (training uses train/dev only)
 - Trains on a single process / single GPU
-- Selects the best checkpoint and applies early stopping by **maximizing the validation F-beta** (`FBETA`, default `1.8`), favoring recall over precision
-- Saves checkpoints and logs to `PROG_DIR`
+- Selects the best checkpoint by **maximizing validation F-beta** (`FBETA`, default `1.8`) among epochs with precision ≥ `MIN_PRECISION` (default `0.90`)
+- Applies early stopping when validation score stops improving
 
-Training hyperparameters (learning rate, epochs, architecture sizes, etc.) are read from environment variables (see [Environment Variables](#environment-variables)).
+**Outputs in `PROG_DIR`:**
 
-### 4. Visualization
+| File | Description |
+| ---- | ----------- |
+| `{JOB_ID}.log` | Training log (loguru). |
+| `{JOB_ID}_training_log.csv` | Per-epoch validation metrics. |
+| `{JOB_ID}_best_params.pt` | Weights for the best validation epoch. |
 
-```bash
-python src/graph.py
-```
-
-- Loads training log CSV from `PROG_DIR/{JOB_ID}_training_log.csv`
-- Creates a 2x2 subplot visualization with:
-  - Training and Validation Loss
-  - Validation Accuracy
-  - Validation Precision and Recall
-  - Validation F1 Score
-- Saves plot to `PROG_DIR/{JOB_ID}_training_log_plot.png`
-
-**Command-line Parameters:**
-
-| Parameter  | Type | Default                                   | Description                                                                                                                                                                                                                                                                                                                                              |
-| ---------- | ---- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--csv`    | str  | `PROG_DIR/{JOB_ID}_training_log.csv`      | Path to the training log CSV file. If not specified, uses the default path based on `PROG_DIR` and `JOB_ID` from the environment.                                                                                                                                                                                                                        |
-| `--output` | str  | `PROG_DIR/{JOB_ID}_training_log_plot.png` | Path where the plot image will be saved. If not specified and `--show` is not used, defaults to that path. If `--show` is used without `--output`, the plot is only displayed and not saved.                                                                                                                                                             |
-| `--show`   | flag | False                                     | Display the plot interactively using matplotlib's GUI. When used without `--output`, the plot is only displayed and not saved to disk. Can be combined with `--output` to both save and display. **Note:** Requires an interactive backend (PyQt5, PyQt6, or Tkinter). In headless environments, the plot will be saved to the default location instead. |
-
-**Examples:**
+### 3. Validation (optional)
 
 ```bash
-# Use default paths from the environment
-python src/graph.py
-
-# Specify custom CSV file
-python src/graph.py --csv path/to/training_log.csv
-
-# Save plot to specific location
-python src/graph.py --output path/to/output.png
-
-# Display plot interactively (not saved)
-python src/graph.py --show
-
-# Save and display plot
-python src/graph.py --output plot.png --show
-
-# Use custom CSV and save to custom location
-python src/graph.py --csv custom_log.csv --output plot.png
+python src/validate.py
 ```
+
+- Verifies preprocessed files exist at `DATA_PATH` and `TRAIN_LABELS_PATH`
+- Loads the checkpoint from `best_model/*_best_params.pt` (config from `best_model/.env`)
+- Evaluates on the dev holdout and logs precision, recall, F1, and F-beta
+- Writes `validate.log`, `false_positives.txt`, `false_negatives.txt`, and `predictions.csv` to `best_model/`
+
+Options: `--skip-model-eval`, `--eval-batch-size N` (default `256`).
+
+### 4. Shot browser (optional)
+
+```bash
+python src/graph.py [start_index]
+```
+
+- Interactive Qt shot browser with a slider and index text box
+- Loads the model from `best_model/` only
+- Plots raw current, smoothed residual, and model disruption probability per shot
+
+Requires a display (PyQt6 / `QtAgg` backend). Optional positional argument sets the starting shot index (default `0`).
+
+### 5. Plots (optional)
+
+```bash
+python src/plot_tune_metrics.py              # recall/precision/F2 vs trial for arch_tune + hp_tune
+python src/generate_scatter_plot.py          # predicted vs true disruption times
+python src/plot_disruption_time_diff.py      # histogram of prediction error
+```
+
+| Script | Input | Output |
+| ------ | ----- | ------ |
+| `plot_tune_metrics.py` | `{ARCH_TUNE_DIR}/trials/trials.csv`, `{HP_TUNE_DIR}/trials/trials.csv` | `tune_metrics.png` in each trials dir |
+| `generate_scatter_plot.py` | `best_model/predictions.csv` | `best_model/predictions_scatter.png` |
+| `plot_disruption_time_diff.py` | `best_model/predictions.csv` | `best_model/disruption_time_diff.png` |
+
+Run `validate.py` before the prediction plots so `best_model/predictions.csv` exists.
 
 ## Polaris Batch Jobs
 
 Run preprocessing and training on compute nodes (not login nodes):
 
 ```bash
-# From DLDL project root, with `.env` configured
-cd /path/to/DLDL
+cd /path/to/DLDL   # with `.env` configured
 
-# Conda activation is driven by DLDL_CONDASH / CONDA_ENV in `.env` (no edits needed).
-# Both scripts default to #PBS -A fusiondl_aesp and walltime 1:00:00 — edit the
-# #PBS headers in scripts/run_preprocess.sh / scripts/run_train.sh if your account,
-# queue, or walltime differ.
-
-# Submit preprocessing (CPU)
-qsub scripts/run_preprocess.sh
-
-# Submit training (GPU)
-qsub scripts/run_train.sh
-
-# Check status
+qsub scripts/run_preprocess.sh   # CPU preprocessing
+qsub scripts/run_train.sh        # GPU training
 qstat -u $USER
 ```
 
-Output logs: `preprocess_<jobid>.out`, `train_<jobid>.out` (and `.err`).
+Conda activation uses `DLDL_CONDASH` and `CONDA_ENV` from `.env`. Edit `#PBS` headers in the scripts if your account, queue, or walltime differ (defaults: `fusiondl_aesp`, `debug` for training, `small` for preprocessing).
 
-### Bayesian Hyperparameter Tuning
+- **Training logs:** PBS merges stdout/stderr (`-j oe`) into the default job output file for `run_train.sh`.
+- **Preprocessing logs:** `run_preprocess.sh` writes PBS output to the path set in its `#PBS -o` / `#PBS -e` headers.
 
-HPTune reads the same project-root `.env` as the rest of the workflow. On Polaris, that is typically a symlink to `.env.polaris`.
+### HP tune (training hyperparameters)
 
-The supported path is a **serial, self-resubmitting PBS chain**: each job plans the next trial, trains it in-process, records its score, then submits the next step job and exits. Exactly one trial runs per job, and at most one job is ever pending (the running job plus the queued next step), so it fits queues that cap you at one running + one queued job per user (Polaris `debug`). There is no separate controller job and no job dependency.
+HP tune reads the same project-root `.env`. On Polaris, that is typically a symlink to `.env.polaris`.
 
-**Objective:** each trial's score (the `score` column in `trials.csv`) is its best validation F-beta (`FBETA`, default `1.8`). The optimizer **maximizes** this score, and `best_trial/` tracks the highest-scoring trial. Because F-beta with `beta>1` weights recall over precision, tuning pushes `cls_pos_weight` toward catching more disruptions.
+The supported path is a **serial, self-resubmitting PBS chain**: each job plans one trial, trains it in-process, records its score, submits the next step job, and exits. At most one job is pending (running + queued), which fits Polaris `debug`.
 
-#### Serial HPTune
+**Objective:** each trial's `score` in `trials.csv` is its best validation F-beta (`FBETA`) among epochs meeting the `MIN_PRECISION` floor. The optimizer **maximizes** this score; `best_trial/` tracks the highest-scoring trial.
 
-Launch:
-
-```bash
-./scripts/start_hptune.sh
-```
-
-To wipe a previous run tree first:
+**Launch training HP tune:**
 
 ```bash
-RESET=1 ./scripts/start_hptune.sh
+./scripts/start_hp_tune.sh              # resume or continue
+RESET=1 ./scripts/start_hp_tune.sh      # wipe HP_TUNE_DIR first
 ```
 
-**Debug queue (smoke-test / short chain)** — point `HPTUNE_DIR` at an isolated tree, cap trials, and use the `debug` queue:
+**Launch architecture HP tune** (CNN architecture only; training hparams fixed from `.env`):
 
 ```bash
-export HPTUNE_DIR=/path/to/data/hptune_debug
-export HPTUNE_MAX_TRIALS=10
-export HPTUNE_QUEUE=debug   # 1 running + 1 queued per user; debug-scaling allows only 1 total
-./scripts/start_hptune.sh
+./scripts/start_arch_tune.sh
+RESET=1 ./scripts/start_arch_tune.sh
 ```
 
-Check the trial log on the login node after jobs start:
+`start_arch_tune.sh` sets `HP_TUNE_MODE=architecture` and `HP_TUNE_DIR` from `ARCH_TUNE_DIR`.
+
+**Smoke test** — point `HP_TUNE_DIR` at an isolated tree and cap trials:
 
 ```bash
-column -t -s, /path/to/data/hptune_debug/trials/trials.csv | head
+export HP_TUNE_DIR=/path/to/data/hp_tune_debug
+export HP_TUNE_MAX_TRIALS=10
+export HP_TUNE_QUEUE=debug
+./scripts/start_hp_tune.sh
+column -t -s, /path/to/data/hp_tune_debug/trials/trials.csv | head
 ```
 
-Layout:
+**Key scripts and modules:**
 
-- `scripts/start_hptune.sh`: submits the first step job (and handles `RESET=1`).
-- `scripts/run_hptune.sh`: the step job — sets up the environment (sources `.env`, activates conda) and `exec`s `python -m hptune_serial`. No logic lives in shell.
-- `src/hptune_serial.py`: CLI entry point for `BayesianHPTuner.run_step()`.
-- `src/model/bayesian_hptuner.py`: trial state, acquisition, retries, and `run_step` (plan → train in-process → record → submit next step).
-- `src/util/pbs.py`: `submit_hptune_step` `qsub` helper; the job id is read directly from `qsub` stdout.
-- `src/model/hp_trial.py` (`HPTuneTrial`): creates each trial directory and per-trial `.env`.
-- `src/service/trial_service.py`: reads/writes `{HPTUNE_DIR}/trials/trials.csv`.
-- `scripts/run_train.sh`: standalone training entrypoint (single trial / manual run); not used by the chain.
+| Path | Role |
+| ---- | ---- |
+| `scripts/start_hp_tune.sh` | Submit the first HP tune step job. |
+| `scripts/start_arch_tune.sh` | Same, for architecture tuning under `ARCH_TUNE_DIR`. |
+| `scripts/run_hp_tune.sh` | PBS step job: sources `.env`, runs `python -m hp_tune_serial`. |
+| `src/hp_tune_serial.py` | CLI entry for `BayesianHpTuner.run_step()`. |
+| `src/model/bayesian_hp_tuner.py` | Trial planning, training subprocess, acquisition, PBS chaining. |
+| `src/service/trial_service.py` | Reads/writes `{HP_TUNE_DIR}/trials/trials.csv`. |
+| `scripts/run_train.sh` | Standalone training job (manual runs; optional `TRIAL_DIR/.env` override). |
 
-Step flow (all in-process within `run_step`; no stdout parsing, no job dependency):
+**Tune data layout:**
 
-1. The step job `exec`s `hptune_serial`, which refreshes trial status (ingesting any trial left over from a prior step) and plans a new trial if none is queued.
-2. It marks the chosen trial `RUNNING` and trains it in-process by running `src/train.py` as a subprocess with that trial's hyperparameters. Each trial trains from a fresh random initialization.
-3. It reads the trial's best validation F-beta from its `training_log.csv` and records it (`COMPLETED` with a score, or retried/`FAILED`); `best_trial/` is refreshed.
-4. Unless `HPTUNE_MAX_TRIALS` is reached, it submits the next `scripts/run_hptune.sh` step and exits. Because the queue allows one queued job, the next step waits until this one ends, then runs.
-5. When the cap is reached and nothing is running or queued, the step logs "Chain complete." and submits nothing further.
+- `{HP_TUNE_DIR}/trials/trials.csv` — trial state
+- `{HP_TUNE_DIR}/trials/trial_*` — per-trial logs and checkpoints
+- `{HP_TUNE_DIR}/trials/best_trial/` — snapshot of the best trial's `.env` and checkpoint
+- `{HP_TUNE_DIR}/controller_logs/` — PBS stdout/stderr (`.OU`/`.ER`)
 
-If a step is ever lost (walltime kill, node failure) before it can submit the next one, just re-run `./scripts/start_hptune.sh` — `run_step` resumes from `trials.csv` and continues planning new trials. (`start_hptune.sh` preserves `trials.csv` and `*_best_params.pt`; only `RESET=1` clears the run, and even then it keeps the best checkpoints.)
+If a step job is lost before it can chain the next one, re-run `./scripts/start_hp_tune.sh` — `run_step` resumes from `trials.csv`.
 
-Important serial env:
+### Interactive session (`qsub -I`)
 
-- `PROJECT_ROOT`, `HPTUNE_DIR`, `HPTUNE_QUEUE`, `HPTUNE_TRAIN_WALLTIME`
-- `HPTUNE_MAX_TRIALS`,
-- `OPENBLAS_NUM_THREADS` / `OMP_NUM_THREADS` (set to `1` in `.env`) — PBS often allocates many CPUs to one process; uncapped BLAS can try to spawn that many threads and fail (`pthread_create` / `Exit_status=1` with little log output).
-
-Data and logging layout:
-
-- Trial state CSV: `{HPTUNE_DIR}/trials/trials.csv`
-- Trial directories: `{HPTUNE_DIR}/trials/trial_*`
-- Best-trial artifacts: `{HPTUNE_DIR}/trials/best_trial/`
-- PBS stdout/stderr: `{HPTUNE_DIR}/controller_logs/` (`.OU`/`.ER`)
-- Per-trial training logs/checkpoints: `{HPTUNE_DIR}/trials/trial_*/`
-
-#### Interactive run (`qsub -I`)
-
-To drive the workflow by hand on a compute node — useful for a quick smoke test or for debugging a single trial — first grab an interactive node:
+For manual smoke tests or debugging on a compute node:
 
 ```bash
 qsub -I -A fusiondl_aesp -q debug \
@@ -346,36 +321,38 @@ qsub -I -A fusiondl_aesp -q debug \
   -l filesystems=home:eagle
 ```
 
-When the compute-node prompt appears, set up the environment once, from the repo root:
+Then, from the repo root:
 
 ```bash
-cd /eagle/fusiondl_aesp/starlightjason2/DLDL
-set -a; source .env; set +a      # load and export every .env setting
-source "$DLDL_CONDASH"           # make `conda` available
+cd /path/to/DLDL
+set -a; source .env; set +a
+source "$DLDL_CONDASH"
 conda activate "$CONDA_ENV"
 export PYTHONPATH="$PWD/src"
+
+python src/preprocess_data.py
+python src/train.py
+python src/validate.py
+python -m hp_tune_serial          # one HP tune step (interactive; no PBS chain)
+./scripts/start_hp_tune.sh        # full serial chain via PBS
 ```
 
-Then run whichever step you need directly:
+> **Run launcher scripts; do not paste their lines.** Execute `./scripts/start_hp_tune.sh` (or `bash scripts/start_hp_tune.sh`). Pasting individual lines into an interactive shell breaks path detection: interactively `$0` is `-bash`, so `readlink -f "$0"` fails, and under `set -u` a bare `${BASH_SOURCE[0]}` reports `unbound variable`.
+
+## Testing
+
+Local smoke tests (imports, objective math, env parsing). No training, GPU, or real data required:
 
 ```bash
-python src/preprocess_data.py    # build the tensors (only if not already built)
-python src/train.py              # train one model using the hyperparameters in .env
-python -m hptune_serial          # one HPTune step: plan + train the next trial, then queue the next step
+pip install -e ".[dev]"
+python3.12 -m pytest tests/ -q
 ```
 
-To launch the full serial Bayesian chain (each step job trains one trial and self-chains the next until `HPTUNE_MAX_TRIALS`):
-
-```bash
-./scripts/start_hptune.sh        # add RESET=1 to wipe the previous run first
-```
-
-> **Run the scripts; do not paste their lines.** Always execute a script with `./scripts/start_hptune.sh` (or `bash scripts/start_hptune.sh`). Pasting individual lines into an interactive shell breaks path detection: interactively `$0` is `-bash`, so `readlink -f "$0"` fails with `readlink: invalid option -- 'b'`, and under `set -u` a bare `${BASH_SOURCE[0]}` reports `unbound variable`.
+Requires Python ≥ 3.8. Tests use dummy env vars from `tests/conftest.py` and `/tmp` paths only.
 
 ## Quick Reference
 
-- **Config:** No JSON—all settings come from `.env` / the process environment; see [Environment Variables](#environment-variables).
-- **Output files:** Whatever paths you set in `DATA_PATH` and `TRAIN_LABELS_PATH` (often filenames include the normalization mode, e.g. `processed_dataset_meanvar-whole.pt`).
-- **Changing normalization:** Update `NORMALIZATION_TYPE` and point `DATA_PATH` / `TRAIN_LABELS_PATH` at the matching `.pt` files.
-
-See https://docs.pytorch.org/tutorials/intermediate/dist_tuto.html
+- **Config:** All settings come from `.env` / the process environment — see [Environment Variables](#environment-variables).
+- **Preprocessed data:** Paths in `DATA_PATH` and `TRAIN_LABELS_PATH` (e.g. `processed_dataset_meanvar-whole.pt`).
+- **Best model (inference / plots):** `best_model/*_best_params.pt` with config in `best_model/.env`.
+- **Changing normalization:** Re-run `preprocess_data.py` after editing preprocessing logic; update `DATA_PATH` / `TRAIN_LABELS_PATH` if output filenames change.

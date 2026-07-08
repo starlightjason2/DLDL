@@ -13,14 +13,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from model.hyperparam_space import ArchitectureHyperparameterSpace, HyperparameterSpace
 from model.trial_status import TrialStatus
-from util.hptune import fixed_training_env_keys, write_env
+from util.hp_tune import fixed_training_env_keys, write_env
 
 TrainingTrialSignature = tuple[str, int, str, str, int, str, int, str, int, int, str]
 ArchitectureTrialSignature = tuple[int, int, int, int, int, int, int, int, int, int, int, int, int, int, int]
 
 
-class HPTuneTrial(BaseModel):
-    """One HPTune trial: training hparams, optional architecture hparams, and status."""
+class HpTuneTrial(BaseModel):
+    """One HP tune trial: training hparams, optional architecture hparams, and status."""
 
     model_config = ConfigDict(from_attributes=True, validate_assignment=True)
 
@@ -65,7 +65,7 @@ class HPTuneTrial(BaseModel):
 
     @property
     def dir_path(self) -> Path:
-        return Path(os.environ["HPTUNE_DIR"]) / "trials" / self.trial_id
+        return Path(os.environ["HP_TUNE_DIR"]) / "trials" / self.trial_id
 
     @property
     def is_architecture_trial(self) -> bool:

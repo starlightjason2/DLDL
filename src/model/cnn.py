@@ -131,9 +131,6 @@ class IpCNN(nn.Module):
         self.dropout2 = nn.Dropout(dropout_rate)
         self.fc3 = nn.Linear(fc2_size, 1)
 
-    def __len__(self) -> int:
-        return sum(p.numel() for p in self.parameters())
-
     def forward_conv(self, x: Tensor) -> Tensor:
         """Forward through conv+pool layers."""
         x = self.pool(F.relu(self.bn1(self.conv1(x))))
@@ -374,12 +371,6 @@ class IpCNN(nn.Module):
                     f"Early stopping triggered after {epoch + 1} epochs (no improvement for {early_stopping_patience} epochs)"
                 )
                 break
-
-            if epoch % 5 == 0:
-                torch.save(
-                    model.state_dict(),
-                    os.path.join(self.prog_dir, f"{job_id}_params_epoch{epoch}.pt"),
-                )
 
         df_logs = pd.DataFrame(logs)
         df_logs.to_csv(

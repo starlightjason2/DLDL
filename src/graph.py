@@ -8,7 +8,6 @@ import matplotlib
 
 matplotlib.use("QtAgg")
 import matplotlib.pyplot as plt
-from dotenv import load_dotenv
 import numpy as np
 import torch
 from matplotlib.widgets import Slider, TextBox
@@ -20,14 +19,13 @@ from util.disruption_predict import (
     apply_smoothing,
     clean_zeros,
 )
-from util.hptune import load_best_trial_cnn
-
-load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=True)
+from util.best_model import load_best_model_cnn, load_best_model_env
 
 
 def main() -> None:
     start = int(sys.argv[1]) if len(sys.argv) > 1 else 0
     repo = Path(__file__).resolve().parents[1]
+    load_best_model_env()
 
     def abs_path(p: str) -> str:
         return p if os.path.isabs(p) else str(repo / p)
@@ -43,7 +41,7 @@ def main() -> None:
     )
     num_rows = len(dataset)
 
-    model = load_best_trial_cnn(dataset)
+    model = load_best_model_cnn(dataset)
     if model is None:
         return
 

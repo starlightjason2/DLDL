@@ -15,22 +15,22 @@ from loguru import logger
 from model.hyperparam_space import (
     ArchitectureHyperparameterSpace,
     HyperparameterSpace,
-    hptune_mode,
+    hp_tune_mode,
 )
-from model.hp_trial import HPTuneTrial
+from model.hp_trial import HpTuneTrial
 from model.trial_status import TrialStatus
 from service.trial_service import TrialService
-from util.hptune import (
+from util.hp_tune import (
     fixed_training_trial_fields,
     next_trial_numbered_id,
     parse_trial_metrics,
     sync_best_trial_artifacts,
 )
 from util.data_loading import env_int
-from util.pbs import submit_hptune_step
+from util.pbs import submit_hp_tune_step
 
 
-class BayesianHPTuner:
+class BayesianHpTuner:
     """Bayesian search over training or architecture hyperparameters."""
 
     trials_dir: Path
@@ -41,8 +41,8 @@ class BayesianHPTuner:
     hp_space: HyperparameterSpace | ArchitectureHyperparameterSpace
 
     def __init__(self) -> None:
-        root = Path(os.environ["HPTUNE_DIR"])
-        self.mode = hptune_mode()
+        root = Path(os.environ["HP_TUNE_DIR"])
+        self.mode = hp_tune_mode()
 
         self.trials_dir = root / "trials"
         self.trials_dir.mkdir(parents=True, exist_ok=True)
@@ -50,37 +50,37 @@ class BayesianHPTuner:
         self.log_dir = root / "controller_logs"
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-        self.max_retries = env_int("HPTUNE_MAX_RETRIES")
+        self.max_retries = env_int("HP_TUNE_MAX_RETRIES")
         if self.max_retries < 0:
-            raise ValueError("HPTUNE_MAX_RETRIES must be >= 0")
+            raise ValueError("HP_TUNE_MAX_RETRIES must be >= 0")
 
-        self.max_trials = env_int("HPTUNE_MAX_TRIALS")
+        self.max_trials = env_int("HP_TUNE_MAX_TRIALS")
         if self.max_trials < 1:
-            raise ValueError("HPTUNE_MAX_TRIALS must be >= 1")
+            raise ValueError("HP_TUNE_MAX_TRIALS must be >= 1")
 
         if self.mode == "architecture":
             self.hp_space = ArchitectureHyperparameterSpace.from_env()
         else:
             self.hp_space = HyperparameterSpace.from_env()
 
-        logger.info("HPTune mode={} dir={}", self.mode, root)
+        logger.info("HP tune mode={} dir={}", self.mode, root)
 
-    def _seen_signatures(self, trials: list[HPTuneTrial]) -> set[tuple]:
+    def _seen_signatures(self, trials: list[HpTuneTrial]) -> set[tuple]:
         return {t.signature() for t in trials}
 
     def _sample_random(
-        self, trials: list[HPTuneTrial], *, context: str
+        self, trials: list[HpTuneTrial], *, context: str
     ) -> dict[str, Any]:
         seen = self._seen_signatures(trials)
         for attempt in range(1, 26):
             proposal = self.hp_space.sample_random()
             if self.mode == "architecture":
                 proposal = {**fixed_training_trial_fields(), **proposal}
-            if HPTuneTrial.proposed_signature(proposal) not in seen:
+            if HpTuneTrial.proposed_signature(proposal) not in seen:
                 return proposal
         raise RuntimeError(f"Exhausted random sampling ({context})")
 
-    def sample_bayesian(self, trials: list[HPTuneTrial]) -> dict[str, Any]:
+    def sample_bayesian(self, trials: list[HpTuneTrial]) -> dict[str, Any]:
         completed = [t for t in trials if t.status == TrialStatus.COMPLETED]
 
         if not completed:
@@ -107,14 +107,14 @@ class BayesianHPTuner:
         if self.mode == "architecture":
             proposal = {**fixed_training_trial_fields(), **proposal}
 
-        if HPTuneTrial.proposed_signature(proposal) in self._seen_signatures(trials):
+        if HpTuneTrial.proposed_signature(proposal) in self._seen_signatures(trials):
             return self._sample_random(
                 trials, context="Duplicate Hyperparameters, skipping"
             )
 
         return proposal
 
-    def sample_hyperparameters(self, trials: list[HPTuneTrial]) -> dict[str, Any]:
+    def sample_hyperparameters(self, trials: list[HpTuneTrial]) -> dict[str, Any]:
         completed = sum(t.status == TrialStatus.COMPLETED for t in trials)
 
         if completed < self.hp_space.num_initial_trials:
@@ -130,7 +130,7 @@ class BayesianHPTuner:
 
         return self.sample_bayesian(trials)
 
-    def update_trials(self, trials: list[HPTuneTrial]) -> list[HPTuneTrial]:
+    def update_trials(self, trials: list[HpTuneTrial]) -> list[HpTuneTrial]:
         timeout = int(os.environ["TRIAL_TIMEOUT"])
         updated = []
 
@@ -172,7 +172,7 @@ class BayesianHPTuner:
         sync_best_trial_artifacts(updated, self.trials_dir / "best_trial")
         return updated
 
-    def is_complete(self, trials: list[HPTuneTrial]) -> bool:
+    def is_complete(self, trials: list[HpTuneTrial]) -> bool:
         counts = TrialService.get_status_counts(trials)
         if (
             counts["total"] >= self.max_trials
@@ -182,14 +182,14 @@ class BayesianHPTuner:
             return True
         return False
 
-    def _plan_next_trial(self, trials: list[HPTuneTrial]) -> list[HPTuneTrial]:
+    def _plan_next_trial(self, trials: list[HpTuneTrial]) -> list[HpTuneTrial]:
         if len(trials) >= self.max_trials:
             return trials
 
         tid = next_trial_numbered_id(self.trials_dir, (t.trial_id for t in trials))
         proposal = self.sample_hyperparameters(trials)
 
-        trial = HPTuneTrial.model_validate(
+        trial = HpTuneTrial.model_validate(
             {
                 **proposal,
                 "trial_id": tid,
@@ -226,9 +226,9 @@ class BayesianHPTuner:
             )
 
     def _log_chain_complete(self) -> None:
-        logger.info("HPTune chain complete (mode={}).", self.mode)
+        logger.info("HP tune chain complete (mode={}).", self.mode)
 
-    def _train_trial(self, trial: HPTuneTrial) -> int:
+    def _train_trial(self, trial: HpTuneTrial) -> int:
         trial.log_pass_hyperparameters(context="train")
         env = {
             **os.environ,
@@ -315,9 +315,9 @@ class BayesianHPTuner:
             self._log_chain_complete()
             return
 
-        step_job = submit_hptune_step(
+        step_job = submit_hp_tune_step(
             log_dir=self.log_dir,
-            queue=os.environ["HPTUNE_QUEUE"],
-            walltime=os.environ["HPTUNE_TRAIN_WALLTIME"],
+            queue=os.environ["HP_TUNE_QUEUE"],
+            walltime=os.environ["HP_TUNE_TRAIN_WALLTIME"],
         )
         logger.info("Submitted next step as {}", step_job)

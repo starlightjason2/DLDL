@@ -1,4 +1,4 @@
-"""Smoke tests: core packages import without circular-import or missing symbols."""
+"""Smoke tests: core modules import without circular-import errors."""
 
 from __future__ import annotations
 
@@ -6,18 +6,23 @@ import importlib
 
 import pytest
 
-# Library modules only (not train.py / graph.py / validate.py — those need full .env at import time).
+# Library modules only. Entry scripts (train.py, validate.py, graph.py) need a full
+# runtime .env and are not imported here.
 _CORE_MODULES = [
-    "service.trial_service",
-    "schemas",
+    "util.objective",
     "util.data_loading",
     "util.processing",
-    "util.hptune",
-    "model.dataset",
-    "model.bayesian_hptuner",
+    "util.training",
+    "util.best_model",
+    "util.hp_tune",
+    "model.trial_status",
+    "model.hyperparam_space",
     "model.hp_trial",
-    "hptune_serial",
+    "model.dataset",
     "model.cnn",
+    "service.trial_service",
+    "model.bayesian_hp_tuner",
+    "hp_tune_serial",
 ]
 
 

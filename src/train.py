@@ -9,8 +9,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from loguru import logger
 
-from model.cnn import IpCNN
 from model.dataset import IpDataset
+from util.training import build_cnn_from_env
 
 _REPO = Path(__file__).resolve().parents[1]  # project root (src/..)
 load_dotenv(dotenv_path=_REPO / ".env", encoding="utf-8")
@@ -62,36 +62,7 @@ def main() -> None:
         preprocessor_max_workers=int(os.environ["PREPROCESSOR_MAX_WORKERS"]),
     )
 
-    model = IpCNN(
-        dataset,
-        prog_dir=str(prog_dir),
-        conv1=(
-            int(os.environ["CONV1_FILTERS"]),
-            int(os.environ["CONV1_KERNEL"]),
-            int(os.environ["CONV1_PADDING"]),
-        ),
-        conv2=(
-            int(os.environ["CONV2_FILTERS"]),
-            int(os.environ["CONV2_KERNEL"]),
-            int(os.environ["CONV2_PADDING"]),
-        ),
-        conv3=(
-            int(os.environ["CONV3_FILTERS"]),
-            int(os.environ["CONV3_KERNEL"]),
-            int(os.environ["CONV3_PADDING"]),
-        ),
-        conv4=(
-            int(os.environ["CONV4_FILTERS"]),
-            int(os.environ["CONV4_KERNEL"]),
-            int(os.environ["CONV4_PADDING"]),
-        ),
-        pool_size=int(os.environ["POOL_SIZE"]),
-        fc1_size=int(os.environ["FC1_SIZE"]),
-        fc2_size=int(os.environ["FC2_SIZE"]),
-        dropout_rate=float(os.environ["DROPOUT_RATE"]),
-        cls_pos_weight=float(os.environ["CLS_POS_WEIGHT"]),
-        decision_threshold=float(os.environ["DECISION_THRESHOLD"]),
-    )
+    model = build_cnn_from_env(dataset, str(prog_dir))
 
     model.train_model(
         job_id=job_id,

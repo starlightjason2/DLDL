@@ -1,7 +1,7 @@
 """Trial lifecycle status.
 
 Kept in its own leaf module (importing nothing from ``model`` or ``util``) so both
-``model.hp_trial`` and ``util.hptune`` can import it at the top level without a
+``model.hp_trial`` and ``util.hp_tune`` can import it at the top level without a
 circular dependency.
 """
 
