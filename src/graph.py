@@ -13,6 +13,7 @@ import torch
 from matplotlib.widgets import Slider, TextBox
 
 from model.dataset import IpDataset
+from util.data_loading import _read_signal_file
 from util.disruption_predict import (
     predict_disruption_time,
     apply_filter,
@@ -45,7 +46,7 @@ def main() -> None:
     if model is None:
         return
 
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 7), sharex=True)
     fig.subplots_adjust(bottom=0.2)
 
     with torch.no_grad():
@@ -57,8 +58,32 @@ def main() -> None:
             idx = max(0, min(int(i), num_rows - 1))
             signal = dataset.data[idx].float().reshape(1, -1)
             cnn_prob = torch.sigmoid(model.forward(signal)[0, 0]).item()
-            current, time = clean_zeros(shot.current, shot.time)
-            predicted_time = predict_disruption_time(shot.current, shot.time)
+
+            # Plot the raw shot file directly: column 0 is time (s), column 1 is
+            # current (SI), so the axes carry physical units without de-normalizing.
+            raw_path = os.path.join(dataset.data_dir, f"{shot.shot_no}.txt")
+            raw_current = _read_signal_file(raw_path, col=1)
+            raw_time = _read_signal_file(raw_path, col=0)
+            current, time = clean_zeros(raw_current, raw_time)
+            predicted_time = predict_disruption_time(raw_current, raw_time)
+
+            # t_disrupt is stored normalized (disruption_index / max_length); map it
+            # back onto the SI time axis via the raw time samples.
+            max_length = dataset.data.shape[1]
+            t_disrupt_si = (
+                float(
+                    raw_time[min(round(shot.t_disrupt * max_length), len(raw_time) - 1)]
+                )
+                if shot.disruptive
+                else None
+            )
+
+            # Offset the shot so it starts at t=0.
+            t_start = time[0]
+            time = time - t_start
+            predicted_time -= t_start
+            if t_disrupt_si is not None:
+                t_disrupt_si -= t_start
 
             ax1.clear()
             ax1.set_title(
@@ -74,42 +99,33 @@ def main() -> None:
             )
             if shot.disruptive:
                 ax1.axvline(
-                    shot.t_disrupt,
+                    t_disrupt_si,
                     color="r",
                     ls="--",
-                    label=f"Real disruption time: $t_0={shot.t_disrupt:.5f}$s",
+                    linewidth=1,
+                    label=f"Real disruption time: $t_0={t_disrupt_si:.5f}$s",
                 )
 
-            ax1.set_xlabel("Normalized time")
-            ax1.set_ylabel("Normalized current")
+            ax1.set_xlabel("Time (s)")
+            ax1.set_ylabel("Current (MA)")
             ax1.legend()
             ax1.grid(True)
 
             ax2.clear()
-            ax2.plot(
-                time,
-                np.gradient(smoothed, time),
-                label="$dI/dt$",
-            )
-            ax2.legend()
-            ax2.grid(True)
-
-            ax3.clear()
-            ax3.plot(time, apply_filter(current), label="Filter")
+            ax2.plot(time, apply_filter(current), label="Filter")
             diff_microsec = (
-                abs(shot.t_disrupt - predicted_time) * 1e5
-                if shot.t_disrupt is not None
-                else None
+                (t_disrupt_si - predicted_time) if t_disrupt_si is not None else None
             )
-            ax3.axvline(
+            ax2.axvline(
                 predicted_time,
                 color="r",
                 ls="--",
-                label=f"Heuristic disruption time:\n$t={predicted_time:.5f}$s, {f"{diff_microsec:.1f} µs diff" if diff_microsec else ""}",
+                linewidth=1,
+                label=f"Heuristic disruption time:\n$t={predicted_time:.2f}$s, {f"{diff_microsec:.4f} s diff" if diff_microsec else ""}",
             )
 
-            ax3.legend()
-            ax3.grid()
+            ax2.legend()
+            ax2.grid()
 
             fig.canvas.draw_idle()
 
@@ -117,7 +133,7 @@ def main() -> None:
 
         index_slider = Slider(
             fig.add_axes([0.12, 0.05, 0.55, 0.03]),
-            "Index",
+            "index",
             0,
             num_rows - 1,
             valinit=start,

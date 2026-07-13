@@ -17,7 +17,6 @@ from sklearn.metrics import (
 )
 from torch import Tensor
 from torch.utils.data import DataLoader
-
 from model.dataset import IpDataset
 from util.objective import (
     INFEASIBLE_SCORE,
@@ -388,9 +387,7 @@ class IpCNN(nn.Module):
                 best[RECALL_COL],
                 min_precision(),
             )
-            self.logger.info(
-                "  Validation Threshold: {:.6f}", best[THRESHOLD_COL]
-            )
+            self.logger.info("  Validation Threshold: {:.6f}", best[THRESHOLD_COL])
             self.logger.info("  Validation Recall:    {:.6f}", best[RECALL_COL])
             self.logger.info("  Validation Precision: {:.6f}", best[PRECISION_COL])
             self.logger.info(

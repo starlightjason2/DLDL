@@ -39,7 +39,7 @@ class ShotView:
     @property
     def title(self) -> str:
         status = "disruptive" if self.disruptive else "non-disruptive"
-        return f"Shot {self.shot_no} (index {self.index}, {status}"
+        return f"Shot {self.shot_no} (index {self.index}, {status})"
 
 
 class IpDataset(Dataset):
@@ -82,8 +82,8 @@ class IpDataset(Dataset):
         else:
             self.logger.info(f"Loading existing dataset from {self.data_file}")
 
-        self.data = torch.load(self.data_file, mmap=True, weights_only=True)
-        self.labels = torch.load(self.labels_file, mmap=True, weights_only=True)
+        self.data = torch.load(self.data_file, weights_only=True)
+        self.labels = torch.load(self.labels_file, weights_only=True)
         self.logger.info(f"Ready: {len(self.data)} shots")
         self._ensure_shot_metadata()
 

@@ -9,7 +9,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import torch
+
+# Prevent macOS OpenMP thread deadlock on CPU inference
+if not torch.cuda.is_available():
+    torch.set_num_threads(1)
+
 from loguru import logger
+from tqdm import tqdm
 from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
@@ -21,6 +27,7 @@ from sklearn.metrics import (
 from torch.utils.data import DataLoader, Subset
 
 from model.dataset import IpDataset
+from util.data_loading import _read_signal_file
 from util.disruption_predict import predict_disruption_time
 from util.best_model import best_model_dir, load_best_model_cnn, load_best_model_env
 
@@ -63,7 +70,7 @@ class EvalResult:
     y_pred: list[int]
     fp_shot_ids: list[int]
     fn_shot_ids: list[int]
-    disruption_times: list[tuple[float, float]]
+    disruption_times: list[tuple[float, float, int]]
 
 
 def _evaluate_dev(
@@ -81,11 +88,11 @@ def _evaluate_dev(
     y_pred: list[int] = []
     fp_shot_ids: list[int] = []
     fn_shot_ids: list[int] = []
-    disruption_times: list[tuple[float, float]] = []
+    disruption_times: list[tuple[float, float, int]] = []
     offset = 0
 
     with torch.no_grad():
-        for signals, labels in loader:
+        for signals, labels in tqdm(loader, desc="Evaluating", unit="batch"):
             probs = torch.sigmoid(model(signals.float().to(device))[:, 0]).cpu().numpy()
             preds = (probs > threshold).astype(int)
             actuals = labels[:, 0].cpu().numpy().astype(int)
@@ -96,9 +103,19 @@ def _evaluate_dev(
                     (fp_shot_ids if pred else fn_shot_ids).append(idx)
                 if actual:
                     shot = dataset.load_shot_view(idx)
-                    pred_time = predict_disruption_time(shot.current, shot.time)
-                    disruption_times.append((pred_time, shot.t_disrupt))
-
+                    # Predict and record in raw SI time: normalized times are
+                    # fractions of max_length, mapped back via the raw time column.
+                    raw_path = os.path.join(dataset.data_dir, f"{shot.shot_no}.txt")
+                    raw_current = _read_signal_file(raw_path, col=1)
+                    raw_time = _read_signal_file(raw_path, col=0)
+                    max_length = dataset.data.shape[1]
+                    pred_time = predict_disruption_time(raw_current, raw_time)
+                    true_time = float(
+                        raw_time[
+                            min(round(shot.t_disrupt * max_length), len(raw_time) - 1)
+                        ]
+                    )
+                    disruption_times.append((shot.index, pred_time, true_time))
             offset += len(preds)
             y_true.extend(actuals.tolist())
             y_pred.extend(preds.tolist())
@@ -148,8 +165,8 @@ def _write_artifacts(prog_dir: Path, result: EvalResult) -> None:
     (prog_dir / "false_negatives.txt").write_text(
         "\n".join(map(str, sorted(result.fn_shot_ids))) + "\n"
     )
-    rows = ["predicted_time,true_time"] + [
-        f"{pred},{true}" for pred, true in result.disruption_times
+    rows = ["index,predicted_time,true_time"] + [
+        f"{index},{pred},{true}" for index, pred, true in result.disruption_times
     ]
     predictions_csv = prog_dir / "predictions.csv"
     predictions_csv.write_text("\n".join(rows) + "\n")
@@ -184,6 +201,8 @@ def evaluate_best_model(batch_size: int = 256) -> None:
         return
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    if device == "cpu":
+        batch_size = min(batch_size, 8)  # 60k-length sequences are huge on CPU
     model = model.to(device)
     fbeta = float(os.environ.get("FBETA", "1.8"))
 

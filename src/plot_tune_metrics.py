@@ -46,7 +46,6 @@ def _plot(csv_path: Path, out_path: Path, *, title: str) -> None:
     ax.scatter(df["trial_num"], df["f2"], label="F2", alpha=0.85, s=40)
     ax.set_xlabel("Trial number")
     ax.set_ylabel("Score")
-    ax.set_title(title)
     ax.set_ylim(0, 1.05)
     ax.legend()
     ax.grid(True, alpha=0.3)

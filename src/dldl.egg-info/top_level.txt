@@ -1,4 +1,3 @@
-database
 model
 schemas
 service
