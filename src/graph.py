@@ -17,7 +17,7 @@ from util.data_loading import _read_signal_file
 from util.disruption_predict import (
     predict_disruption_time,
     apply_filter,
-    apply_smoothing,
+    get_oriented_current,
     clean_zeros,
 )
 from util.best_model import load_best_model_cnn, load_best_model_env
@@ -78,24 +78,28 @@ def main() -> None:
                 else None
             )
 
-            # Offset the shot so it starts at t=0.
-            t_start = time[0]
-            time = time - t_start
-            predicted_time -= t_start
-            if t_disrupt_si is not None:
-                t_disrupt_si -= t_start
-
             ax1.clear()
             ax1.set_title(
                 f"CNN disruption probability: {100*cnn_prob:.2f}%", fontsize=10
             )
-            ax1.plot(time, current, label="Current $I(t)$")
-            smoothed = apply_smoothing(current)
+            ax1.plot(time, current, label="Current $I(t)$", color="tab:blue")
+            flipped = get_oriented_current(current)
+            if not np.array_equal(current, flipped):
+                ax1.plot(
+                    time,
+                    flipped,
+                    label="Flipped $I(t)$",
+                    linestyle=":",
+                    color="tab:blue",
+                )
+
+            filtered, smoothed = apply_filter(current)
             ax1.plot(
                 time,
                 smoothed,
-                label="Smoothed & shifted $I(t)$",
+                label="Smoothed $I(t)$",
                 linestyle="--",
+                color="tab:orange",
             )
             if shot.disruptive:
                 ax1.axvline(
@@ -103,7 +107,7 @@ def main() -> None:
                     color="r",
                     ls="--",
                     linewidth=1,
-                    label=f"Real disruption time: $t_0={t_disrupt_si:.5f}$s",
+                    label=f"Real disruption time: $t_0={t_disrupt_si:.3f}$s",
                 )
 
             ax1.set_xlabel("Time (s)")
@@ -112,16 +116,14 @@ def main() -> None:
             ax1.grid(True)
 
             ax2.clear()
-            ax2.plot(time, apply_filter(current), label="Filter")
-            diff_microsec = (
-                (t_disrupt_si - predicted_time) if t_disrupt_si is not None else None
-            )
+            ax2.plot(time, filtered, label="Filter")
+            diff = (t_disrupt_si - predicted_time) if t_disrupt_si is not None else None
             ax2.axvline(
                 predicted_time,
                 color="r",
                 ls="--",
                 linewidth=1,
-                label=f"Heuristic disruption time:\n$t={predicted_time:.2f}$s, {f"{diff_microsec:.4f} s diff" if diff_microsec else ""}",
+                label=f"Heuristic disruption time:\n$t={predicted_time:.3f}$s, {f"{diff:.4f} s diff" if diff else ""}",
             )
 
             ax2.legend()

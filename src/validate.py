@@ -26,17 +26,22 @@ from sklearn.metrics import (
 )
 from torch.utils.data import DataLoader, Subset
 
+import matplotlib.pyplot as plt
+import pandas as pd
+
 from model.dataset import IpDataset
 from util.data_loading import _read_signal_file
 from util.disruption_predict import predict_disruption_time
 from util.best_model import best_model_dir, load_best_model_cnn, load_best_model_env
 
 _REPO = Path(__file__).resolve().parents[1]
-
-
-def _abs(path: str) -> Path:
-    p = Path(path)
-    return p if p.is_absolute() else _REPO / p
+# Env paths are relative to the repo root; run from there so they resolve directly.
+os.chdir(_REPO)
+load_best_model_env()
+data_path = Path(os.environ["DATA_PATH"])
+labels_path = Path(os.environ["TRAIN_LABELS_PATH"])
+model_dir = best_model_dir()
+predictions_csv = model_dir / "predictions.csv"
 
 
 def _configure_logging(prog_dir: Path) -> None:
@@ -73,16 +78,85 @@ class EvalResult:
     disruption_times: list[tuple[float, float, int]]
 
 
-def _evaluate_dev(
+def _disruption_time_for_shot(dataset: IpDataset, idx: int) -> tuple[float, float, int]:
+    """Predict and record disruption time for one disruptive shot in raw SI time.
+
+    Normalized times are fractions of max_length, mapped back via the raw time column.
+    """
+    shot = dataset.load_shot_view(idx)
+    raw_path = os.path.join(dataset.data_dir, f"{shot.shot_no}.txt")
+    raw_current = _read_signal_file(raw_path, col=1)
+    raw_time = _read_signal_file(raw_path, col=0)
+    max_length = dataset.data.shape[1]
+    pred_time = predict_disruption_time(raw_current, raw_time)
+    true_time = float(
+        raw_time[min(round(shot.t_disrupt * max_length), len(raw_time) - 1)]
+    )
+    return (shot.index, pred_time, true_time)
+
+
+def _predict_disruption_times(
+    dataset: IpDataset, subset: Subset
+) -> list[tuple[float, float, int]]:
+    """Compute disruption times for the given holdout shots without running the model."""
+    disruption_times: list[tuple[float, float, int]] = []
+    for idx in tqdm(list(subset.indices), desc="Predicting times", unit="shot"):
+        _, label = dataset[idx]
+        if int(label[0].item()) == 1:
+            disruption_times.append(_disruption_time_for_shot(dataset, idx))
+    return disruption_times
+
+
+def generate_histogram(df: pd.DataFrame) -> None:
+    diff = (df["true_time"] - df["predicted_time"]) * 1e3
+
+    print(
+        f"Disruption time error (milliseconds, n={len(diff)}): "
+        f"median={diff.median():.3f}, variance={diff.var():.3f}, stddev={diff.std():.3f}"
+    )
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.hist(diff, bins=50, edgecolor="black", alpha=0.85, range=(-10, 10))
+    ax.axvline(0.0, color="red", linestyle="--", linewidth=1)
+    ax.set_xlabel("Difference from real disruption time (milliseconds)")
+    ax.set_ylabel("Count (# shots)")
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+
+    out_path = model_dir / "disruption_time_diff.png"
+    fig.savefig(out_path, dpi=600)
+    plt.close(fig)
+    print(f"Wrote {out_path}")
+
+
+def generate_scatter_plot(df: pd.DataFrame) -> None:
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.scatter(df["predicted_time"], df["true_time"], alpha=0.85)
+    lo = min(df["predicted_time"].min(), df["true_time"].min())
+    hi = max(df["predicted_time"].max(), df["true_time"].max())
+    ax.plot([lo, hi], [lo, hi], "r--", linewidth=1, label="y = x")
+    ax.set_xlabel("Predicted disruption time (s)")
+    ax.set_ylabel("True disruption time (s)")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+
+    out_path = model_dir / "predictions_scatter.png"
+    fig.savefig(out_path, dpi=200)
+    plt.close(fig)
+    print(f"Wrote {out_path}")
+
+
+def _evaluate_split(
     dataset: IpDataset,
     model: torch.nn.Module,
-    dev: Subset,
+    subset: Subset,
     *,
     batch_size: int,
     device: str,
 ) -> EvalResult:
-    dev_indices = list(dev.indices)
-    loader = DataLoader(dev, batch_size=batch_size, shuffle=False)
+    subset_indices = list(subset.indices)
+    loader = DataLoader(subset, batch_size=batch_size, shuffle=False)
     threshold = model.decision_threshold
     y_true: list[int] = []
     y_pred: list[int] = []
@@ -98,24 +172,11 @@ def _evaluate_dev(
             actuals = labels[:, 0].cpu().numpy().astype(int)
 
             for i, (pred, actual) in enumerate(zip(preds, actuals)):
-                idx = dev_indices[offset + i]
+                idx = subset_indices[offset + i]
                 if pred != actual:
                     (fp_shot_ids if pred else fn_shot_ids).append(idx)
                 if actual:
-                    shot = dataset.load_shot_view(idx)
-                    # Predict and record in raw SI time: normalized times are
-                    # fractions of max_length, mapped back via the raw time column.
-                    raw_path = os.path.join(dataset.data_dir, f"{shot.shot_no}.txt")
-                    raw_current = _read_signal_file(raw_path, col=1)
-                    raw_time = _read_signal_file(raw_path, col=0)
-                    max_length = dataset.data.shape[1]
-                    pred_time = predict_disruption_time(raw_current, raw_time)
-                    true_time = float(
-                        raw_time[
-                            min(round(shot.t_disrupt * max_length), len(raw_time) - 1)
-                        ]
-                    )
-                    disruption_times.append((shot.index, pred_time, true_time))
+                    disruption_times.append(_disruption_time_for_shot(dataset, idx))
             offset += len(preds)
             y_true.extend(actuals.tolist())
             y_pred.extend(preds.tolist())
@@ -128,7 +189,7 @@ def _log_metrics(result: EvalResult, *, fbeta: float) -> None:
         result.y_true, result.y_pred, labels=[0, 1]
     ).ravel()
     logger.info("=" * 60)
-    logger.info("Best-model evaluation ({} dev holdout shots):", len(result.y_true))
+    logger.info("Best-model evaluation ({} test holdout shots):", len(result.y_true))
     logger.info("  Accuracy:  {:.6f}", accuracy_score(result.y_true, result.y_pred))
     logger.info(
         "  Precision: {:.6f}",
@@ -158,6 +219,17 @@ def _log_metrics(result: EvalResult, *, fbeta: float) -> None:
     logger.info("=" * 60)
 
 
+def _write_predictions_csv(
+    prog_dir: Path, disruption_times: list[tuple[int, float, float]]
+) -> None:
+    df = pd.DataFrame(
+        [(index, pred, true, true - pred) for index, pred, true in disruption_times],
+        columns=["index", "predicted_time", "true_time", "diff"],
+    )
+    df.sort_values("diff", inplace=True, ascending=False)
+    df.to_csv(predictions_csv, index=False)
+
+
 def _write_artifacts(prog_dir: Path, result: EvalResult) -> None:
     (prog_dir / "false_positives.txt").write_text(
         "\n".join(map(str, sorted(result.fp_shot_ids))) + "\n"
@@ -165,11 +237,7 @@ def _write_artifacts(prog_dir: Path, result: EvalResult) -> None:
     (prog_dir / "false_negatives.txt").write_text(
         "\n".join(map(str, sorted(result.fn_shot_ids))) + "\n"
     )
-    rows = ["index,predicted_time,true_time"] + [
-        f"{index},{pred},{true}" for index, pred, true in result.disruption_times
-    ]
-    predictions_csv = prog_dir / "predictions.csv"
-    predictions_csv.write_text("\n".join(rows) + "\n")
+    _write_predictions_csv(prog_dir, result.disruption_times)
     logger.info(
         "Wrote misclassified shot ids and {} disruption-time pairs to {}",
         len(result.disruption_times),
@@ -177,21 +245,47 @@ def _write_artifacts(prog_dir: Path, result: EvalResult) -> None:
     )
 
 
-def evaluate_best_model(batch_size: int = 256) -> None:
-    """Run the best_model checkpoint on the dev holdout used during training."""
-    load_best_model_env()
-    model_dir = best_model_dir()
-    dataset = IpDataset(
-        data_file=str(_abs(os.environ["DATA_PATH"])),
-        labels_file=str(_abs(os.environ["TRAIN_LABELS_PATH"])),
-        labels_path=str(_abs(os.environ["LABELS_PATH"])),
-        data_dir=str(_abs(os.environ["DATA_DIR"])),
+def _build_dataset() -> IpDataset:
+    return IpDataset(
+        data_file=os.environ["DATA_PATH"],
+        labels_file=os.environ["TRAIN_LABELS_PATH"],
+        labels_path=os.environ["LABELS_PATH"],
+        data_dir=os.environ["DATA_DIR"],
         labels_type="scaled",
         cpu_use=float(os.environ["CPU_USE"]),
         preprocessor_max_workers=int(os.environ["PREPROCESSOR_MAX_WORKERS"]),
     )
 
-    _, dev, _ = dataset.split()
+
+def predict_disruption_times() -> None:
+    """Write predicted/true disruption times for the test holdout without model inference."""
+    load_best_model_env()
+    dataset = _build_dataset()
+    # Evaluate on the test split, held out from model selection (early stopping,
+    # best-checkpoint, and threshold tuning all used the dev split during training).
+    _, _, test = dataset.split()
+
+    logger.info(
+        "Predicting disruption times on {} test holdout shots (no model inference)",
+        len(test),
+    )
+    disruption_times = _predict_disruption_times(dataset, test)
+    _write_predictions_csv(model_dir, disruption_times)
+    logger.info(
+        "Wrote {} disruption-time pairs to {}",
+        len(disruption_times),
+        predictions_csv,
+    )
+
+
+def evaluate_best_model(batch_size: int = 256) -> None:
+    """Run the best_model checkpoint on the test holdout (unseen during training)."""
+    load_best_model_env()
+    dataset = _build_dataset()
+
+    # Evaluate on the test split, held out from model selection (early stopping,
+    # best-checkpoint, and threshold tuning all used the dev split during training).
+    _, _, test = dataset.split()
 
     model = load_best_model_cnn(dataset)
     if model is None:
@@ -207,13 +301,13 @@ def evaluate_best_model(batch_size: int = 256) -> None:
     fbeta = float(os.environ.get("FBETA", "1.8"))
 
     logger.info(
-        "Evaluating best model on {} dev holdout shots (device={}, threshold={:.4f})",
-        len(dev),
+        "Evaluating best model on {} test holdout shots (device={}, threshold={:.4f})",
+        len(test),
         device,
         model.decision_threshold,
     )
 
-    result = _evaluate_dev(dataset, model, dev, batch_size=batch_size, device=device)
+    result = _evaluate_split(dataset, model, test, batch_size=batch_size, device=device)
     _log_metrics(result, fbeta=fbeta)
     _write_artifacts(model_dir, result)
 
@@ -228,6 +322,14 @@ def main() -> None:
         help="Skip running the best model on the dev holdout set",
     )
     parser.add_argument(
+        "--predictions-only",
+        action="store_true",
+        help=(
+            "Only compute predicted/true disruption times and write predictions.csv; "
+            "skip loading and running the model entirely"
+        ),
+    )
+    parser.add_argument(
         "--eval-batch-size",
         type=int,
         default=256,
@@ -235,18 +337,16 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    load_best_model_env()
-    model_dir = best_model_dir()
-    data_path = _abs(os.environ["DATA_PATH"])
-    labels_path = _abs(os.environ["TRAIN_LABELS_PATH"])
-    for path in (model_dir, data_path.parent, labels_path.parent):
-        path.mkdir(parents=True, exist_ok=True)
-
     _configure_logging(model_dir)
     logger.info("Running validation...")
     _require_preprocessed(data_path, labels_path)
 
-    if not args.skip_model_eval:
+    if args.predictions_only:
+        predict_disruption_times()
+        df = pd.read_csv(predictions_csv)
+        generate_scatter_plot(df)
+        generate_histogram(df)
+    elif not args.skip_model_eval:
         evaluate_best_model(batch_size=args.eval_batch_size)
 
     logger.info("Validation complete.")

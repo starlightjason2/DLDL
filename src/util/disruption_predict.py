@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-DEFAULT_SMOOTHING = 200
+DEFAULT_SMOOTHING = 300
 
 # The boxcar smoother lags the true corner by a fixed fraction of its own window. Measured experimentally.
 LAG_WINDOW_FRACTION = 0.09
@@ -36,24 +36,25 @@ def apply_smoothing(current: np.ndarray):
     return smoothed
 
 
-def apply_filter(current):
-    smoothed = apply_smoothing(current)
+def get_oriented_current(current):
+    return current if np.max(current) > 0.1 else -current
 
-    return current - smoothed
+
+def apply_filter(current):
+    oriented = get_oriented_current(current)
+    smoothed = apply_smoothing(oriented)
+
+    return oriented - smoothed, smoothed
 
 
 def predict_disruption_time(current, time) -> float:
-    clean_current, clean_time = clean_zeros(current, time)
+    diff, _ = apply_filter(current)
+    dt = float(np.median(np.diff(time)))
+    lag = LAG_WINDOW_FRACTION * get_window_size(current) * dt
 
-    # Orient every shot the same way: plateau above ramp-start → convex corner
-    oriented = (
-        clean_current if clean_current[-1] >= clean_current[0] else -clean_current
-    )
-
-    smoothed = apply_smoothing(oriented)
-    residual = oriented - smoothed  # signed, no square
-
-    # Median step is robust to a coarse leading sample in raw time columns.
-    dt = float(np.median(np.diff(clean_time)))
-    lag = LAG_WINDOW_FRACTION * get_window_size(oriented) * dt
-    return float(clean_time[int(np.argmax(residual))]) - lag
+    idx_peak = np.argmax(diff)
+    idx_trough = np.argmin(diff[idx_peak:]) + idx_peak
+    # find where the
+    idx_root = np.abs(diff[idx_peak:idx_trough]).argmin()
+    # print(idx_peak, idx_trough, idx_root)
+    return float(time[int(idx_peak + idx_root)])

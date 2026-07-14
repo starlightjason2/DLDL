@@ -9,23 +9,20 @@ from loguru import logger
 from model.dataset import IpDataset
 
 _REPO = Path(__file__).resolve().parents[1]
+# Env paths are relative to the repo root; run from there so they resolve directly.
+os.chdir(_REPO)
 load_dotenv(dotenv_path=_REPO / ".env", encoding="utf-8")
 
-
-def _abs(p: str) -> str:
-    return p if os.path.isabs(p) else str(_REPO / p)
-
-
-os.makedirs(_abs(os.environ["PROG_DIR"]), exist_ok=True)
+os.makedirs(os.environ["PROG_DIR"], exist_ok=True)
 for _parent in {
-    Path(_abs(os.environ["DATA_PATH"])).parent,
-    Path(_abs(os.environ["TRAIN_LABELS_PATH"])).parent,
+    Path(os.environ["DATA_PATH"]).parent,
+    Path(os.environ["TRAIN_LABELS_PATH"]).parent,
 }:
     os.makedirs(_parent, exist_ok=True)
 
-prog_dir = _abs(os.environ["PROG_DIR"])
-data_path = _abs(os.environ["DATA_PATH"])
-labels_pt_path = _abs(os.environ["TRAIN_LABELS_PATH"])
+prog_dir = os.environ["PROG_DIR"]
+data_path = os.environ["DATA_PATH"]
+labels_pt_path = os.environ["TRAIN_LABELS_PATH"]
 
 # Configure logging: stderr + file
 logger.remove()
@@ -48,8 +45,8 @@ if __name__ == "__main__":
         
         data_file=data_path,
         labels_file=labels_pt_path,
-        labels_path=_abs(os.environ["LABELS_PATH"]),
-        data_dir=_abs(os.environ["DATA_DIR"]),
+        labels_path=os.environ["LABELS_PATH"],
+        data_dir=os.environ["DATA_DIR"],
         labels_type="scaled",
         cpu_use=float(os.environ["CPU_USE"]),
         preprocessor_max_workers=int(os.environ["PREPROCESSOR_MAX_WORKERS"]),

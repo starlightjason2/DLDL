@@ -13,12 +13,9 @@ from model.dataset import IpDataset
 from util.training import build_cnn_from_env
 
 _REPO = Path(__file__).resolve().parents[1]  # project root (src/..)
+# Env paths are relative to the repo root; run from there so they resolve directly.
+os.chdir(_REPO)
 load_dotenv(dotenv_path=_REPO / ".env", encoding="utf-8")
-
-
-def _abs(p: str) -> Path:
-    """Resolve a path relative to the repo root if not already absolute."""
-    return Path(p) if Path(p).is_absolute() else _REPO / p
 
 
 def _configure_logging(prog_dir: Path, job_id: str) -> None:
@@ -37,10 +34,10 @@ def _configure_logging(prog_dir: Path, job_id: str) -> None:
 
 
 def main() -> None:
-    prog_dir = _abs(os.environ["PROG_DIR"])
+    prog_dir = Path(os.environ["PROG_DIR"])
     job_id = os.environ["JOB_ID"]
-    data_path = _abs(os.environ["DATA_PATH"])
-    labels_path = _abs(os.environ["TRAIN_LABELS_PATH"])
+    data_path = Path(os.environ["DATA_PATH"])
+    labels_path = Path(os.environ["TRAIN_LABELS_PATH"])
 
     # Ensure output directories exist before logging starts
     prog_dir.mkdir(parents=True, exist_ok=True)
@@ -55,8 +52,8 @@ def main() -> None:
         
         data_file=str(data_path),
         labels_file=str(labels_path),
-        labels_path=str(_abs(os.environ["LABELS_PATH"])),
-        data_dir=str(_abs(os.environ["DATA_DIR"])),
+        labels_path=os.environ["LABELS_PATH"],
+        data_dir=os.environ["DATA_DIR"],
         labels_type="scaled",
         cpu_use=float(os.environ["CPU_USE"]),
         preprocessor_max_workers=int(os.environ["PREPROCESSOR_MAX_WORKERS"]),

@@ -24,11 +24,8 @@ from model.dataset import IpDataset
 from util.best_model import best_model_dir, load_best_model_cnn, load_best_model_env
 
 _REPO = Path(__file__).resolve().parents[1]
-
-
-def _abs(path: str) -> Path:
-    p = Path(path)
-    return p if p.is_absolute() else _REPO / p
+# Env paths are relative to the repo root; run from there so they resolve directly.
+os.chdir(_REPO)
 
 
 def create_model_diagram(model: IpCNN, fig_path: Path) -> Path:
@@ -279,10 +276,10 @@ def main() -> None:
     load_best_model_env()
     model_dir = best_model_dir()
     dataset = IpDataset(
-        data_file=str(_abs(os.environ["DATA_PATH"])),
-        labels_file=str(_abs(os.environ["TRAIN_LABELS_PATH"])),
-        labels_path=str(_abs(os.environ["LABELS_PATH"])),
-        data_dir=str(_abs(os.environ["DATA_DIR"])),
+        data_file=os.environ["DATA_PATH"],
+        labels_file=os.environ["TRAIN_LABELS_PATH"],
+        labels_path=os.environ["LABELS_PATH"],
+        data_dir=os.environ["DATA_DIR"],
         labels_type="scaled",
         cpu_use=float(os.environ["CPU_USE"]),
         preprocessor_max_workers=int(os.environ["PREPROCESSOR_MAX_WORKERS"]),

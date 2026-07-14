@@ -1,4 +1,4 @@
-"""Plot the ROC curve for the best_model network on the dev holdout set."""
+"""Plot the ROC curve for the best_model network on the test holdout set."""
 
 from __future__ import annotations
 
@@ -16,23 +16,22 @@ from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
 
 from model.dataset import IpDataset
-from util.best_model import best_model_dir, load_best_model_cnn, load_best_model_env
+from util.best_model import best_model_dir, load_best_model_cnn, load_best_model_env, repo_root
 
-
-def _abs(path: str) -> str:
-    return path if os.path.isabs(path) else os.path.join(str(best_model_dir().parent), path)
+# Env paths are relative to the repo root; run from there so they resolve directly.
+os.chdir(repo_root())
 
 
 @torch.no_grad()
 def _collect_scores(
     model: torch.nn.Module,
-    dev: Subset,
+    subset: Subset,
     *,
     batch_size: int,
     device: str,
 ) -> tuple[list[int], list[float]]:
-    """Run the model over the dev set, returning true labels and disruption scores."""
-    loader = DataLoader(dev, batch_size=batch_size, shuffle=False)
+    """Run the model over the split, returning true labels and disruption scores."""
+    loader = DataLoader(subset, batch_size=batch_size, shuffle=False)
     y_true: list[int] = []
     y_score: list[float] = []
     for signals, labels in tqdm(loader, desc="Scoring", unit="batch"):
@@ -47,15 +46,17 @@ def plot_roc_curve(batch_size: int = 256) -> None:
     model_dir = best_model_dir()
 
     dataset = IpDataset(
-        data_file=_abs(os.environ["DATA_PATH"]),
-        labels_file=_abs(os.environ["TRAIN_LABELS_PATH"]),
-        labels_path=_abs(os.environ["LABELS_PATH"]),
-        data_dir=_abs(os.environ["DATA_DIR"]),
+        data_file=os.environ["DATA_PATH"],
+        labels_file=os.environ["TRAIN_LABELS_PATH"],
+        labels_path=os.environ["LABELS_PATH"],
+        data_dir=os.environ["DATA_DIR"],
         labels_type="scaled",
         cpu_use=float(os.environ["CPU_USE"]),
         preprocessor_max_workers=int(os.environ["PREPROCESSOR_MAX_WORKERS"]),
     )
-    _, dev, _ = dataset.split()
+    # Evaluate on the test split, held out from model selection (early stopping,
+    # best-checkpoint, and threshold tuning all used the dev split during training).
+    _, _, test = dataset.split()
 
     model = load_best_model_cnn(dataset)
     if model is None:
@@ -68,18 +69,18 @@ def plot_roc_curve(batch_size: int = 256) -> None:
         batch_size = min(batch_size, 8)  # 60k-length sequences are huge on CPU
     model = model.to(device)
 
-    y_true, y_score = _collect_scores(model, dev, batch_size=batch_size, device=device)
+    y_true, y_score = _collect_scores(model, test, batch_size=batch_size, device=device)
 
     fpr, tpr, _ = roc_curve(y_true, y_score)
     auc = roc_auc_score(y_true, y_score)
-    print(f"ROC AUC (n={len(y_true)} dev holdout shots): {auc:.6f}")
+    print(f"ROC AUC (n={len(y_true)} test holdout shots): {auc:.6f}")
 
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.plot(fpr, tpr, linewidth=2, label=f"IpCNN (AUC = {auc:.4f})")
     ax.plot([0, 1], [0, 1], "k--", linewidth=1, label="Chance (AUC = 0.5)")
     ax.set_xlabel("False positive rate")
     ax.set_ylabel("True positive rate")
-    ax.set_title("ROC curve — disruption classifier (dev holdout)")
+    ax.set_title("ROC curve — disruption classifier (test holdout)")
     ax.legend(loc="lower right")
     ax.grid(True, alpha=0.3)
     ax.set_aspect("equal")

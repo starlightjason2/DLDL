@@ -37,9 +37,7 @@
 \maketitle
 
 \begin{abstract}
-A Tokamak is a torus-shaped nuclear fusion reactor design that uses magnetic fields to confine fusion fuel in the form of plasma. A single plasma experiement in a Tokamak is called a "shot", and can often experience disruption events that cause a current drop to zero. The existence of a computationally inexpensive model for classifying shots as disruptive/not-disruptive, as well as identifying the time of disruption, can assist the scientific community in conducting future experiements. We train a CNN (Convolutional Neural Network) on current time series data from 40,000 shots from the DIII-D Tokamak, and achieve a recall of 99\% and precision of 91\% on boolean disruption/not-disruption predictions. We additionally develop a convolutional heuristic that accurately identifies time of disruption with a standard deviation $\sigma=\qty{8.7}{\milli\sec}$.
-
-
+Plasma in a Tokamak fusion reactor can often experience disruption events, causing damage to the interior reactor walls and resulting in a current drop to zero. The existence of a computationally inexpensive model for identifying disruptive shots and accurately identifying the time of disruption can assist the scientific community by efficiently auto-labeling experimental data for further analysis. We took an existing labeled disruption dataset from the DIII-D Tokamak reactor, utilizing shot numbers 125500-186000 (~40,000 total) to develop a new disruption labeling model that can generate automated labeling up to the current day. We train a CNN (Convolutional Neural Network) to perform boolean disruption/not-disruption prediction and achieve a 99\% recall and 91\% precision on our test dataset. We additionally develop a convolutional heuristic that accurately identifies time of disruption with a standard deviation $\sigma=\qty{8.7}{\milli\sec}$.
 \end{abstract}
 
 

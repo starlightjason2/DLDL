@@ -27,7 +27,7 @@ def _trial_num(trial_id: str) -> int:
     return int(match.group(1))
 
 
-def _plot(csv_path: Path, out_path: Path, *, title: str) -> None:
+def _plot(csv_path: Path, out_path: Path) -> None:
     df = pd.read_csv(csv_path)
     df = df[df["status"] == TrialStatus.COMPLETED].copy()
     if df.empty:
@@ -71,7 +71,6 @@ def main() -> None:
         _plot(
             csv_path,
             tune_dir / "trials" / "tune_metrics.png",
-            title=f"{label}: metrics vs trial",
         )
 
 
