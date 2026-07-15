@@ -1,4 +1,4 @@
-\documentclass{article}
+\documentclass[twocolumn]{article}
 
 \usepackage{arxiv}
 
@@ -34,30 +34,37 @@
 }
 
 \begin{document}
-\maketitle
 
-\begin{abstract}
-Plasma in a Tokamak fusion reactor can often experience disruption events, causing damage to the interior reactor walls and resulting in a current drop to zero. The existence of a computationally inexpensive model for identifying disruptive shots and accurately identifying the time of disruption can assist the scientific community by efficiently auto-labeling experimental data for further analysis. We took an existing labeled disruption dataset from the DIII-D Tokamak reactor, utilizing shot numbers 125500-186000 (~40,000 total) to develop a new disruption labeling model that can generate automated labeling up to the current day. We train a CNN (Convolutional Neural Network) to perform boolean disruption/not-disruption prediction and achieve a 99\% recall and 91\% precision on our test dataset. We additionally develop a convolutional heuristic that accurately identifies time of disruption with a standard deviation $\sigma=\qty{8.7}{\milli\sec}$.
-\end{abstract}
+\twocolumn[
+  \maketitle
+  \begin{@twocolumnfalse}
+    \begin{abstract}
+    Plasma in a Tokamak fusion reactor frequently experiences disruption events that result in a current drop to zero. The existence of a computationally inexpensive model for identifying disruptive shots and accurately identifying time of disruption can assist the scientific community by auto-labeling experimental data for further analysis. We took a labeled disruption dataset from the DIII-D Tokamak reactor, utilizing shot numbers 125500-186000 (nearly 40,000 total shots) to develop a new disruption labeling model that can generate automated labeling up to the current day. We train a CNN (Convolutional Neural Network) to perform boolean disruption/not-disruption prediction and achieve a 99\% recall and 91\% precision on our test dataset. We additionally develop a convolutional heuristic that accurately identifies time of disruption, with 86\% of predictions within a standard deviation of $\qty{2.1}{\micro\s}$.
+    \end{abstract}
+    \vspace{1em}
+  \end{@twocolumnfalse}
+]
 
 
 % ==================================================================
 \section{Introduction}
 \label{sec:intro}
 
-State the problem, motivation, and contributions.
 
 % ==================================================================
 \section{Methods}
 \label{sec:methods}
 
-Describe data, models, training, and evaluation.
+
+Current vs. time data from DIII-D was availabile to us in the form of timestamped `.txt` files. We normalized every shot using the maximum current and shot length throughout the entire dataset, adding trailing zeroes to each shot to match the shape of the largest current series. Our classifier consisted of four convolutional layers, max pooling layers, Batch Normalization layers, and used a sigmoid activation function. See ~\ref{fig:model_diagram}.
 
 
 
-\begin{figure}[t]
+
+
+\begin{figure}[h]
   \centering
-  \includegraphics[width=0.8\linewidth]{best_model/model_diagram.png}
+  \includegraphics[width=\columnwidth]{best_model/model_diagram.png}
   \caption{Figure caption.}
   \label{fig:model_diagram}
 \end{figure}
@@ -83,13 +90,6 @@ Report quantitative and qualitative findings. Reference figures and tables as ne
   \label{fig:disruption_time_diff}
 \end{figure}
 
-
-
-% ==================================================================
-\section{Discussion}
-\label{sec:discussion}
-
-Interpret results, note limitations, and compare to prior work.
 
 % ==================================================================
 \section{Conclusion}

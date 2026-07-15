@@ -7,7 +7,7 @@ import numpy as np
 DEFAULT_SMOOTHING = 300
 
 # The boxcar smoother lags the true corner by a fixed fraction of its own window. Measured experimentally.
-LAG_WINDOW_FRACTION = 0.09
+# LAG = 0.09
 
 
 def get_window_size(current):
@@ -49,12 +49,12 @@ def apply_filter(current):
 
 def predict_disruption_time(current, time) -> float:
     diff, _ = apply_filter(current)
-    dt = float(np.median(np.diff(time)))
-    lag = LAG_WINDOW_FRACTION * get_window_size(current) * dt
+    # dt = float(np.median(np.diff(time)))
+    # lag = LAG_WINDOW_FRACTION * get_window_size(current) * dt
 
     idx_peak = np.argmax(diff)
     idx_trough = np.argmin(diff[idx_peak:]) + idx_peak
     # find where the
     idx_root = np.abs(diff[idx_peak:idx_trough]).argmin()
-    # print(idx_peak, idx_trough, idx_root)
+    # print(lag, dt, get_window_size(current), get_window_size(current) * dt)
     return float(time[int(idx_peak + idx_root)])

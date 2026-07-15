@@ -7,7 +7,7 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-
+import numpy as np
 import torch
 
 # Prevent macOS OpenMP thread deadlock on CPU inference
@@ -97,9 +97,9 @@ def _disruption_time_for_shot(dataset: IpDataset, idx: int) -> tuple[float, floa
 
 def _predict_disruption_times(
     dataset: IpDataset, subset: Subset
-) -> list[tuple[float, float, int]]:
+) -> list[tuple[int, float, float]]:
     """Compute disruption times for the given holdout shots without running the model."""
-    disruption_times: list[tuple[float, float, int]] = []
+    disruption_times: list[tuple[int, float, float]] = []
     for idx in tqdm(list(subset.indices), desc="Predicting times", unit="shot"):
         _, label = dataset[idx]
         if int(label[0].item()) == 1:
@@ -108,25 +108,50 @@ def _predict_disruption_times(
 
 
 def generate_histogram(df: pd.DataFrame) -> None:
-    diff = (df["true_time"] - df["predicted_time"]) * 1e3
-
-    print(
-        f"Disruption time error (milliseconds, n={len(diff)}): "
-        f"median={diff.median():.3f}, variance={diff.var():.3f}, stddev={diff.std():.3f}"
+    # Errors in seconds; keep those within +/-10 ms, then convert to microseconds.
+    diff = df["diff"][(df["diff"] < 10e-3) & (df["diff"] > -10e-3)] * 1e3
+    sigma = diff.std()
+    mu = diff.mean()
+    logger.success(
+        f"Disruption time error (microseconds, n={len(diff)}): "
+        f"mean={mu:.3f}, median={diff.median():.3f}, variance={diff.var():.3f}, stddev={sigma:.3f}"
+    )
+    first_quartile = diff[np.abs(diff) < sigma]
+    secondt_quartile = diff[np.abs(diff) < 2 * sigma]
+    third_quartile = diff[np.abs(diff) < 3 * sigma]
+    logger.success(
+        f"{100*len(first_quartile) / len(diff):2f}% shots within 1 stddev, {100*len(secondt_quartile) / len(diff):2f}% shots within 2 stddev, {100*len(third_quartile) / len(diff):2f}% shots within 3 stddev"
     )
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.hist(diff, bins=50, edgecolor="black", alpha=0.85, range=(-10, 10))
+    n, bins, patches = ax.hist(
+        diff, bins=75, edgecolor="black", alpha=0.85, range=(-10, 10)
+    )
     ax.axvline(0.0, color="red", linestyle="--", linewidth=1)
-    ax.set_xlabel("Difference from real disruption time (milliseconds)")
+    ax.set_xlabel(r"Difference from real disruption time $\Delta t$ (microseconds)")
     ax.set_ylabel("Count (# shots)")
+
+    # Overlay the best-fit Gaussian. The histogram plots counts, so scale the
+    # normal PDF by (n_total * bin_width) to put it on the same vertical axis.
+    bin_width = bins[1] - bins[0]
+    x = np.linspace(bins[0], bins[-1], 500)
+    pdf = np.exp(-0.5 * ((x - mu) / sigma) ** 2) / (sigma * np.sqrt(2 * np.pi))
+    ax.plot(
+        x,
+        pdf * len(diff) * bin_width,
+        "r--",
+        linewidth=1.5,
+        label=f"Best fit Gaussian ($\\mu$={mu:.2f}, $\\sigma$={sigma:.2f})",
+    )
+    ax.legend()
+
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
     out_path = model_dir / "disruption_time_diff.png"
     fig.savefig(out_path, dpi=600)
     plt.close(fig)
-    print(f"Wrote {out_path}")
+    logger.info(f"Wrote {out_path}")
 
 
 def generate_scatter_plot(df: pd.DataFrame) -> None:
@@ -263,11 +288,10 @@ def predict_disruption_times() -> None:
     dataset = _build_dataset()
     # Evaluate on the test split, held out from model selection (early stopping,
     # best-checkpoint, and threshold tuning all used the dev split during training).
-    _, _, test = dataset.split()
+    train, dev, test = dataset.split()
 
     logger.info(
-        "Predicting disruption times on {} test holdout shots (no model inference)",
-        len(test),
+        f"Predicting disruption times on {len(test)} test holdout shots (no model inference). Model was trained on {len(train)} shots and validated on {len(dev)} shots."
     )
     disruption_times = _predict_disruption_times(dataset, test)
     _write_predictions_csv(model_dir, disruption_times)
