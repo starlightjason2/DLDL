@@ -25,7 +25,7 @@
 % ------------------------------------------------------------------
 % Title and author
 % ------------------------------------------------------------------
-\title{Paper Title}
+\title{A Unified Framework for Automated Disruption Labeling of DIII-D shots using a 1D Convolutional Neural Network and Temporal Filtering}
 
 \author{
   Jason Jain, Dr. Jesse Rodriguez \\
@@ -39,7 +39,7 @@
   \maketitle
   \begin{@twocolumnfalse}
     \begin{abstract}
-    Plasma in a Tokamak fusion reactor frequently experiences disruption events that result in a current drop to zero. The existence of a computationally inexpensive model for identifying disruptive shots and accurately identifying time of disruption can assist the scientific community by auto-labeling experimental data for further analysis. We took a labeled disruption dataset from the DIII-D Tokamak reactor, utilizing shot numbers 125500-186000 (nearly 40,000 total shots) to develop a new disruption labeling model that can generate automated labeling up to the current day. We train a CNN (Convolutional Neural Network) to perform boolean disruption/not-disruption prediction and achieve a 99\% recall and 91\% precision on our test dataset. We additionally develop a convolutional heuristic that accurately identifies time of disruption, with 86\% of predictions within a standard deviation of $\qty{2.1}{\micro\s}$.
+    Plasma in a Tokamak fusion reactor frequently experiences disruption events that result in a current drop to zero. The existence of a computationally inexpensive model for identifying disruptive shots and accurately identifying time of disruption can assist the scientific community by auto-labeling shots for further analysis. We took a labeled disruption dataset from the DIII-D Tokamak reactor, utilizing shot numbers 125500-186000 (nearly 40,000 total shots) to develop a new disruption labeling model that can generate automated labeling up to the current day. We train a CNN (Convolutional Neural Network) to perform boolean disruption/not-disruption prediction and achieve a 99\% recall and 91\% precision on our test dataset. We additionally develop a convolutional heuristic that accurately identifies time of disruption within a standard deviation of $\qty{2.1}{\micro\s}$.
     \end{abstract}
     \vspace{1em}
   \end{@twocolumnfalse}
@@ -69,6 +69,7 @@ Current vs. time data from DIII-D was availabile to us in the form of timestampe
   \label{fig:model_diagram}
 \end{figure}
 
+$$y[n]=\sum_{k=0}^{K}{x[k]h[n-k]}$$
 
 % ==================================================================
 \section{Results}
@@ -78,18 +79,25 @@ Report quantitative and qualitative findings. Reference figures and tables as ne
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.8\linewidth]{best_model/predictions_scatter.png}
+  \includegraphics[width=1\columnwidth]{best_model/predictions_scatter.png}
   \caption{Figure caption.}
   \label{fig:predictions_scatter}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.8\linewidth]{best_model/disruption_time_diff.png}
+  \includegraphics[width=1\columnwidth]{best_model/disruption_time_diff.png}
   \caption{Figure caption.}
   \label{fig:disruption_time_diff}
 \end{figure}
 
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=1\columnwidth]{best_model/roc_curve.png}
+  \caption{Figure caption.}
+  \label{fig:roc}
+\end{figure}
 
 % ==================================================================
 \section{Conclusion}

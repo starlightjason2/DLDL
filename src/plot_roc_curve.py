@@ -16,7 +16,12 @@ from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
 
 from model.dataset import IpDataset
-from util.best_model import best_model_dir, load_best_model_cnn, load_best_model_env, repo_root
+from util.best_model import (
+    best_model_dir,
+    load_best_model_cnn,
+    load_best_model_env,
+    repo_root,
+)
 
 # Env paths are relative to the repo root; run from there so they resolve directly.
 os.chdir(repo_root())
@@ -76,18 +81,17 @@ def plot_roc_curve(batch_size: int = 256) -> None:
     print(f"ROC AUC (n={len(y_true)} test holdout shots): {auc:.6f}")
 
     fig, ax = plt.subplots(figsize=(8, 8))
-    ax.plot(fpr, tpr, linewidth=2, label=f"IpCNN (AUC = {auc:.4f})")
+    ax.plot(fpr, tpr, linewidth=2, label=f"CNN (Area Under Curve = {auc:.4f})")
     ax.plot([0, 1], [0, 1], "k--", linewidth=1, label="Chance (AUC = 0.5)")
-    ax.set_xlabel("False positive rate")
-    ax.set_ylabel("True positive rate")
-    ax.set_title("ROC curve — disruption classifier (test holdout)")
+    ax.set_xlabel("False Rositive Rate ($x$)")
+    ax.set_ylabel("True Rositive Rate ($y$)")
     ax.legend(loc="lower right")
     ax.grid(True, alpha=0.3)
     ax.set_aspect("equal")
     fig.tight_layout()
 
     out_path = model_dir / "roc_curve.png"
-    fig.savefig(out_path, dpi=200)
+    fig.savefig(out_path, dpi=600)
     plt.close(fig)
     print(f"Wrote {out_path}")
 

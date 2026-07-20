@@ -65,7 +65,9 @@ def main() -> None:
             raw_current = _read_signal_file(raw_path, col=1)
             raw_time = _read_signal_file(raw_path, col=0)
             current, time = clean_zeros(raw_current, raw_time)
-            predicted_time = predict_disruption_time(raw_current, raw_time)
+            predicted_time_start, pred_time, predicted_time_end = (
+                predict_disruption_time(raw_current, raw_time)
+            )
 
             # t_disrupt is stored normalized (disruption_index / max_length); map it
             # back onto the SI time axis via the raw time samples.
@@ -82,7 +84,7 @@ def main() -> None:
             ax1.set_title(
                 f"CNN disruption probability: {100*cnn_prob:.2f}%", fontsize=10
             )
-            ax1.plot(time, current, label="Current $I(t)$", color="tab:blue")
+            ax1.plot(time, current, label="Current $I(t)$")
             flipped = get_oriented_current(current)
             if not np.array_equal(current, flipped):
                 ax1.plot(
@@ -90,7 +92,6 @@ def main() -> None:
                     flipped,
                     label="Flipped $I(t)$",
                     linestyle=":",
-                    color="tab:blue",
                 )
 
             filtered, smoothed = apply_filter(current)
@@ -99,12 +100,10 @@ def main() -> None:
                 smoothed,
                 label="Smoothed $I(t)$",
                 linestyle="--",
-                color="tab:orange",
             )
             if shot.disruptive:
                 ax1.axvline(
                     t_disrupt_si,
-                    color="r",
                     ls="--",
                     linewidth=1,
                     label=f"Real disruption time: $t_0={t_disrupt_si:.3f}$s",
@@ -117,15 +116,35 @@ def main() -> None:
 
             ax2.clear()
             ax2.plot(time, filtered, label="Filter")
-            diff = (t_disrupt_si - predicted_time) if t_disrupt_si is not None else None
+            diff = (
+                (t_disrupt_si - predicted_time_start)
+                if t_disrupt_si is not None
+                else None
+            )
             ax2.axvline(
-                predicted_time,
-                color="r",
+                pred_time,
                 ls="--",
                 linewidth=1,
-                label=f"Heuristic disruption time:\n$t={predicted_time:.3f}$s, {f"{diff:.4f} s diff" if diff else ""}",
+                label=f"Heuristic disruption time:\n$t={pred_time:.3f}$s, {f"{diff:.4f} s diff" if diff else ""}",
             )
-
+            ax1.axvline(
+                pred_time,
+                ls="--",
+                linewidth=1,
+                label=f"Heuristic disruption time:\n$t={pred_time:.3f}$s, {f"{diff:.4f} s diff" if diff else ""}",
+            )
+            ax2.axvspan(
+                xmin=predicted_time_start,
+                xmax=predicted_time_end,
+                alpha=0.5,
+                label="Heuristic Disruption Interval",
+            )
+            ax1.axvspan(
+                xmin=predicted_time_start,
+                xmax=predicted_time_end,
+                alpha=0.2,
+                label="Heuristic Disruption Interval",
+            )
             ax2.legend()
             ax2.grid()
 

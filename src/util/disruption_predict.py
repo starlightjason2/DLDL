@@ -1,16 +1,19 @@
 """Disruption time prediction from smoothed current residuals."""
 
 from __future__ import annotations
-
+from enum import IntEnum
 import numpy as np
 
 DEFAULT_SMOOTHING = 300
 
-# The boxcar smoother lags the true corner by a fixed fraction of its own window. Measured experimentally.
-# LAG = 0.09
+
+class PredictionType(IntEnum):
+    START = 0
+    ROOT = 1
+    END = 2
 
 
-def get_window_size(current):
+def get_window_size(current: np.ndarray):
     return max(1, len(current) // DEFAULT_SMOOTHING)
 
 
@@ -36,11 +39,11 @@ def apply_smoothing(current: np.ndarray):
     return smoothed
 
 
-def get_oriented_current(current):
+def get_oriented_current(current: np.ndarray):
     return current if np.max(current) > 0.1 else -current
 
 
-def apply_filter(current):
+def apply_filter(current: np.ndarray):
     oriented = get_oriented_current(current)
     smoothed = apply_smoothing(oriented)
 
@@ -49,12 +52,17 @@ def apply_filter(current):
 
 def predict_disruption_time(current, time) -> float:
     diff, _ = apply_filter(current)
-    # dt = float(np.median(np.diff(time)))
-    # lag = LAG_WINDOW_FRACTION * get_window_size(current) * dt
 
     idx_peak = np.argmax(diff)
     idx_trough = np.argmin(diff[idx_peak:]) + idx_peak
-    # find where the
-    idx_root = np.abs(diff[idx_peak:idx_trough]).argmin()
-    # print(lag, dt, get_window_size(current), get_window_size(current) * dt)
-    return float(time[int(idx_peak + idx_root)])
+
+    # first root after peak
+    arr = diff[idx_peak:idx_trough]
+    idx_root = next(iter(np.flatnonzero(np.diff(np.signbit(arr)))), 0)
+    # idx_root = np.argmin(np.abs(arr))
+
+    return (
+        time[idx_peak],
+        time[idx_peak + idx_root],
+        time[idx_trough],
+    )

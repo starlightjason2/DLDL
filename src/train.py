@@ -18,21 +18,6 @@ os.chdir(_REPO)
 load_dotenv(dotenv_path=_REPO / ".env", encoding="utf-8")
 
 
-def _configure_logging(prog_dir: Path, job_id: str) -> None:
-    log_format = (
-        "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | "
-        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
-    )
-    logger.remove()
-    logger.add(sys.stderr, format=log_format, colorize=True, level="INFO")
-
-    logger.add(
-        prog_dir / f"{job_id}.log",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-        level="INFO",
-    )
-
-
 def main() -> None:
     prog_dir = Path(os.environ["PROG_DIR"])
     job_id = os.environ["JOB_ID"]
@@ -44,12 +29,9 @@ def main() -> None:
     data_path.parent.mkdir(parents=True, exist_ok=True)
     labels_path.parent.mkdir(parents=True, exist_ok=True)
 
-    _configure_logging(prog_dir, job_id)
-
     lr_scheduler = os.environ["LR_SCHEDULER"].lower() in ("true", "1", "yes", "on")
 
     dataset = IpDataset(
-        
         data_file=str(data_path),
         labels_file=str(labels_path),
         labels_path=os.environ["LABELS_PATH"],
