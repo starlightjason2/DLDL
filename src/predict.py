@@ -54,18 +54,9 @@ def _require_preprocessed(data_path: Path, labels_path: Path) -> None:
     logger.info("Preprocessed files exist: OK")
 
 
-@dataclass
-class EvalResult:
-    y_true: list[int]
-    y_pred: list[int]
-    fp_shot_ids: list[int]
-    fn_shot_ids: list[int]
-    disruption_times: list[tuple[float, float, int]]
-
-
 def _disruption_time_for_shot(
     dataset: IpDataset, idx: int, predictionType=PredictionType.ROOT
-) -> tuple[float, float, int]:
+):
     """Predict and record disruption time for one disruptive shot in raw SI time.
 
     Normalized times are fractions of max_length, mapped back via the raw time column.
@@ -75,128 +66,11 @@ def _disruption_time_for_shot(
     raw_current = _read_signal_file(raw_path, col=1)
     raw_time = _read_signal_file(raw_path, col=0)
     max_length = dataset.data.shape[1]
-    pred_time = predict_disruption_time(raw_current, raw_time)[predictionType]
+    pred_start, pred_time, pred_end = predict_disruption_time(raw_current, raw_time)
     true_time = float(
         raw_time[min(round(shot.t_disrupt * max_length), len(raw_time) - 1)]
     )
-    return (shot.index, pred_time, true_time)
-
-
-def gaussian(x: np.ndarray, mu, sigma):
-    return np.exp(-0.5 * ((x - mu) / sigma) ** 2) / (sigma * np.sqrt(2 * np.pi))
-
-
-def plot_gaussian(ax, arr, label="Best fit Gaussian"):
-    sigma = arr.std()
-    mu = arr.mean()
-
-    xmin, xmax = ax.get_xlim()
-    x = np.linspace(xmin, xmax, 500)
-    ax.plot(
-        x,
-        gaussian(x, mu, sigma),
-        linewidth=2,
-        label=f"{label} ($\\mu$={mu:.2f}, $\\sigma$={sigma:.2f})",
-    )
-
-
-def generate_histogram(df: pd.DataFrame) -> None:
-    # Errors in seconds; keep those within +/-10 ms, then convert to milliseconds.
-    diff = df["diff"][(df["diff"] < 10e-3) & (df["diff"] > -10e-3)] * 1e3
-    sigma = diff.std()
-    mu = diff.mean()
-    logger.success(
-        f"Disruption time error (milliseconds, n={len(diff)}): "
-        f"mean={mu:.3f}, median={diff.median():.3f}, variance={diff.var():.3f}, stddev={sigma:.3f}"
-    )
-    first_quartile = diff[np.abs(diff) < sigma]
-    second_quartile = diff[np.abs(diff) < 2 * sigma]
-    third_quartile = diff[np.abs(diff) < 3 * sigma]
-    logger.success(
-        f"{100*len(first_quartile) / len(diff):2f}% shots within 1 stddev, {100*len(second_quartile) / len(diff):2f}% shots within 2 stddev, {100*len(third_quartile) / len(diff):2f}% shots within 3 stddev"
-    )
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    start = mu - 5 * sigma
-    end = mu + 5 * sigma
-    ax.hist(
-        diff, bins=60, density=True, edgecolor="black", alpha=0.85, range=(start, end)
-    )
-    ax.axvline(0.0, color="red", linestyle="--", linewidth=1)
-    ax.set_xlabel(r"Difference from real disruption time $\Delta t$ (milliseconds)")
-    ax.set_ylabel("Count (# shots)")
-
-    # Overlay the best-fit Gaussian
-    plot_gaussian(ax, diff)
-    plot_gaussian(
-        ax,
-        diff[np.abs(diff) < 2],
-        label="Best fit Gaussian within $\\Delta t \\leq\\pm 2$ ms",
-    )
-    ax.legend()
-
-    ax.grid(True, alpha=0.3)
-    fig.tight_layout()
-
-    out_path = model_dir / "disruption_time_diff.png"
-    fig.savefig(out_path, dpi=600)
-    plt.close(fig)
-    logger.info(f"Wrote {out_path}")
-
-
-def generate_scatter_plot(df: pd.DataFrame) -> None:
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.scatter(df["predicted_time"], df["true_time"], alpha=0.85)
-    lo = min(df["predicted_time"].min(), df["true_time"].min())
-    hi = max(df["predicted_time"].max(), df["true_time"].max())
-    ax.plot([lo, hi], [lo, hi], "r--", linewidth=1, label="y = x")
-    ax.set_xlabel("Predicted disruption time (s)")
-    ax.set_ylabel("True disruption time (s)")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    fig.tight_layout()
-
-    out_path = model_dir / "predictions_scatter.png"
-    fig.savefig(out_path, dpi=200)
-    plt.close(fig)
-    print(f"Wrote {out_path}")
-
-
-def _evaluate_split(
-    dataset: IpDataset,
-    model: torch.nn.Module,
-    subset: Subset,
-    *,
-    batch_size: int,
-    device: str,
-) -> EvalResult:
-    subset_indices = list(subset.indices)
-    loader = DataLoader(subset, batch_size=batch_size, shuffle=False)
-    threshold = model.decision_threshold
-    y_true: list[int] = []
-    y_pred: list[int] = []
-    fp_shot_ids: list[int] = []
-    fn_shot_ids: list[int] = []
-    disruption_times: list[tuple[float, float, int]] = []
-    offset = 0
-
-    with torch.no_grad():
-        for signals, labels in tqdm(loader, desc="Evaluating", unit="batch"):
-            probs = torch.sigmoid(model(signals.float().to(device))[:, 0]).cpu().numpy()
-            preds = (probs > threshold).astype(int)
-            actuals = labels[:, 0].cpu().numpy().astype(int)
-
-            for i, (pred, actual) in enumerate(zip(preds, actuals)):
-                idx = subset_indices[offset + i]
-                if pred != actual:
-                    (fp_shot_ids if pred else fn_shot_ids).append(idx)
-                if actual:
-                    disruption_times.append(_disruption_time_for_shot(dataset, idx))
-            offset += len(preds)
-            y_true.extend(actuals.tolist())
-            y_pred.extend(preds.tolist())
-
-    return EvalResult(y_true, y_pred, fp_shot_ids, fn_shot_ids, disruption_times)
+    return (shot.index, true_time, pred_start, pred_time, pred_end)
 
 
 def predict_disruption_times(dataset: IpDataset) -> None:
@@ -216,10 +90,15 @@ def predict_disruption_times(dataset: IpDataset) -> None:
             disruption_times.append(_disruption_time_for_shot(dataset, idx))
 
     df = pd.DataFrame(
-        [(index, pred, true, pred - true) for index, pred, true in disruption_times],
-        columns=["index", "predicted_time", "true_time", "diff"],
+        disruption_times,
+        columns=[
+            "index",
+            "true_time",
+            "pred_start",
+            "pred_root",
+            "pred_end",
+        ],
     )
-    df.sort_values("diff", inplace=True, ascending=False)
     df.to_csv(predictions_csv, index=False)
     logger.info(
         f"Wrote {len(disruption_times)} disruption-time pairs to {predictions_csv}",
@@ -242,9 +121,7 @@ def main() -> None:
         preprocessor_max_workers=int(os.environ["PREPROCESSOR_MAX_WORKERS"]),
     )
 
-    df = predict_disruption_times(dataset)
-    generate_scatter_plot(df)
-    generate_histogram(df)
+    predict_disruption_times(dataset)
 
     logger.info("Validation complete.")
 
