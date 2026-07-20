@@ -128,7 +128,7 @@ def main() -> None:
     load_best_model_env()
 
     df = pd.read_csv(predictions_csv)
-    preds = df["pred_root"]
+    preds = df["pred_start"]
 
     shots_in_range = df[
         (df["true_time"] < df["pred_end"]) & (df["true_time"] > df["pred_start"])
