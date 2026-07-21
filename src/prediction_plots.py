@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import numpy as np
 import torch
+import matplotlib.axes
 
 # Prevent macOS OpenMP thread deadlock on CPU inference
 if not torch.cuda.is_available():
@@ -44,11 +45,16 @@ model_dir = best_model_dir()
 predictions_csv = model_dir / "predictions.csv"
 
 
-def gaussian(x: np.ndarray, mu, sigma):
+def gaussian(x: np.ndarray, mu: float, sigma: float):
     return np.exp(-0.5 * ((x - mu) / sigma) ** 2) / (sigma * np.sqrt(2 * np.pi))
 
 
-def plot_gaussian(ax, arr, label="Best fit Gaussian"):
+def plot_gaussian(
+    ax: matplotlib.axes.Axes,
+    arr: np.ndarray,
+    label="Best fit Gaussian",
+    color=None,
+):
     sigma = arr.std()
     mu = arr.mean()
 
@@ -58,11 +64,12 @@ def plot_gaussian(ax, arr, label="Best fit Gaussian"):
         x,
         gaussian(x, mu, sigma),
         linewidth=2,
+        color=color,
         label=f"{label} ($\\mu$={mu:.2f}, $\\sigma$={sigma:.2f})",
     )
 
 
-def generate_histogram(df: pd.DataFrame) -> None:
+def generate_histogram(df: pd.DataFrame, prediction_type: str) -> None:
     # Errors in seconds; keep those within +/-10 ms, then convert to milliseconds.
     diff = df["diff"][(df["diff"] < 10e-3) & (df["diff"] > -10e-3)] * 1e3
     sigma = diff.std()
@@ -75,40 +82,50 @@ def generate_histogram(df: pd.DataFrame) -> None:
     second_quartile = diff[np.abs(diff) < 2 * sigma]
     third_quartile = diff[np.abs(diff) < 3 * sigma]
     logger.success(
-        f"{100*len(first_quartile) / len(diff):2f}% shots within 1 stddev, {100*len(second_quartile) / len(diff):2f}% shots within 2 stddev, {100*len(third_quartile) / len(diff):2f}% shots within 3 stddev"
+        f"{100*len(first_quartile) / len(diff):2f}% shots within 1 stddev, {100*len(second_quartile) / len(diff):2f}% shots within 2 stddev, {(100*len(third_quartile) / len(diff)):2f}% shots within 3 stddev"
     )
 
     fig, ax = plt.subplots(figsize=(10, 6))
     start = mu - 5 * sigma
     end = mu + 5 * sigma
     ax.hist(
-        diff, bins=60, density=True, edgecolor="black", alpha=0.85, range=(start, end)
+        diff,
+        bins=60,
+        density=True,
+        color="#B8C4D0",
+        edgecolor="#5A6B7B",
+        linewidth=0.5,
+        alpha=0.9,
+        range=(start, end),
     )
-    ax.axvline(0.0, color="red", linestyle="--", linewidth=1)
+    ax.axvline(0.0, color="#333333", linestyle=":", linewidth=1)
     ax.set_xlabel(r"Difference from real disruption time $\Delta t$ (milliseconds)")
     ax.set_ylabel("Count (# shots)")
 
-    # Overlay the best-fit Gaussian
-    plot_gaussian(ax, diff)
+    # Overlay the best-fit Gaussian. Explicit high-contrast accents against the
+    # neutral gray bars: full-data fit in blue, the 3-sigma-trimmed fit in orange.
+    plot_gaussian(ax, diff, color="#0072B2")
+    range_label = rf"${(mu - 3*sigma):.2f} < \Delta t < {(mu + 3*sigma):.2f}$"
     plot_gaussian(
         ax,
         diff[np.abs(diff) < (3 * sigma)],
-        label=f"Best fit Gaussian within $3\\sigma={(3*sigma):2f}$ ms",
+        label=f"Best fit Gaussian within $3\\sigma$ ({range_label} ms)",
+        color="#D55E00",
     )
     ax.legend()
 
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
-    out_path = model_dir / "disruption_time_diff.png"
+    out_path = model_dir / f"disruption_time_diff_{prediction_type}.png"
     fig.savefig(out_path, dpi=600)
     plt.close(fig)
     logger.info(f"Wrote {out_path}")
 
 
-def generate_scatter_plot(preds, true) -> None:
+def generate_scatter_plot(df: pd.DataFrame, prediction_type: str) -> None:
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.scatter(preds, true, alpha=0.85)
+    ax.scatter(df[prediction_type], df["true_time"], alpha=0.85)
 
     lo, hi = ax.get_xlim()
     ax.plot([lo, hi], [lo, hi], "r--", linewidth=1, label="y = x")
@@ -118,17 +135,28 @@ def generate_scatter_plot(preds, true) -> None:
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
 
-    out_path = model_dir / "predictions_scatter.png"
+    out_path = model_dir / f"predictions_scatter_{prediction_type}.png"
     fig.savefig(out_path, dpi=200)
     plt.close(fig)
-    print(f"Wrote {out_path}")
+    logger.info(f"Wrote {out_path}")
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Generate prediction plots")
+    parser.add_argument(
+        "--prediction-type",
+        type=str,
+        default=256,
+        help="Prediction type can be one of 'pred_root', 'pred_start', 'pred_end'",
+    )
+    args = parser.parse_args()
+    if args.prediction_type not in ["pred_root", "pred_start", "pred_end"]:
+        raise ValueError(
+            "Prediction type must be one of 'pred_root', 'pred_start', 'pred_end'"
+        )
     load_best_model_env()
 
     df = pd.read_csv(predictions_csv)
-    preds = df["pred_start"]
 
     shots_in_range = df[
         (df["true_time"] < df["pred_end"]) & (df["true_time"] > df["pred_start"])
@@ -137,9 +165,9 @@ def main() -> None:
         f"{len(shots_in_range)} / {len(df["true_time"])} shots in range ({len(shots_in_range) / len(df["true_time"])})."
     )
 
-    df["diff"] = preds - df["true_time"]
-    generate_scatter_plot(preds, df["true_time"])
-    generate_histogram(df)
+    df["diff"] = df[args.prediction_type] - df["true_time"]
+    generate_scatter_plot(df, args.prediction_type)
+    generate_histogram(df, args.prediction_type)
 
 
 if __name__ == "__main__":
