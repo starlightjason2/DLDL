@@ -84,7 +84,7 @@ class IpDataset(Dataset):
 
         self.data = torch.load(self.data_file, weights_only=True)
         self.labels = torch.load(self.labels_file, weights_only=True)
-        self.logger.info(f"Ready: {len(self.data)} shots")
+        self.logger.info(f"Ready: {len(self.data)} shots. ")
         self._ensure_shot_metadata()
 
     def _ensure_shot_metadata(self) -> None:
@@ -176,22 +176,6 @@ class IpDataset(Dataset):
         if save:
             torch.save(torch.tensor(labels), self.labels_file)
         return labels
-
-    def _get_normalization_loader(
-        self, data_dir_args: List[str], max_length_args: List[int]
-    ) -> Tuple[Callable[..., Tuple[int, NDArray[float32]]], Tuple[Any, ...]]:
-        return (
-            (
-                load_and_pad_norm,
-                (
-                    self.file_list,
-                    data_dir_args,
-                    max_length_args,
-                    [self.mean] * self.num_shots,
-                    [self.std] * self.num_shots,
-                ),
-            ),
-        )
 
     def _make_dataset(self, make_labels: bool = True) -> None:
         """Build preprocessed dataset from raw signal files."""

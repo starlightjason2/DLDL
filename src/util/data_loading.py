@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-
 # env helpers
 
 
@@ -54,24 +53,13 @@ def get_means(filename: str, data_dir: str) -> List[float]:
     return [float(np.mean(data)), float(np.mean(data**2))]
 
 
-def _load_and_pad_base(
-    filename: str, data_dir: str, max_length: int, data: NDArray
+def load_and_pad_norm(
+    filename: str, data_dir: str, max_length: int, mean, std
 ) -> Tuple[int, NDArray[np.float32]]:
-    """Base function for loading and padding."""
+    data = _read_signal_file(os.path.join(data_dir, filename), col=1)
+    data = (data - mean) / std if std > 0 else np.zeros_like(data)
+
     shot_no = int(filename[:-4])
     padded = np.zeros(max_length, dtype=np.float32)
     padded[: min(len(data), max_length)] = data[: min(len(data), max_length)]
     return shot_no, padded
-
-
-def load_and_pad_norm(
-    filename: str,
-    data_dir: str,
-    max_length: int,
-    mean,
-    std
-) -> Tuple[int, NDArray[np.float32]]:
-    data = _read_signal_file(os.path.join(data_dir, filename), col=1)
-    data = (data - mean) / std if std > 0 else np.zeros_like(data)
-    return _load_and_pad_base(filename, data_dir, max_length, data)
-

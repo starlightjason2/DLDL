@@ -52,13 +52,108 @@
 
 
 % ==================================================================
-\section{Methods}
+\section{Neural Net Classifier}
 \label{sec:methods}
 
 
-Current vs. time data from DIII-D was availabile to us in the form of timestamped `.txt` files. We normalized every shot using the maximum current and shot length throughout the entire dataset, adding trailing zeroes to each shot to match the shape of the largest current series. Our classifier consisted of four convolutional layers, max pooling layers, Batch Normalization layers, and used a sigmoid activation function. See ~\ref{fig:model_diagram}.
+We were provided 39438 labeled shot files from the DIII-D team, of which 13429 were disruptive shots and labeled with time of disruption. Each file represented one shot and sampled reactor current at $\qty{40}{\kilo\hertz}$, giving us a discrete current vector $\mathbf{I}$ where the $m$th component is current at the $m$th timestep. 
+
+\begin{equation}
+  \label{current_tensor}
+  \mathbf{I}=\begin{bmatrix} I_1 & \dots & I_m \end{bmatrix}
+\end{equation}
+
+We used an 80/10/10 train/test/dev split, which left us with 31542 trainable shots. To prepare the data for a neural net classifier, we tested three different nornmalization methods, including per-shot min-max unit scale normalization,  per-shot Mean-Variance (meanvar) normalization, and dataset-wide meanvar normalization. We found most success with the dataset-wide meanvar approach. Letting the current mean and standard deviation across all shots be $\mu$ and $\sigma$, we computed a nornmalized shot tensor $I_\mathrm{N}$. 
+
+\begin{equation}
+  \label{current_norm}
+\mathbf{I}_{\mathrm{N}} =
+\begin{cases}
+\frac{1}{\sigma}(\mathbf{I} - \mu) & \sigma > 0 \\[0.5em]
+  0 & \sigma \leq 0  
+\end{cases}  
+\end{equation}
+
+The normalized data was then fed into a Convolutional Neural Network classifier (see ~\ref{fig:model_diagram}) consisting of four convolutional layers, each with a batch normalization layer and a Rectified Linear Unit (ReLU) activation function, and a final max pooling layer. The convolutional layer outputs were then fed into two fully connected layers, with batch normalization, ReLU, and a dropout layer to prevent overfitting, exposing a dropout rate \verb|dropout| hyperparameter. 
+
+The CNN was trained using the Adam (Adaptive Moment Estimation) optimizer with weight decay and learning rate hyperparameters. Learning rate was tuned per-epoch with PyTorch's \verb|lr_scheduler.ReduceLROnPlateau| in "min" mode, further exposing hyperparameters learning rate factor and learning rate patience. We utilized PyTorch's `torch.nn.BCEWithLogitsLoss` with a tunable classification positive weight and gradient clipping. The final hyperparameters were number of training epochs, batch size, and early stopping patience.
+
+We tuned our hyperparameters using Bayesian Optimization with the \verb|ExpectedImprovement| acquisition function with $\xi=0.05$, and we additionally inerted random hyperparameter samples every 5 trials to escape local minima. We used a weighted Fbeta=1.5 scoring strategy with a minimum precision floor of 90\% and trained for 100+ trials on the Polaris supercomputer in Argonne National Lab. Our final hyperparameters are presented in ~\ref{tab:hyperparams}. 
+          
+\begin{table}[h]
+    \centering
+    \caption{Tuned Hyperparameters}
+    \label{tab:hyperparams}
+    \begin{tabular}{|l|r|}
+        \hline
+        \textbf{Hyperparameter} & \textbf{Value} \\
+        \hline
+          Learning Rate & 0.0005  \\
+        \hline
+          Number of Epochs & 200  \\
+        \hline
+          Dropout Rate & 0.35  \\
+        \hline
+          Weight Decay & 0.0001  \\
+        \hline
+          Training Batch Size & 128  \\
+        \hline
+          Gradient Clip & 1.0  \\
+        \hline
+          Learning Rate Scheduler Factor  &  0.5 \\
+        \hline
+          Learning Rate Patience  & 5  \\
+        \hline
+          Early Stopping Patience & 10  \\
+        \hline
+          Positive Weight  & 3.0  \\
+        \hline
+    \end{tabular}
+\end{table}
+
+The final performance metrics of the CNN classifier were an accuracy of a precision of 90.52\% and recall of 98.84\%, along with an F1 score of $0.9450$ and F2 score of $0.9706$.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=1\columnwidth]{best_model/roc_curve.png}
+  \caption{Figure caption.}
+  \label{fig:roc}
+\end{figure}
+
+\section{Convolutional Heuristic for Time of Disruption}
+
+Given a noisy current $I(t)$ where $0<t<T$, we first calculate a smoothed current by applying a moving average with a window size $K=T / S$, where $S=300$ is an experimentally determined smoothing parameter.
+
+\begin{equation}
+  \label{current_smooth}
+  I_\mathrm{smooth}(t) = \frac{1}{K} \int_{t-K}^{t}I(\tau)\,d\tau
+\end{equation}
+
+Note that if $\max{(I)}\approx0$, we consider the shot a negative polarity shot and flip the current.
+
+\begin{equation}
+  I_\mathrm{raw}(t) = \begin{cases}
+    -I(t) & \max(I)\approx0 \\
+    I(t) & \text{otherwise}
+  \end{cases}
+\end{equation}
+
+We then define the time of disruption heuristic $f(t)$ as the difference between the raw $I(t)$ and smooth current ~\eqref{current_smooth}. To find the start of a disruption, we search for the global maximum of $f(t)$, and then search for the following local minima to identify the disruption end.
+
+We test this heuristic against the test holdout set, consisting of 889 total disruptive shots. 
 
 
+\begin{equation}
+  \label{filter}
+  f(t)=I_\mathrm{raw}(t) - I_\mathrm{smooth}(t)
+\end{equation}
+
+
+
+Computationally, the moving average is applied as a discrete convolution on the current tensor ~\eqref{current_tensor}, where the $i$th component of the smooth current is $\frac{1}{K} \sum_{k=1}^{K} I_{i-k}$. 
+
+
+\subsection{Subtleties}
 
 
 
@@ -69,7 +164,6 @@ Current vs. time data from DIII-D was availabile to us in the form of timestampe
   \label{fig:model_diagram}
 \end{figure}
 
-$$y[n]=\sum_{k=0}^{K}{x[k]h[n-k]}$$
 
 % ==================================================================
 \section{Results}
@@ -79,24 +173,16 @@ Report quantitative and qualitative findings. Reference figures and tables as ne
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=1\columnwidth]{best_model/predictions_scatter.png}
+  \includegraphics[width=1\columnwidth]{best_model/predictions_scatter_pred_root.png}
   \caption{Figure caption.}
   \label{fig:predictions_scatter}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=1\columnwidth]{best_model/disruption_time_diff.png}
+  \includegraphics[width=1\columnwidth]{best_model/disruption_time_diff_pred_root.png}
   \caption{Figure caption.}
   \label{fig:disruption_time_diff}
-\end{figure}
-
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=1\columnwidth]{best_model/roc_curve.png}
-  \caption{Figure caption.}
-  \label{fig:roc}
 \end{figure}
 
 % ==================================================================
@@ -105,14 +191,12 @@ Report quantitative and qualitative findings. Reference figures and tables as ne
 
 Summarize findings and outline future work.
 
-% ------------------------------------------------------------------
-% Optional back matter (uncomment as needed)
-% ------------------------------------------------------------------
-% \section*{Acknowledgments}
-% Funding and thanks.
 
-% \section*{Data and code availability}
-% Where artifacts are hosted.
+\section*{Acknowledgments}
+Funding and thanks.
+
+\section*{Data and code availability}
+Where artifacts are hosted.
 
 % ------------------------------------------------------------------
 \bibliographystyle{unsrtnat}

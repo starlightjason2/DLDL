@@ -42,16 +42,6 @@ logger.add(
 # gridlines, and vector-friendly output. Individual scripts can still override
 # any of these per-figure.
 # ----------------------------------------------------------------------------
-_PALETTE = [
-    "#0072B2",  # blue
-    "#D55E00",  # vermillion
-    "#009E73",  # green
-    "#CC79A7",  # reddish purple
-    "#E69F00",  # orange
-    "#56B4E9",  # sky blue
-    "#F0E442",  # yellow
-    "#000000",  # black
-]
 
 mpl.rcParams.update(
     {
@@ -66,8 +56,6 @@ mpl.rcParams.update(
         "ytick.labelsize": 10,
         "legend.fontsize": 10,
         "figure.titlesize": 13,
-        # Color: colorblind-safe (Okabe-Ito) cycle.
-        "axes.prop_cycle": mpl.cycler(color=_PALETTE),
         # Axes / spines: drop the top and right box for a cleaner look.
         "axes.spines.top": False,
         "axes.spines.right": False,
